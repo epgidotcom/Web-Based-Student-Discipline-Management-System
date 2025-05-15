@@ -124,18 +124,13 @@
     </div>
   </div>
   <script>
-    document.querySelector('#loginForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const form = e.target;
-      const data = new FormData(form);
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        body: data
-      });
-      if (res.ok) {
-        window.location.href = 'Dashboard.html';
-      } else {
-        alert('Login failed!');
+   <script>
+  document.querySelector('#loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    // Temporary redirection for testing
+    window.location.href = 'Dashboard.html';
+  });
+</script>
       }
     });
   </script>
