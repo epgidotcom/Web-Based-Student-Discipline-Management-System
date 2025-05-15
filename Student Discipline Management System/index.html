@@ -13,7 +13,7 @@
     }
     body {
       font-family: 'Poppins', sans-serif;
-      background: url(https://th.bing.com/th/id/OIP.wim07yEmJFPkn69G2YXEuAHaFl?cb=iwc2&rs=1&pid=ImgDetMain);
+      background: url('/background-image.jpg'); /* Replace with a relative path */
       background-size: cover;
       background-repeat: no-repeat;
       background-position: center;
@@ -133,7 +133,7 @@
         body: data
       });
       if (res.ok) {
-        window.location.href = 'Dashboard.html';
+        window.location.href = '/dashboard.html'; // Updated path
       } else {
         alert('Login failed!');
       }
