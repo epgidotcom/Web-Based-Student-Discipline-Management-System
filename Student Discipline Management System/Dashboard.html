@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Management Dashboard</title>
+  <style>
+    /* Importing the Poppins font from Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar styling */
+    .sidebar {
+      width: 220px;
+      background-color: #004385;
+      color: #fff;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .logo {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 30px;
+    }
+
+    .menu {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .menu li {
+      padding: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+    }
+
+    .menu li:hover {
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+    .sidebar-bottom ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .sidebar-bottom li {
+      padding: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+    }
+
+    .sidebar-bottom li:hover {
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Main content styling */
+    .main-content {
+      flex: 1;
+      background-color: #f4f4f4;
+      padding: 40px;
+    }
+
+    .header {
+      margin-bottom: 20px;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .cards {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      flex: 1;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      text-align: center;
+      color: #fff;
+    }
+
+    .card h3 {
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .card p {
+      font-size: 1.5rem;
+      font-weight: 300;
+    }
+
+    /* Colored cards */
+    .card.year {
+      background-color: #28a745; /* Green for Year */
+    }
+
+    .card.total-student {
+      background-color: #8bc34a; /* Light green for Total Student */
+    }
+
+    .card.total-violation {
+      background-color: #ff9800; /* Orange for Total Violation */
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <!-- Logo section -->
+      <div class="logo">Logo</div>
+      <!-- Main Menu Options -->
+      <ul class="menu">
+        <li>Dashboard</li>
+        <li>Student List</li>
+        <li>Violation List</li>
+        <li>Records</li>
+      </ul>
+    </div>
+    <div class="sidebar-bottom">
+      <!-- Secondary Options at the bottom -->
+      <ul class="secondary-menu">
+        <li>Account Settings</li>
+        <li><a href="Login page.html" style="color:inherit;text-decoration:none;display:block;width:100%;">Log out</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="main-content">
+    <div class="header">Dashboard</div>
+    <div class="cards">
+      <div class="card year">
+        <h3>Year</h3>
+        <p>2025-2026</p>
+      </div>
+      <div class="card total-student">
+        <h3>Total Student</h3>
+        <p>0</p>
+      </div>
+      <div class="card total-violation">
+        <h3>Total Violation</h3>
+        <p>0</p>
+      </div>
+    </div>
+    
