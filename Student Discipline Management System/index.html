@@ -107,7 +107,8 @@
   <div class="login-container">
     <div class="login-card">
       <h2>Login</h2>
-      <form id="loginForm" action="/Dashboard.html" method="post">
+      <!-- Updated form to directly redirect to Dashboard -->
+      <form id="loginForm" action="/Dashboard.html" method="get">
         <div class="input-group">
           <label for="idNumber">ID Number</label>
           <input type="number" id="idNumber" name="idNumber" placeholder="Enter your ID number" required />
@@ -123,17 +124,5 @@
       </form>
     </div>
   </div>
-  <script>
-   <script>
-  document.querySelector('#loginForm').addEventListener('submit', async function (e) {
-  e.preventDefault();
-  // Redirect to the correct deployed path
-  window.location.href = '/Student%20Discipline%20Management%20System/Dashboard.html';
-});
-  });
-</script>
-      }
-    });
-  </script>
 </body>
 </html>
