@@ -21,51 +21,97 @@
     }
 
     /* Sidebar styling */
-    .sidebar {
-      width: 220px;
-      background-color: #004385;
-      color: #fff;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .logo {
-      text-align: center;
-      font-size: 1.8rem;
-      font-weight: 600;
-      margin-bottom: 30px;
-    }
-
-    .menu {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .menu li {
-      padding: 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      cursor: pointer;
-    }
-
-    .menu li:hover {
-      background-color: rgba(0, 0, 0, 0.1);
-    }
-    .sidebar-bottom ul {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .sidebar-bottom li {
-      padding: 15px;
-      border-top: 1px solid rgba(255, 255, 255, 0.2);
-      cursor: pointer;
-    }
-
-    .sidebar-bottom li:hover {
-      background-color: rgba(0, 0, 0, 0.1);
-    }
+  .sidebar {
+    width: 250px;
+    background: #173a6e;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 0 20px 0;
+    min-height: 100vh;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.07);
+  }
+  .sidebar .logo-img {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    border: 3px solid #fff;
+    object-fit: cover;
+    background: #fff;
+  }
+  .sidebar .username {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 30px;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+  .sidebar .profile-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 10px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 25px 0 10px 0;
+    font-size: 3rem;
+    color: #173a6e;
+  }
+  .sidebar .role {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 40px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  .sidebar .sidebar-menu {
+    width: 100%;
+    list-style: none;
+    padding: 0;
+    margin-bottom: auto;
+  }
+  .sidebar .sidebar-menu li {
+    padding: 15px 30px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 1rem;
+    border-left: 4px solid transparent;
+  }
+  .sidebar .sidebar-menu li.active,
+  .sidebar .sidebar-menu li:hover {
+    background: #204d8c;
+    border-left: 4px solid #fff;
+  }
+  .sidebar .sidebar-bottom {
+    width: 100%;
+    margin-top: 30px;
+  }
+  .sidebar .sidebar-bottom ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .sidebar .sidebar-bottom li {
+    padding: 12px 30px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: #fff;
+    transition: background 0.2s;
+  }
+  .sidebar .sidebar-bottom li:hover {
+    background: #204d8c;
+  }
+  .sidebar .sidebar-bottom a {
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    display: block;
+  }
+  /* ...keep your main-content and card styles as is... */
 
     /* Main content styling */
     .main-content {
@@ -123,24 +169,19 @@
 </head>
 <body>
   <div class="sidebar">
-    <div class="sidebar-top">
-      <!-- Logo section -->
-      <div class="logo">
-         <img src="https://th.bing.com/th/id/ODL.022b7881a6fbea61f0b96cb7dc75d61b?w=80&h=80&c=12&rs=1&qlt=90&o=6&dpr=1.3&pid=algoBlockDebug" alt="Logo" style="max-width: 100%; height: auto;" />
-      </div>
-      <!-- Main Menu Options -->
-      <ul class="menu">
-        <li>Dashboard</li>
-        <li>Student List</li>
-        <li>Violation List</li>
-        <li>Records</li>
-      </ul>
-    </div>
+    <img class="logo-img" src="https://th.bing.com/th/id/ODL.022b7881a6fbea61f0b96cb7dc75d61b?w=80&h=80&c=12&rs=1&qlt=90&o=6&dpr=1.3&pid=algoBlockDebug" alt="School Logo" />
+    <div class="profile-img">👤</div>
+    <div class="role">TEACHER</div>
+    <ul class="sidebar-menu">
+      <li class="active" onclick="location.href='Dashboard.html'">Dashboard</li>
+      <li onclick="location.href='#'">Student List</li>
+      <li onclick="location.href='Violation.html'">Violation List</li>
+      <li onclick="location.href='#'">Records</li>
+    </ul>
     <div class="sidebar-bottom">
-      <!-- Secondary Options at the bottom -->
-      <ul class="secondary-menu">
-        <li>Account Settings</li>
-        <li><a href="index.html" style="color:inherit;text-decoration:none;display:block;width:100%;">Log out</a></li>
+      <ul>
+        <li>⚙️ Account Settings</li>
+        <li><a href="index.html">🚪 Log out</a></li>
       </ul>
     </div>
   </div>
@@ -160,4 +201,7 @@
         <p>0</p>
       </div>
     </div>
+  </div>
+</body>
+</html>
     
