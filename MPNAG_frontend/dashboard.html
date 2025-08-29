@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SDMS - Dashboard</title>
+
+  <!-- Global + Page Specific CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+
+  <a href="dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
+</div>
+
+<div class="main">
+
+  <div class="topbar">
+    <h1>Student Discipline Management System</h1>
+    <button id="logoutBtn" class="logout-btn">
+      <i class="fa fa-sign-out-alt"></i> Logout
+    </button>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Students</h3>
+      <p id="totalStudents">0 Registered</p>
+    </div>
+    <div class="card">
+      <h3>Violations</h3>
+      <p id="totalViolations">0 Recorded</p>
+    </div>
+  </div>
+
+  <!-- 📊 Analytics Graph -->
+  <div class="analytics-widget">
+    <h2>Analytics Overview</h2>
+    <canvas id="analyticsChart" height="100"></canvas>
+  </div>
+
+  <div class="calendar-widget">
+    <h2>Calendar</h2>
+    <iframe
+      src="https://calendar.google.com/calendar/embed?src=en.philippines%23holiday%40group.v.calendar.google.com&ctz=Asia%2FManila"
+      style="border: 0" width="100%" height="400" frameborder="0" scrolling="no">
+    </iframe>
+  </div>
+
+  <div class="widgets">
+    <div class="widget">
+      <h3>Student List</h3>
+      <table id="studentTable">
+        <tr>
+          <th>Name</th>
+          <th>Grade</th>
+          <th>Section</th>
+        </tr>
+      </table>
+    </div>
+
+    <div class="widget">
+      <h3>Violation List</h3>
+      <table id="violationTable">
+        <tr>
+          <th>Student</th>
+          <th>Violation</th>
+          <th>Date</th>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Global + Page Scripts -->
+<script src="js/main.js" defer></script>
+<script src="js/dashboard.js" defer></script>
+</body>
+</html>

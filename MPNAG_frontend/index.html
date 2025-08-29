@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MPNAG - Student Discipline Management System</title>
+
+  <!-- Global and Page-Specific CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/login.css">
+
+  <!-- Font  -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+  <div class="login-container">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo" />
+    <h2>MPNAG - Student Discipline Management System</h2>
+
+    <!-- Error Message Placeholder -->
+    <p class="error-message" id="errorMessage"></p>
+
+    <form id="loginForm">
+      <div class="input-group">
+        <i class="fa fa-user icon"></i>
+        <input
+          type="text"
+          id="username"
+          placeholder="Username or Email"
+          required
+        />
+      </div>
+      <div class="input-group">
+        <i class="fa fa-lock icon"></i>
+        <input
+          type="password"
+          id="password"
+          placeholder="Password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn-login">
+        Login Now <i class="fa fa-sign-in-alt"></i>
+      </button>
+      <a href="#" class="forgot-password">Forgot Your Password?</a>
+    </form>
+  </div>
+
+  <!-- Global + Page-Specific JS -->
+  <script src="js/main.js" defer></script>
+  <script src="js/login.js" defer></script>
+</body>
+</html>
