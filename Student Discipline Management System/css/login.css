@@ -6,7 +6,7 @@ body {
   height: 100vh;
 
   /* Background school image */
-  background: url("mpnag_bg.jpg") no-repeat center center fixed;
+  background: url("../images/mpnag_bg.jpg") no-repeat center center fixed;
   background-size: cover;
   font-family: Arial, sans-serif;
 }
@@ -97,4 +97,5 @@ h2 {
   font-size: 13px;
   margin-bottom: 15px;
 }
+
 
