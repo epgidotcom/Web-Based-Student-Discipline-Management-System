@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SDMS - Dashboard</title>
+
+  <!-- Global + Page Specific CSS -->
+  <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/style.css">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+
+  <a href="dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+</div>
+
+<div class="main">
+
+  <div class="topbar">
+    <h1>Student Discipline Management System</h1>
+
+    <button id="logoutBtn" class="logout-btn">
+      <i class="fa fa-sign-out-alt"></i> Logout
+    </button>
+  </div>
+
+  <!-- ===== KPIs ===== -->
+     <!-- SAMPLE DATA LANG TO, NEED ACTUAL DATA -->
+
+  <div class="kpi-grid">
+    <div class="kpi card" id="kpiTotalStudents">
+      <div class="kpi-icon"><i class="fa fa-users"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Students</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">Registered</div>
+      </div>
+    </div>
+
+    <div class="kpi card" id="kpiViolations30">
+      <div class="kpi-icon warn"><i class="fa fa-exclamation-triangle"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Violations</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">Last 30 days</div>
+      </div>
+    </div>
+
+    <div class="kpi card" id="kpiOpenCases">
+      <div class="kpi-icon info"><i class="fa fa-clipboard-list"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Open Cases</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">Needing follow-up</div>
+      </div>
+    </div>
+
+    <div class="kpi card" id="kpiRepeatOffenders">
+      <div class="kpi-icon danger"><i class="fa fa-user-times"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Repeat Offenders</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">≥ 3 violations (90d)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Filters ===== -->
+  <div class="filters card">
+    <div class="filters-row">
+      <div class="field">
+        <label for="dateFrom">From</label>
+        <input type="date" id="dateFrom" />
+      </div>
+      <div class="field">
+        <label for="dateTo">To</label>
+        <input type="date" id="dateTo" />
+      </div>
+      <div class="field">
+        <label for="filterGrade">Grade</label>
+        <select id="filterGrade">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filterSection">Section</label>
+        <select id="filterSection">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filterType">Violation</label>
+        <select id="filterType">
+          <option value="">All</option>
+        </select>
+      </div>
+
+      <div class="buttons">
+        <button id="btnQuick7" class="btn subtle">Last 7d</button>
+        <button id="btnQuick30" class="btn subtle">Last 30d</button>
+        <button id="btnReset" class="btn outline">Reset</button>
+        <button id="btnApply" class="btn primary"><i class="fa fa-filter"></i> Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Charts ===== -->
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-header">
+        <h3>Violations Over Time</h3>
+        <span class="hint" id="rangeHint"></span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartTrend"></canvas>
+      </div>
+      <div class="empty hidden" id="emptyTrend">No violations in the selected range.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Top Violation Types</h3>
+        <span class="hint" id="typesHint"></span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartTopTypes"></canvas>
+      </div>
+      <div class="empty hidden" id="emptyTypes">No data to show.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Violations by Grade</h3>
+        <span class="hint">Current filters</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartByGrade"></canvas>
+      </div>
+      <div class="empty hidden" id="emptyByGrade">No data to show.</div>
+    </div>
+  </div>
+
+  <!-- ===== Calendar (kept) ===== -->
+  <div class="calendar-widget">
+    <h2>Calendar</h2>
+    <iframe
+      src="https://calendar.google.com/calendar/embed?src=en.philippines%23holiday%40group.v.calendar.google.com&ctz=Asia%2FManila"
+      style="border: 0" width="100%" height="400" frameborder="0" scrolling="no">
+    </iframe>
+  </div>
+
+<!-- Global + Page Scripts -->
+<script src="js/app.js" defer></script>
+<script src="js/dashboard.js" defer></script>
+</body>
+</html>
