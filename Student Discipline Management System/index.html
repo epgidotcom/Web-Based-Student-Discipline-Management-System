@@ -21,7 +21,7 @@
     <!-- Error Message Placeholder -->
     <p class="error-message" id="errorMessage"></p>
 
-    <form id="loginForm">
+    <form id="loginForm" novalidate>
       <div class="input-group">
         <i class="fa fa-user icon"></i>
         <input
@@ -29,6 +29,7 @@
           id="username"
           placeholder="Username or Email"
           required
+          autocomplete="username"
         />
       </div>
       <div class="input-group">
@@ -38,13 +39,56 @@
           id="password"
           placeholder="Password"
           required
+          autocomplete="current-password"
         />
       </div>
-      <button type="submit" class="btn-login">
+
+      <!-- Hidden token set when verified -->
+      <input type="hidden" id="captchaToken" value="">
+
+      <button type="submit" class="btn-login" id="loginBtn">
         Login Now <i class="fa fa-sign-in-alt"></i>
       </button>
       <a href="#" class="forgot-password">Forgot Your Password?</a>
     </form>
+  </div>
+
+  <!-- CAPTCHA MODAL -->
+  <div class="modal" id="captchaModal" aria-hidden="true" role="dialog" aria-labelledby="captchaTitle" aria-modal="true">
+    <div class="modal__backdrop" data-close-modal></div>
+    <div class="modal__dialog" role="document">
+      <button class="modal__close" id="captchaClose" aria-label="Close dialog">
+        <i class="fa fa-times"></i>
+      </button>
+
+      <div class="modal__header">
+        <h3 id="captchaTitle"><i class="fa fa-shield-halved"></i> Verify You’re Human</h3>
+        <p class="modal__subtitle">Slide the handle all the way to the right.</p>
+      </div>
+
+      <div class="captcha captcha--in-modal" id="captcha">
+        <div
+          class="captcha__track"
+          id="captchaTrack"
+          role="slider"
+          aria-label="Slide to verify"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          tabindex="0"
+        >
+          <div class="captcha__progress" id="captchaProgress"></div>
+          <div class="captcha__knob" id="captchaKnob">
+            <i class="fa fa-angle-right"></i>
+          </div>
+        </div>
+        <p class="captcha__hint" id="captchaHint">Drag the handle all the way to the right.</p>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn-secondary" id="captchaCancel" type="button">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <!-- Global + Page-Specific JS -->

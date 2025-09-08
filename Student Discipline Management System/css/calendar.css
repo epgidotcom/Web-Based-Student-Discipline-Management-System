@@ -241,68 +241,31 @@ table th {
 }
 
 
-
-/* ===== TEMPORARY LANG Mobile-friendly layout ===== */
-@media (max-width: 768px) {
-  /* Sidebar turns into a top navigation */
-  .sidebar {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 60px;
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-around;
-    align-items: center;
-    padding: 0 10px;
-    z-index: 1000;
-  }
-
-  .sidebar img {
-    display: none; /* hide logo on small screens */
-  }
-
-  .sidebar a {
-    padding: 10px;
-    font-size: 14px;
-    gap: 6px;
-  }
-
-  /* Push main content below sidebar */
-  .main {
-    margin-top: 70px;
-    padding: 15px;
-  }
-
-  /* Topbar title smaller */
-  .topbar h1 {
-    font-size: 16px;
-  }
-
-  /* Cards and charts single column */
-  .kpi-grid, .charts-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Filters stack nicely */
-  .filters-row {
-    grid-template-columns: 1fr;
-  }
-  .buttons {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .buttons .btn {
-    flex: 1 0 45%;
-    margin-top: 5px;
-  }
+/* Prevent modal form controls from overflowing */
+.modal-content,
+.modal-content * {
+  box-sizing: border-box;
 }
 
-@media (max-width: 480px) {
-  .topbar h1 {
-    font-size: 14px;
-  }
-  .logout-btn {
-    padding: 6px 10px;
-    font-size: 12px;
-  }
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+}
+
+/* Let the two columns shrink inside the grid */
+.row-2 > div {
+  min-width: 0;           /* critical for inputs not to overflow in CSS grid */
+}
+
+/* Some browsers make datetime-local wider than its container */
+input[type="datetime-local"] {
+  min-width: 0;
+}
+
+/* If you still see a tiny horizontal scroll, keep it hidden */
+.modal-content {
+  overflow-x: hidden;
 }

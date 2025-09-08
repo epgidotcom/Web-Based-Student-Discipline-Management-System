@@ -209,4 +209,27 @@ select option {
 }
 
 
+/* Evidence uploader */
+.evidence-uploader { margin: 6px 0 14px; }
+.evidence-uploader .head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.evidence-uploader .drop {
+  border: 2px dashed #d1d5db; border-radius: 10px; padding: 14px; text-align: center;
+  background: #fafafa; transition: background .2s, border-color .2s;
+}
+.evidence-uploader .drop.dragover { background: #f3f4f6; border-color: #3498db; }
+.evidence-uploader .drop p { margin: 6px 0 10px; color:#6b7280; font-size:13px; }
+
+.evidence-actions { display:flex; gap:8px; margin-top:10px; justify-content:center; }
+.evidence-actions .btn { padding:8px 10px; border-radius:6px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
+.evidence-actions .btn:hover { background:#f3f4f6; }
+.evidence-actions .btn.danger { background:#e74c3c; color:#fff; border-color:transparent; }
+
+.evidence-preview { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; justify-content:center; }
+.evidence-thumb {
+  width:84px; height:84px; border-radius:8px; object-fit:cover; border:1px solid #e5e7eb; background:#eef2f7;
+  cursor: pointer;
+}
+
+.has-attachment i { color:#2563eb; } /* icon highlight when a row has evidence */
+.is-hidden { display:none !important; }
 
