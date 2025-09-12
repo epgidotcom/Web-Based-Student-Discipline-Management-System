@@ -1,0 +1,277 @@
+.search-container {
+  margin-bottom: 25px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.search-container input[type="text"] {
+  padding: 8px;
+  width: 250px;
+  border: 1px solid #ccc;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.search-container button {
+  padding: 8px 15px;
+  border: none;
+  background-color: #3498db;
+  color: white;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+}
+
+.search-container button:hover {
+  background-color: #2980b9;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+table th, table td {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+}
+
+table th {
+  background-color: #f2f2f2;
+}
+
+table tr[data-student] {
+  cursor: pointer; /* so users know rows are clickable */
+}
+
+table tr:hover {
+  background-color: #f9f9f9;
+}
+
+/* Buttons for Add/Edit/Delete */
+.action-btn {
+  padding: 5px 10px;
+  font-size: 13px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.action-btn.edit-btn {
+  background-color: #f39c12;
+  color: white;
+}
+
+.action-btn.edit-btn:hover {
+  background-color: #e67e22;
+}
+
+.action-btn.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.action-btn.delete-btn:hover {
+  background-color: #c0392b;
+}
+
+.add-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+}
+
+.add-btn:hover {
+    background-color: #218838;
+}
+
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;                     
+  z-index: 1000;
+  display: none;                
+  align-items: center;
+  justify-content: center;
+  padding: 24px;                 
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(2px);
+}
+
+.modal.is-open {
+  display: flex;
+}
+
+.modal-content {
+  background: #fff;
+  color: #222;
+  width: 100%;
+  max-width: 640px;              
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.35);
+  overflow: hidden;              
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;              
+}
+
+.modal-content > * {
+  padding: 16px 18px;
+}
+
+.modal-content .modal-body {
+  overflow: auto;
+}
+
+.modal-content form {
+  overflow: auto;
+  padding: 16px 18px;
+}
+
+/* Optional sticky footer */
+.modal-content .modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 1px solid #eee;
+  padding: 12px 18px;
+}
+
+/* Title */
+.modal h2 {
+  margin: 0;
+  font-size: 18px;
+  padding: 16px 18px 8px;
+}
+
+
+/* Inputs inside modal */
+.modal form input,
+.modal form select,
+.modal form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+.modal form input[type="date"] {
+  line-height: normal;
+  padding-right: 36px;
+}
+
+/* Buttons */
+.modal form button,
+.modal .btn {
+  background-color: #3498db;
+  color: #fff;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.modal form button:hover,
+.modal .btn:hover { background-color: #2980b9; }
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.modal .close-btn {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  padding: 2px 10px;
+  transition: color 0.3s ease;
+}
+
+.modal .close-btn:hover {
+  color: #e74c3c;
+}
+
+
+@media (max-width: 540px) {
+  .modal { padding: 10px; }
+  .modal-content { max-width: 100%; border-radius: 8px; }
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 560px) {
+  .form-row { grid-template-columns: 1fr 1fr; }
+}
+
+
+/* ===== Avatars ===== */
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  object-fit: cover; background: #eef2f7; display: inline-block;
+  border: 1px solid #e5e7eb;
+}
+.avatar--lg {
+  width: 96px; height: 96px; border-radius: 50%;
+  object-fit: cover; border: 1px solid #e5e7eb; background: #eef2f7;
+}
+.avatar--fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  font-weight: 700; color: #1f2937; background: #e6f0ff; border: 1px solid #d7e6ff;
+}
+.name-cell {
+  display: flex; align-items: center; gap: 10px;
+}
+.student-name { font-weight: 600; }
+
+/* ===== Photo uploader (in modal) ===== */
+.photo-uploader { margin: 6px 0 14px; }
+.photo-uploader .head {
+  display:flex; align-items:center; gap:14px; margin-bottom:10px;
+}
+.photo-uploader .drop {
+  border: 2px dashed #d1d5db; border-radius: 10px; padding: 14px; text-align: center;
+  background: #fafafa; transition: background .2s, border-color .2s;
+}
+.photo-uploader .drop.dragover { background: #f3f4f6; border-color: #3498db; }
+.photo-uploader .drop p { margin: 6px 0 10px; color: #6b7280; font-size: 13px; }
+.photo-actions { display: flex; gap: 8px; margin-top: 10px; }
+.photo-actions .btn { padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; }
+.photo-actions .btn:hover { background: #f3f4f6; }
+.photo-actions .btn.danger { background: #e74c3c; color:#fff; border-color: transparent; }
+.is-hidden { display: none !important; }
+
+
+
+
+

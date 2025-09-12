@@ -1,0 +1,46 @@
+.widget form {
+  max-width: 600px;
+  margin-top: 20px;
+}
+
+.widget form label {
+  display: block;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  color: #333;
+}
+
+.widget form input[type="text"],
+.widget form input[type="email"],
+.widget form input[type="password"],
+.widget form select {
+  width: 100%;
+  padding: 10px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.widget form input:focus,
+.widget form select:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 6px rgba(52, 152, 219, 0.3);
+}
+
+.widget form button.add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 16px;
+  padding: 10px 16px;
+}
+
+/* Show/hide group */
+#gradeGroup {
+  transition: all 0.3s ease-in-out;
+}

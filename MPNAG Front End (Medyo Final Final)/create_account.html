@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDMS - Create Account</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/create_account.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="create_account.html" class="active"><i class="fa fa-user-plus"></i> Create Account</a>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <h1>Student Discipline Management System</h1>
+    <button id="logoutBtn" class="logout-btn">
+      <i class="fa fa-sign-out-alt"></i> Logout
+    </button>
+  </div>
+
+  <div class="widget">
+    <h3>Create Account</h3>
+
+    <form id="accountForm">
+
+      <label for="fullName">Full Name:</label>
+      <input type="text" id="fullName" required>
+
+      <label for="email">Email:</label>
+      <input type="email" id="email" required>
+
+      <label for="username">Username:</label>
+      <input type="text" id="username" required>
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" required minlength="6">
+
+      <label for="confirmPassword">Confirm Password:</label>
+      <input type="password" id="confirmPassword" required>
+
+      <label for="role">Role:</label>
+      <select id="role" required>
+        <option value="">-- Select Role --</option>
+        <option value="Student">Student</option>
+        <option value="Teacher">Teacher</option>
+      </select>
+
+      <div id="gradeGroup" style="display: none;">
+        <label for="grade">Grade:</label>
+        <select id="grade">
+          <option value="">-- Select Grade --</option>
+          <option value="7">Grade 7</option>
+          <option value="8">Grade 8</option>
+          <option value="9">Grade 9</option>
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
+        </select>
+      </div>
+
+      <button type="submit" class="add-btn" style="margin-top: 12px;">
+        <i class="fa fa-user-plus"></i> Create Account
+      </button>
+    </form>
+  </div>
+</div>
+
+
+<script src="js/create_account.js" defer></script>
+</body>
+</html>
+
