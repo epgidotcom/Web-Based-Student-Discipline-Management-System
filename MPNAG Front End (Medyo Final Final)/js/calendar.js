@@ -9,6 +9,7 @@ const saveEvents = (arr) => localStorage.setItem(STORAGE_KEY, JSON.stringify(arr
 const addBtn = document.getElementById('addEventBtn');
 const viewPicker = document.getElementById('viewPicker');
 const typeFilter = document.getElementById('typeFilter');
+const yearPicker = document.getElementById('yearPicker'); // ✅ Added Year Picker
 const logoutBtn = document.getElementById('logoutBtn');
 
 const modal = document.getElementById('eventModal');
@@ -86,11 +87,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   calendar.render();
 
+  // ✅ Populate year picker (range: current year ±10)
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === currentYear) opt.selected = true;
+    yearPicker.appendChild(opt);
+  }
+
+  // ✅ On year change, keep month & day
+  yearPicker.addEventListener('change', () => {
+    const selectedYear = parseInt(yearPicker.value, 10);
+    const calendarDate = calendar.getDate();
+    const newDate = new Date(calendarDate);
+    newDate.setFullYear(selectedYear);
+    calendar.gotoDate(newDate);
+  });
+
   // Controls
   addBtn?.addEventListener('click', () => openModal());
   closeModalBtn?.addEventListener('click', () => toggleModal(false));
   viewPicker?.addEventListener('change', (e) => calendar.changeView(e.target.value));
-  typeFilter?.addEventListener('change', (e) => { currentFilter = e.target.value; calendar.refetchEvents(); });
+  typeFilter?.addEventListener('change', (e) => {
+    currentFilter = e.target.value;
+    calendar.refetchEvents();
+  });
 
   // Save / Delete
   form.addEventListener('submit', (e) => {
@@ -124,19 +147,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Logout
-  logoutBtn?.addEventListener('click', () => { window.location.href = 'index.html'; });
+  logoutBtn?.addEventListener('click', () => {
+    window.location.href = 'index.html';
+  });
 });
 
 // Helpers
 function toLocalDT(dateObj) {
   const d = new Date(dateObj);
   const pad = (n) => String(n).padStart(2, '0');
-  const y = d.getFullYear(), m = pad(d.getMonth()+1), da = pad(d.getDate());
+  const y = d.getFullYear(), m = pad(d.getMonth() + 1), da = pad(d.getDate());
   const h = pad(d.getHours()), mi = pad(d.getMinutes());
   return `${y}-${m}-${da}T${h}:${mi}`;
 }
 
-function toggleModal(show) { modal.classList.toggle('open', !!show); }
+function toggleModal(show) {
+  modal.classList.toggle('open', !!show);
+}
 
 function openModal(data = {}, isEdit = false) {
   modalTitle.textContent = isEdit ? 'Edit Event' : 'Add Event';
