@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - Appeals</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="appeals.html" class="active"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
+    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Student Discipline Management System</h1>
+        <span class="subtitle">Appeals</span>
+      </div>
+    </header>
+
+    <!-- Appeals Panel -->
+    <section class="panel">
+      <div class="panel-header"><h3>Submit an Appeal</h3></div>
+      <form id="appealForm" class="appeal-form">
+        <div class="field">
+          <label for="violationSelect">Violation</label>
+          <select id="violationSelect"></select>
+        </div>
+        <div class="field">
+          <label for="appealReason">Reason / Explanation</label>
+          <textarea id="appealReason" rows="4" placeholder="Explain why you are appealing…"></textarea>
+        </div>
+        <button class="btn primary" type="submit"><i class="fa fa-file-circle-check"></i> Submit Appeal</button>
+      </form>
+    </section>
+
+    <!-- Appeal History -->
+    <section class="panel">
+      <div class="panel-header"><h3>My Appeals</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date Submitted</th>
+              <th>Violation</th>
+              <th>Reason</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="appealRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // 🔹 Sample Violations (pending only)
+    const pendingViolations = [
+      { id: 1, date: "2025-07-12", type: "Disrespect" },
+      { id: 2, date: "2025-08-02", type: "Cheating" },
+      { id: 3, date: "2025-08-22", type: "Uniform" },
+      { id: 4, date: "2025-09-10", type: "Tardiness" }
+    ];
+
+    // 🔹 Sample Appeals
+    let appeals = [
+      { date: "2025-09-05", violation: "Cheating (2025-08-02)", reason: "Phone was confiscated but not used", status: "Pending" }
+    ];
+
+    // Fill select options
+    const select = document.getElementById("violationSelect");
+    pendingViolations.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = `${v.date} — ${v.type}`;
+      select.appendChild(opt);
+    });
+
+    // Render appeal history
+    function renderAppeals() {
+      const tbody = document.getElementById("appealRows");
+      tbody.innerHTML = "";
+      appeals.forEach(a => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${a.date}</td>
+          <td>${a.violation}</td>
+          <td>${a.reason}</td>
+          <td><span class="status ${a.status.toLowerCase()}">${a.status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Submit appeal
+    document.getElementById("appealForm").addEventListener("submit", e => {
+      e.preventDefault();
+      const vId = select.value;
+      const reason = document.getElementById("appealReason").value.trim();
+      if (!vId || !reason) return alert("Please select a violation and add your explanation.");
+
+      const violation = pendingViolations.find(v => v.id == vId);
+      appeals.unshift({
+        date: new Date().toISOString().slice(0,10),
+        violation: `${violation.type} (${violation.date})`,
+        reason,
+        status: "Pending"
+      });
+
+      document.getElementById("appealReason").value = "";
+      renderAppeals();
+      alert("Appeal submitted successfully.");
+    });
+
+    // Init
+    renderAppeals();
+  </script>
+</body>
+</html>

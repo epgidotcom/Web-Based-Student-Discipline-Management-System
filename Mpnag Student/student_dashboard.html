@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - Dashboard</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
+    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Student Discipline Management System</h1>
+        <span class="subtitle">Student Dashboard</span>
+      </div>
+      <div class="profile">
+        <div class="name-grade">
+          <strong>Juan Dela Cruz</strong>
+          <small>Grade 9 • Section Emerald</small>
+        </div>
+        <img src="images/sample_avatar.png"
+             onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
+             alt="Avatar" class="avatar"/>
+      </div>
+    </header>
+
+    <!-- Dashboard Cards -->
+    <section class="cards">
+      <div class="card">
+        <i class="fa fa-exclamation-circle"></i>
+        <h2 id="totalViolations">0</h2>
+        <p>Total Violations</p>
+      </div>
+      <div class="card">
+        <i class="fa fa-folder-open"></i>
+        <h2 id="openCases">0</h2>
+        <p>Open Cases</p>
+      </div>
+      <div class="card">
+        <i class="fa fa-calendar"></i>
+        <h2 id="lastViolation">—</h2>
+        <p>Last Violation</p>
+      </div>
+      <div class="card">
+        <i class="fa fa-user-check"></i>
+        <span class="status" id="studentStatus">Good Standing</span>
+        <p>Status</p>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><h3>My Violations Over Time</h3></div>
+        <canvas id="lineChart" height="140"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Violation Breakdown</h3></div>
+        <canvas id="barChart" height="140"></canvas>
+      </div>
+    </section>
+
+    <!-- Violation History -->
+    <section class="panel">
+      <div class="panel-header"><h3>Violation History</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Remarks</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="violationRows">
+            <!-- auto-filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Script -->
+  <script>
+    // 🔹 Sample Data (10 lang!)
+    const violations = [
+      { date: "2025-06-10", type: "Tardiness", remarks: "Arrived late for class", status: "Resolved" },
+      { date: "2025-06-22", type: "No ID", remarks: "Forgot school ID", status: "Resolved" },
+      { date: "2025-07-01", type: "Uniform", remarks: "Incomplete uniform", status: "Resolved" },
+      { date: "2025-07-12", type: "Disrespect", remarks: "Talking back to teacher", status: "Pending" },
+      { date: "2025-07-20", type: "Tardiness", remarks: "15 mins late", status: "Resolved" },
+      { date: "2025-08-02", type: "Cheating", remarks: "Phone visible during quiz", status: "Pending" },
+      { date: "2025-08-15", type: "No ID", remarks: "Lost ID", status: "Resolved" },
+      { date: "2025-08-22", type: "Uniform", remarks: "Wearing PE uniform on non-PE day", status: "Pending" },
+      { date: "2025-09-05", type: "Disrespect", remarks: "Shouting in class", status: "Resolved" },
+      { date: "2025-09-10", type: "Tardiness", remarks: "Late arrival", status: "Pending" }
+    ];
+
+    // 🔹 Update Cards
+    const total = violations.length;
+    const open = violations.filter(v => v.status === "Pending").length;
+    const last = violations[violations.length - 1].date;
+    document.getElementById("totalViolations").textContent = total;
+    document.getElementById("openCases").textContent = open;
+    document.getElementById("lastViolation").textContent = last;
+    document.getElementById("studentStatus").textContent =
+      open >= 3 ? "On Probation" : "Good Standing";
+
+    // 🔹 Fill Table
+    const tbody = document.getElementById("violationRows");
+    violations.forEach(v => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${v.date}</td>
+        <td>${v.type}</td>
+        <td>${v.remarks}</td>
+        <td><span class="status ${v.status.toLowerCase()}">${v.status}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 🔹 Charts
+    const lineCtx = document.getElementById("lineChart");
+    const barCtx = document.getElementById("barChart");
+
+    // Line Chart (timeline)
+    new Chart(lineCtx, {
+      type: "line",
+      data: {
+        labels: violations.map(v => v.date),
+        datasets: [{
+          label: "Violations",
+          data: violations.map((_, i) => i + 1),
+          borderColor: "#e74c3c",
+          backgroundColor: "rgba(231, 76, 60, 0.3)",
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: { plugins: { legend: { display: false } }, responsive: true }
+    });
+
+    // Bar Chart (by type)
+    const byType = {};
+    violations.forEach(v => { byType[v.type] = (byType[v.type] || 0) + 1; });
+    new Chart(barCtx, {
+      type: "bar",
+      data: {
+        labels: Object.keys(byType),
+        datasets: [{
+          label: "Count",
+          data: Object.values(byType),
+          backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
+        }]
+      },
+      options: { plugins: { legend: { display: false } }, responsive: true }
+    });
+  </script>
+</body>
+</html> 

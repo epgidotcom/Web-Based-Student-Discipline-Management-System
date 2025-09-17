@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - About & Concept</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="about.html" class="active"><i class="fa fa-circle-info"></i> About & Concept</a>
+    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Student Discipline Management System</h1>
+        <span class="subtitle">About & Concept</span>
+      </div>
+      <div class="profile">
+        <div class="name-grade">
+          <strong>Juan Dela Cruz</strong>
+          <small>Grade 9 • Section Emerald</small>
+        </div>
+        <img src="images/sample_avatar.png"
+             onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
+             alt="Avatar" class="avatar"/>
+      </div>
+    </header>
+
+    <!-- About & Concept Panel -->
+    <section class="panel">
+      <div class="panel-header"><h3>SDMS — System Concept & Features</h3></div>
+      <div class="about-content">
+        <p><strong>Overview:</strong> What this Student Dashboard does and how it’s structured.</p>
+
+        <h4>Purpose</h4>
+        <p>The Student Discipline Management System (SDMS) is a centralized portal where students can monitor discipline records, read official notices, message advisers, and submit appeals.</p>
+
+        <h4>Core Features (Student UI)</h4>
+        <ul>
+          <li>Dashboard Cards: Total Violations, Open Cases, Last Violation, Standing.</li>
+          <li>Filters: Date range + type filtering.</li>
+          <li>Analytics: Line and bar charts (Chart.js) for trend & breakdown.</li>
+          <li>Violation History: Full table with status chips (Pending / Resolved).</li>
+          <li>Messages & Notices: Read notices; send message to adviser/prefect.</li>
+          <li>Appeals: Submit appeal for pending violations.</li>
+          <li>Auth Guard (demo): Basic front-end check via <code>localStorage.auth</code>.</li>
+        </ul>
+
+        <h4>Information Architecture (Entities)</h4>
+        <ul>
+          <li>Student (id, name, grade, section)</li>
+          <li>Violation (id, student_id, date, type, remarks, status)</li>
+          <li>Notice/Message (id, to_student_id, text, date, sender_role)</li>
+          <li>Appeal (id, student_id, violation_id, reason, submitted_at, decision, decided_at)</li>
+          <li>User (id, username/email, role: Student/Adviser/Discipline/Admin)</li>
+        </ul>
+
+        <h4>Front-End Data Flow</h4>
+        <ul>
+          <li><strong>Login:</strong> separate page sets <code>localStorage.auth="ok"</code> after CAPTCHA.</li>
+          <li><strong>Guard:</strong> redirects here only if authenticated.</li>
+          <li><strong>Load Context:</strong> mock data now; later fetch from API.</li>
+          <li><strong>Filter:</strong> in-memory filter; charts redraw with filtered set.</li>
+          <li><strong>Message/Appeal:</strong> demo shows alerts; later connect to backend endpoints.</li>
+        </ul>
+
+        <h4>Roles & Permissions</h4>
+        <ul>
+          <li><strong>Student:</strong> View own records, message adviser, submit appeals.</li>
+          <li><strong>Adviser:</strong> View class, post notices, reply to messages, recommend actions.</li>
+          <li><strong>Discipline Officer:</strong> Create/update violations, set statuses, decide appeals.</li>
+          <li><strong>Admin:</strong> Manage users, roles, system settings and audit logs.</li>
+        </ul>
+
+        <h4>Security (when backend is added)</h4>
+        <ul>
+          <li>JWT sessions, hashed passwords (bcrypt/argon2).</li>
+          <li>RBAC on every API; audit trail for sensitive changes.</li>
+          <li>HTTPS-only, secure cookies/CSRF, minimal PII exposure.</li>
+        </ul>
+
+        <h4>Suggested Stack & APIs</h4>
+        <ul>
+          <li><strong>Front-End:</strong> HTML/CSS/JS, Chart.js</li>
+          <li><strong>Back-End:</strong> Node/Express or PHP/Laravel</li>
+          <li><strong>DB:</strong> MySQL/PostgreSQL</li>
+          <li><strong>Endpoints:</strong> GET /violations?student_id=, GET /notices, POST /messages, POST /appeals</li>
+        </ul>
+
+        <h4>Future Enhancements</h4>
+        <ul>
+          <li>Evidence attachments on appeals.</li>
+          <li>Threaded messaging, email/SMS notifications.</li>
+          <li>PDF/CSV exports, parent letters.</li>
+          <li>Admin analytics for trends and risk flags.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
