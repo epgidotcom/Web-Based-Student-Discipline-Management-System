@@ -6,7 +6,7 @@ import { query } from "./db.js";
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
 async function run() {
-  const schemaPath = path.join(__dirname, "..", "db", "schema.sql");
+  const schemaPath = path.join(__dirname, "schema.sql");
   if (!fs.existsSync(schemaPath)) {
     console.error("Schema file not found at", schemaPath);
     process.exit(1);
