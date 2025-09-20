@@ -3,7 +3,7 @@ services:
     name: sdms-backend
     env: node
     plan: free
-    rootDir: backend
+    rootDir: SDMS-backend
     buildCommand: npm ci
     startCommand: npm start
     autoDeploy: true
