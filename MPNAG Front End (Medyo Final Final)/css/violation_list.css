@@ -233,3 +233,7 @@ select option {
 .has-attachment i { color:#2563eb; } /* icon highlight when a row has evidence */
 .is-hidden { display:none !important; }
 
+/* Past Offense Box */
+.past-offense-box { background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px; max-height:140px; overflow:auto; }
+.po-list { margin:6px 0 0; padding-left:18px; }
+.po-list li { margin:2px 0; }
