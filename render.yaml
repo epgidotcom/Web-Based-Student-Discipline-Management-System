@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: sdms-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromSecret: NEON_DATABASE_URL
+      - key: ALLOWED_ORIGINS
+        value: https://mpnag.vercel.app
