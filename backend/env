@@ -1,0 +1,8 @@
+# Required - use Neon pooled or direct connection string; SSL is required
+DATABASE_URL=postgres://USER:PASSWORD@YOUR-NEON-HOST.neon.tech/DBNAME?sslmode=require
+
+# Comma-separated list of allowed origins for CORS
+ALLOWED_ORIGINS=https://mpnag.vercel.app,http://localhost:5173,http://localhost:3000
+
+# Optional: override port (Render sets PORT automatically in production)
+PORT=3000
