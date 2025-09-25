@@ -61,21 +61,21 @@ table tr:hover {
   margin-right: 5px;
 }
 
-.edit-btn {
+.action-btn.edit-btn {
   background-color: #f39c12;
   color: white;
 }
 
-.edit-btn:hover {
+.action-btn.edit-btn:hover {
   background-color: #e67e22;
 }
 
-.delete-btn {
+.action-btn.delete-btn {
   background-color: #e74c3c;
   color: white;
 }
 
-.delete-btn:hover {
+.action-btn.delete-btn:hover {
   background-color: #c0392b;
 }
 
@@ -233,3 +233,7 @@ select option {
 .has-attachment i { color:#2563eb; } /* icon highlight when a row has evidence */
 .is-hidden { display:none !important; }
 
+/* Past Offense Box */
+.past-offense-box { background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px; max-height:140px; overflow:auto; }
+.po-list { margin:6px 0 0; padding-left:18px; }
+.po-list li { margin:2px 0; }

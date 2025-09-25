@@ -25,9 +25,7 @@ const progress = document.getElementById("captchaProgress");
 const hint = document.getElementById("captchaHint");
 const captchaTokenInput = document.getElementById("captchaToken");
 
-// -----------------------------
-// State
-// -----------------------------
+
 let captchaVerified = false;
 let isDragging = false;
 let startX = 0;
@@ -200,9 +198,3 @@ form.addEventListener("submit", function (event) {
 
 
 
-// TEMPORARY MUNA TO, CLICK NYO LANG BUTTON KAHIT WALANG CREDS //
-
-form.addEventListener("submit", function (event) {
-  event.preventDefault();
-  window.location.href = "dashboard.html";
-});

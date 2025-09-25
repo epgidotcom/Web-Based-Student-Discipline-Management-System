@@ -1,0 +1,96 @@
+.widget form {
+  max-width: 600px;
+  margin-top: 20px;
+}
+
+.widget form label {
+  display: block;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  color: #333;
+}
+
+.widget form input[type="text"],
+.widget form input[type="email"],
+.widget form input[type="password"],
+.widget form select {
+  width: 100%;
+  padding: 10px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.widget form input:focus,
+.widget form select:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 6px rgba(52, 152, 219, 0.3);
+}
+
+.widget form button.add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 16px;
+  padding: 10px 16px;
+}
+
+/* Show/hide group */
+#gradeGroup {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Create Account button */
+.widget form button.add-btn{
+  background: #28a745;            /* green */
+  color: #fff;
+  border: 1px solid #28a745;
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 10px 16px;              /* keep from above */
+  box-shadow: 0 2px 6px rgba(40,167,69,.2);
+  transition: background .2s ease, transform .08s ease, box-shadow .2s ease;
+}
+
+.widget form button.add-btn:hover{
+  background: #218838;
+  border-color: #1e7e34;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(40,167,69,.25);
+}
+
+.widget form button.add-btn:active{
+  transform: scale(0.98);
+}
+
+.widget form button.add-btn:focus-visible{
+  outline: 3px solid rgba(40,167,69,.35);
+  outline-offset: 2px;
+}
+
+.widget form button.add-btn:disabled{
+  background: #a7dfb5;
+  border-color: #a7dfb5;
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: .85;
+}
+
+.widget form button.add-btn i{
+  font-size: 14px;                
+  margin-right: 4px;
+}
+
+/* Accounts table wrapper */
+.table-wrap{ width:100%; overflow:auto; }
+#accountsTable{ width:100%; border-collapse: collapse; margin-top:10px; font-size:14px; }
+#accountsTable th, #accountsTable td{ padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
+#accountsTable th{ background:#f3f4f6; color:#374151; }
+.action-btn.delete-btn{ background:#dc2626; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+.action-btn.delete-btn:hover{ background:#b91c1c; }
+

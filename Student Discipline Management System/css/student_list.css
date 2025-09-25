@@ -44,7 +44,7 @@ table th {
 }
 
 table tr[data-student] {
-  cursor: pointer; 
+  cursor: pointer; /* so users know rows are clickable */
 }
 
 table tr:hover {
@@ -61,21 +61,21 @@ table tr:hover {
   margin-right: 5px;
 }
 
-.edit-btn {
+.action-btn.edit-btn {
   background-color: #f39c12;
   color: white;
 }
 
-.edit-btn:hover {
+.action-btn.edit-btn:hover {
   background-color: #e67e22;
 }
 
-.delete-btn {
+.action-btn.delete-btn {
   background-color: #e74c3c;
   color: white;
 }
 
-.delete-btn:hover {
+.action-btn.delete-btn:hover {
   background-color: #c0392b;
 }
 
@@ -97,6 +97,7 @@ table tr:hover {
 .add-btn:hover {
     background-color: #218838;
 }
+
 
 /* Modal */
 .modal {
@@ -157,21 +158,6 @@ table tr:hover {
   padding: 16px 18px 8px;
 }
 
-/* Close button */
-.modal .close-btn {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  font-size: 20px;
-  line-height: 1;
-  background: transparent;
-  border: none;
-  color: #444;
-  cursor: pointer;
-  padding: 6px 8px;           
-  border-radius: 6px;
-}
-.modal .close-btn:hover { background: #f3f3f3; color: #e74c3c; }
 
 /* Inputs inside modal */
 .modal form input,
@@ -204,6 +190,34 @@ table tr:hover {
 }
 .modal form button:hover,
 .modal .btn:hover { background-color: #2980b9; }
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.modal .close-btn {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  padding: 2px 10px;
+  transition: color 0.3s ease;
+}
+
+.modal .close-btn:hover {
+  color: #e74c3c;
+}
+
 
 @media (max-width: 540px) {
   .modal { padding: 10px; }
@@ -256,6 +270,9 @@ table tr:hover {
 .photo-actions .btn:hover { background: #f3f4f6; }
 .photo-actions .btn.danger { background: #e74c3c; color:#fff; border-color: transparent; }
 .is-hidden { display: none !important; }
+
+
+
 
 
 

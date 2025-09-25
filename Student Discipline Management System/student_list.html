@@ -1,44 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SDMS - Student List</title>
+
+  <!-- Global + Page CSS -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/student_list.css">
+
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-<div class="sidebar">
-    <img src="images/mpnag_logo.png" alt="MPNAG Logo">
-    <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
-    <a href="student_list.html" class="active"><i class="fa fa-users"></i> Student List</a>
-    <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
-    <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
-    <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
-</div>
+<!-- Sidebar (drawer on mobile) -->
+<nav class="sidebar" id="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html" class="active"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
 
+      <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
+  </div>
+</nav>
+
+
+<!-- Backdrop for drawer -->
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+<!-- Main -->
 <div class="main">
   <div class="topbar">
-    <h1>Student Discipline Management System</h1>
-    <button id="logoutBtn" class="logout-btn">
-      <i class="fa fa-sign-out-alt"></i> Logout
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
     </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
   </div>
 
   <div class="widget">
+    <div class="widget-head">
       <h3>Student List</h3>
 
       <button id="addStudentBtn" class="add-btn">
         <i class="fa fa-plus"></i> Add Student
       </button>
+    </div>
 
-      <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchStudent()">
-        <button>Search</button>
-      </div>
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchStudent()">
+      <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
+    </div>
 
+    <!-- Wrap table to avoid page-wide horizontal scroll on phones -->
+    <div class="table-wrap">
       <table id="studentTable">
         <thead>
           <tr>
@@ -50,39 +79,47 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+          <!-- rows injected by JS -->
+          <tr>
+            <td colspan="6" style="text-align:center;color:#6b7280;">No data</td>
+          </tr>
+        </tbody>
       </table>
+    </div>
   </div>
 </div>
 
 <!-- Add/Edit Student Modal -->
 <div id="studentModal" class="modal">
   <div class="modal-content">
-    <span class="close-btn">&times;</span>
-    <h2 id="modalTitle">Add Student</h2>
+    <div class="modal-header">
+      <h2 id="modalTitle">Add Student</h2>
+      <span class="close-btn" id="closeStudentModalBtn">&times;</span>
+    </div>
+
     <form id="studentForm">
       <input type="hidden" id="editIndex">
 
-      <!-- Photo Uploader -->
-<div class="photo-uploader" id="photoUploader">
-  <div class="head">
-    <img id="photoPreview" class="avatar--lg is-hidden" alt="Student photo preview">
-    <div>
-      <strong>Student Photo</strong>
-      <div class="photo-actions is-hidden" id="photoActions">
-        <button type="button" class="btn" id="photoChange"><i class="fa fa-camera"></i> Change</button>
-        <button type="button" class="btn danger" id="photoRemove"><i class="fa fa-trash"></i> Remove</button>
-      </div>
-    </div>
-  </div>
+      <div class="photo-uploader" id="photoUploader">
+        <div class="head">
+          <img id="photoPreview" class="avatar--lg is-hidden" alt="Student photo preview">
+          <div>
+            <strong>Student Photo</strong>
+            <div class="photo-actions is-hidden" id="photoActions">
+              <button type="button" class="btn" id="photoChange"><i class="fa fa-camera"></i> Change</button>
+              <button type="button" class="btn danger" id="photoRemove"><i class="fa fa-trash"></i> Remove</button>
+            </div>
+          </div>
+        </div>
 
-  <div class="drop" id="photoDrop">
-    <i class="fa fa-camera"></i>
-    <p>Drag & drop or choose an image (JPG/PNG, max ~2MB). We’ll auto-resize.</p>
-    <button type="button" class="btn" id="photoChoose">Choose file</button>
-    <input type="file" id="photoInput" accept="image/*" class="is-hidden">
-  </div>
-</div>
+        <div class="drop" id="photoDrop">
+          <i class="fa fa-camera"></i>
+          <p>Drag & drop or choose an image (JPG/PNG, max ~2MB). We’ll auto-resize.</p>
+          <button type="button" class="btn" id="photoChoose">Choose file</button>
+          <input type="file" id="photoInput" accept="image/*" class="is-hidden">
+        </div>
+      </div>
 
       <label>LRN:</label>
       <input type="text" id="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number" required>
@@ -127,14 +164,15 @@
 <!-- View Student Modal -->
 <div id="viewModal" class="modal">
   <div class="modal-content">
-    <span class="close-btn">&times;</span>
-    <h2>Student Details</h2>
-    
-    <!-- Add this under <h2>Student Details</h2> -->
-<div style="display:flex; align-items:center; gap:12px; margin:4px 0 8px;">
-  <img id="viewAvatar" class="avatar--lg is-hidden" alt="Student photo">
-  <div id="viewInitials" class="avatar--fallback is-hidden" style="width:48px;height:48px;font-size:16px;"></div>
-</div>
+    <div class="modal-header">
+      <h2>Student Details</h2>
+      <span class="close-btn">&times;</span>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:12px; margin:4px 0 8px;">
+      <img id="viewAvatar" class="avatar--lg is-hidden" alt="Student photo">
+      <div id="viewInitials" class="avatar--fallback is-hidden" style="width:48px;height:48px;font-size:16px;"></div>
+    </div>
 
     <p><strong>LRN:</strong> <span id="viewLRN"></span></p>
     <p><strong>Name:</strong> <span id="viewName"></span></p>
@@ -146,8 +184,34 @@
   </div>
 </div>
 
-<!-- Global + Page Scripts -->
+<!-- Page scripts -->
 <script src="js/main.js" defer></script>
-<script src="js/student_list.js"></script>
+<script src="js/student_list.js" defer></script>
+
+
+<!-- Inline page logic (self-contained) -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  /* ===== Drawer fallback (guarded) ===== */
+  var sidebar  = document.getElementById('sidebar');
+  var menuBtn  = document.querySelector('.menu-btn');
+  var backdrop = document.getElementById('backdrop'); // may not exist
+
+  if (menuBtn && sidebar && !menuBtn.dataset.bound) {
+    function setOpen(open){
+      sidebar.classList.toggle('open', open);
+      if (backdrop) backdrop.classList.toggle('show', open);
+      document.body.style.overflow = open ? 'hidden' : '';
+      menuBtn.setAttribute('aria-expanded', String(open));
+    }
+    function toggle(){ setOpen(!sidebar.classList.contains('open')); }
+    menuBtn.addEventListener('click', toggle);
+    if (backdrop) backdrop.addEventListener('click', function(){ setOpen(false); });
+    window.addEventListener('keydown', function(e){ if(e.key === 'Escape') setOpen(false); });
+    window.addEventListener('resize', function(){ if (window.innerWidth >= 769) setOpen(false); });
+    menuBtn.dataset.bound = '1';
+  }
+    });
+</script>
 </body>
 </html>

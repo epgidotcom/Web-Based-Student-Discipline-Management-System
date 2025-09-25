@@ -4,147 +4,199 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sanction Notice — Parent SMS (One-Way)</title>
-  <link rel="stylesheet" href="css/SMS.css">
+
+  <!-- Global + Page CSS -->
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/student_list.css">
+  <link rel="stylesheet" href="css/SMS.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
+<body class="sms-page">
 
-<div class="sidebar">
+  <!-- Sidebar (drawer on mobile) -->
+  <nav class="sidebar" id="sidebar" aria-hidden="true">
     <img src="images/mpnag_logo.png" alt="MPNAG Logo">
     <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
     <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
     <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
     <a href="SMS.html" class="active"><i class="fa fa-message"></i> Message</a>
-
-</div>
-</head>
-<body>
-  <div class="app">
-    <!-- Left: Form -->
-    <section class="panel" id="formPanel">
-        
-    <header class="panel-header">
-    <button id="returnBtn" class="btn-icon" title="Return to Dashboard">
-        <i class="fa fa-arrow-left"></i>
+  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+        <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
     </button>
-    <h2>Sanction Notice — Parent SMS (One-Way)</h2>
-    </header>
-
-      <div class="body">
-        <p class="subtle">Use this module to text parents when a student receives a sanction. Replies are not monitored.</p>
-
-        <div class="form-grid">
-          <div>
-            <label for="phone">Parent's Phone Number</label>
-            <input id="phone" placeholder="e.g., 09298843693" inputmode="numeric" required/>
-          </div>
-
-          <div>
-            <label for="student">Student Name</label>
-            <input id="student" placeholder="e.g., Juan Dela Cruz" required/>
-          </div>
-
-          <div>
-            <label for="grade">Grade & Section</label>
-            <select id="grade" required>
-              <option value="" disabled selected>— Select Grade & Section —</option>
-              <option>Grade 7 - Section A</option>
-              <option>Grade 8 - Section B</option>
-              <option>Grade 9 - Section C</option>
-              <option>Grade 10 - Section D</option>
-              <option>Grade 11 - Section AB1</option>
-              <option>Grade 12 - Section AB2</optiosn>
-            </select>
-          </div>
-
-          <div>
-            <label for="violation">Violation / Incident</label>
-            <select id="violation" required>
-              <option value="" disabled selected>— Select Violation —</option>
-              <option>Bullying</option>
-              <option>Cheating</option>
-              <option>Improper Uniform</option>
-              <option>Tardiness</option>
-              <option>Others</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="sanction">Sanction</label>
-            <select id="sanction" required>
-              <option value="" disabled selected>— Select Sanction —</option>
-              <option>Detention</option>
-              <option>Extra Homework</option>
-              <option>Reprimand</option>
-              <option>Suspension</option>
-              <option>Verbal Warning</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="date">Date of Incident</label>
-            <input id="date" type="date" required/>
-          </div>
-
-          <div>
-            <label for="teacher">Teacher-in-Charge</label>
-            <input id="teacher" placeholder="e.g., Ms. Santos" required/>
-          </div>
-
-          <div>
-            <label for="template">Template</label>
-            <select id="template" required>
-              <option value="" disabled selected>— Select Template —</option>
-              <option value="warning">Warning Notice</option>
-              <option value="minor">Minor Offense Notice</option>
-              <option value="major">Major Offense Notice</option>
-              <option value="suspension">Suspension Notice</option>
-            </select>
-          </div>
-
-            <div class="full hstack">
-            <button class="btn" id="genBtn" type="button">Generate Message</button>
-            <button class="btn outline" id="resetBtn" type="button">Reset</button>
-            </div>
+  </div>
+</nav>
 
 
-          <div class="full">
-            <label for="message">Message</label>
-            <textarea id="message" placeholder="Auto-generated or type custom…"></textarea>
+  <!-- Backdrop for drawer -->
+  <div class="backdrop" id="backdrop" aria-hidden="true"></div>
 
-            <div class="toolbar">
-              <div class="hstack">
-                <button class="btn primary" id="sendBtn" type="button">Send Sanction SMS</button>
-                <button class="btn outline" id="previewBtn" type="button">Preview Only</button>
+  <!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+    <section class="widget">
+      <div class="sms-header">
+        <h3>Sanction Notice — Parent SMS (One-Way)</h3>
+        <button class="btn-icon" id="returnBtn" title="Back to Dashboard" type="button">
+          <i class="fa fa-arrow-left"></i>
+        </button>
+      </div>
+
+      <p class="sms-subtext">Use this module to text parents when a student receives a sanction. Replies are not monitored.</p>
+
+      <div class="sms-container">
+        <!-- ================== Form ================== -->
+        <div class="sms-form">
+
+          <form id="formPanel" autocomplete="off" novalidate>
+            <div class="form-grid">
+              <div>
+                <label for="phone">Parent's Phone Number:</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  inputmode="numeric"
+                  maxlength="11"
+                  pattern="\d{11}"
+                  placeholder="e.g., 09171234567"
+                  required
+                />
+                <small class="help">11 digits, numbers only.</small>
               </div>
-              <div class="counter" id="counter">0 characters • 0 SMS segments (160 chars per SMS)</div>
-            </div>
 
-            <div class="help">
-              POST to <code>/api/sms/sanctions/send</code> with JSON payload (see console log on send).
+              <div>
+                <label for="student">Student Name:</label>
+                <input id="student" type="text" placeholder="e.g., Juan Dela Cruz" required />
+              </div>
+
+              <div>
+                <label for="grade">Grade &amp; Section:</label>
+                <select id="grade" required>
+                  <option value="">— Select Grade &amp; Section —</option>
+                  <option>Grade 7 - Section A</option>
+                  <option>Grade 8 - Section B</option>
+                  <option>Grade 9 - Section C</option>
+                  <option>Grade 10 - Section D</option>
+                  <option>Grade 11 - ABM</option>
+                  <option>Grade 12 - AB2</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="violation">Violation / Incident:</label>
+                <select id="violation" required>
+                  <option value="">— Select Violation —</option>
+                  <option>Bullying</option>
+                  <option>Cheating</option>
+                  <option>Improper Uniform</option>
+                  <option>Tardiness</option>
+                  <option>Others</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="sanction">Sanction:</label>
+                <select id="sanction" required>
+                  <option value="">— Select Sanction —</option>
+                  <option>Warning</option>
+                  <option>Written Reprimand</option>
+                  <option>Extra Homework</option>
+                  <option>Suspension</option>
+                  <option>Expulsion</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="date">Date of Incident:</label>
+                <input id="date" type="date" required />
+              </div>
+
+              <div>
+                <label for="teacher">Teacher-in-Charge:</label>
+                <input id="teacher" type="text" placeholder="e.g., Ms. Santos" required />
+              </div>
+
+              <div>
+                <label for="template">Violation Type:</label>
+                <select id="template">
+                  <option value="">— Select Type —</option>
+                  <option value="warning">Warning Notice</option>
+                  <option value="minor">Minor Offense Notice</option>
+                  <option value="major">Major Offense Notice</option>
+                  <option value="suspension">Suspension Notice</option>
+                </select>
+              </div>
+
+              <div class="full">
+                <div class="button-row">
+                  <button class="btn secondary" id="genBtn" type="button">
+                    <i class="fa fa-magic"></i> Generate Message
+                  </button>
+                  <button class="btn danger" id="resetBtn" type="button">
+                    <i class="fa fa-times-circle"></i> Reset
+                  </button>
+                </div>
+              </div>
+
+              <div class="full">
+                <label for="message">Message:</label>
+                <textarea id="message" rows="6" placeholder="Auto-generated or type custom…"></textarea>
+
+                <!-- live counter (JS updates this) -->
+                <div id="counter" class="sms-counter" aria-live="polite">
+                  0 characters • 0 SMS segments (160 chars per SMS)
+                </div>
+
+                <div class="button-row">
+                  <button class="btn primary" id="sendBtn" type="button">
+                    <i class="fa fa-paper-plane"></i> Send Sanction SMS
+                  </button>
+                  <button class="btn outline" id="previewBtn" type="button">
+                    <i class="fa fa-eye"></i> Preview Only
+                  </button>
+                </div>
+
+                <div class="meta-info">
+                  <div class="help">
+                    POST to <code>/api/sms/sanctions/send</code> with JSON payload (see console log on send).
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          </form>
         </div>
-      </div>
-    </section>
+        <!-- ================== /Form ================== -->
 
-    <!-- Right: SMS Preview -->
-    <section class="panel chat">
-      <div class="chat-header">
-        <span class="dot"></span>
-        <div class="chat-title">SMS — School Discipline</div>
-      </div>
-      <div class="chat-body" id="chat">
-        <div class="msg">Hello Parent/Guardian, you will receive important discipline updates here. Replies are not monitored.<br><small id="welcomeClock"></small></div>
-      </div>
+        <!-- ================== Preview ================== -->
+        <aside class="sms-preview">
+          <div class="chat-header">SMS — School Discipline</div>
+          <div class="sms-bubble" id="chat">
+            Hello Parent/Guardian, you will receive important discipline updates here. Replies are not monitored.
+            <br>
+            <small id="welcomeClock">Today – 04:04 PM</small>
+          </div>
+        </aside>
+      </div> 
     </section>
   </div>
 
-<!-- Global + Page Scripts -->
-<script src="js/SMS.js" defer></script>
-<script src="js/dashboard.js" defer></script>
+  <script src="js/config.js"></script>
+  <script src="js/sms.js" defer></script>
+  <script src="js/main.js" defer></script>
 </body>
 </html>

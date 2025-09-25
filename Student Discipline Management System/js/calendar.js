@@ -9,6 +9,7 @@ const saveEvents = (arr) => localStorage.setItem(STORAGE_KEY, JSON.stringify(arr
 const addBtn = document.getElementById('addEventBtn');
 const viewPicker = document.getElementById('viewPicker');
 const typeFilter = document.getElementById('typeFilter');
+const yearPicker = document.getElementById('yearPicker'); // ✅ Added Year Picker
 const logoutBtn = document.getElementById('logoutBtn');
 
 const modal = document.getElementById('eventModal');
@@ -28,17 +29,7 @@ let events = loadEvents();
 let currentFilter = 'all';
 let calendar;
 
-// Seed some examples first time only so it’s never empty
-if (events.length === 0) {
-  events = [
-    { id: crypto.randomUUID(), title: 'Tardiness Violation', type: 'violation', start: '2025-08-01T08:00', desc: '' },
-    { id: crypto.randomUUID(), title: 'Improper Uniform Violation', type: 'violation', start: '2025-08-05T08:00', desc: '' },
-    { id: crypto.randomUUID(), title: 'Cheating Violation', type: 'violation', start: '2025-08-10T08:00', desc: '' },
-    { id: crypto.randomUUID(), title: 'School Sports Event', type: 'event', start: '2025-08-15T13:00', desc: '' },
-    { id: crypto.randomUUID(), title: 'Quarterly Exams', type: 'exam', start: '2025-08-20T09:00', end: '2025-08-20T11:00', desc: '' }
-  ];
-  saveEvents(events);
-}
+// Start with no seeded events; show UI empty until user adds
 
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('calendar');
@@ -86,11 +77,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   calendar.render();
 
+  // ✅ Populate year picker (range: current year ±10)
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === currentYear) opt.selected = true;
+    yearPicker.appendChild(opt);
+  }
+
+  // ✅ On year change, keep month & day
+  yearPicker.addEventListener('change', () => {
+    const selectedYear = parseInt(yearPicker.value, 10);
+    const calendarDate = calendar.getDate();
+    const newDate = new Date(calendarDate);
+    newDate.setFullYear(selectedYear);
+    calendar.gotoDate(newDate);
+  });
+
   // Controls
   addBtn?.addEventListener('click', () => openModal());
   closeModalBtn?.addEventListener('click', () => toggleModal(false));
   viewPicker?.addEventListener('change', (e) => calendar.changeView(e.target.value));
-  typeFilter?.addEventListener('change', (e) => { currentFilter = e.target.value; calendar.refetchEvents(); });
+  typeFilter?.addEventListener('change', (e) => {
+    currentFilter = e.target.value;
+    calendar.refetchEvents();
+  });
 
   // Save / Delete
   form.addEventListener('submit', (e) => {
@@ -124,19 +137,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Logout
-  logoutBtn?.addEventListener('click', () => { window.location.href = 'index.html'; });
+  logoutBtn?.addEventListener('click', () => {
+    window.location.href = 'index.html';
+  });
 });
 
 // Helpers
 function toLocalDT(dateObj) {
   const d = new Date(dateObj);
   const pad = (n) => String(n).padStart(2, '0');
-  const y = d.getFullYear(), m = pad(d.getMonth()+1), da = pad(d.getDate());
+  const y = d.getFullYear(), m = pad(d.getMonth() + 1), da = pad(d.getDate());
   const h = pad(d.getHours()), mi = pad(d.getMinutes());
   return `${y}-${m}-${da}T${h}:${mi}`;
 }
 
-function toggleModal(show) { modal.classList.toggle('open', !!show); }
+function toggleModal(show) {
+  modal.classList.toggle('open', !!show);
+}
 
 function openModal(data = {}, isEdit = false) {
   modalTitle.textContent = isEdit ? 'Edit Event' : 'Add Event';

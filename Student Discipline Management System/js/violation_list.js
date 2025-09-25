@@ -1,31 +1,46 @@
+/* ================= In-memory list for current page ================= */
 let violations = [];
 
-// get elements
-const violationForm = document.getElementById("violationForm");
+/* ================= Elements ================= */
+const violationForm  = document.getElementById("violationForm");
 const violationTable = document.getElementById("violationTable").querySelector("tbody");
-const addViolationBtn = document.getElementById("addViolationBtn");
+const addViolationBtn= document.getElementById("addViolationBtn");
 const violationModal = document.getElementById("violationModal");
-const viewModal = document.getElementById("viewModal");
-const modalTitle = document.getElementById("modalTitle");
+const viewModal      = document.getElementById("viewModal");
+const modalTitle     = document.getElementById("modalTitle");
+const closeBtns      = document.querySelectorAll(".close-btn");
 
-const closeBtns = document.querySelectorAll(".close-btn");
-
-// inputs
+/* ---- Inputs (core) ---- */
 const studentNameInput = document.getElementById("studentName");
-const violationInput = document.getElementById("violation");
-const sanctionInput = document.getElementById("sanction");
+const gradeSectionInput= document.getElementById("gradeSection");     // NEW
+const violationTypeInput = document.getElementById("violationType");  // NEW
+const sanctionInput    = document.getElementById("sanction");
 const descriptionInput = document.getElementById("description");
-const dateInput = document.getElementById("date");
-const editIndexInput = document.getElementById("editIndex");
+const dateInput        = document.getElementById("date");
+const editIndexInput   = document.getElementById("editIndex");
 
-// view modal elements
-const viewStudent = document.getElementById("viewStudent");
-const viewViolation = document.getElementById("viewViolation");
-const viewSanction = document.getElementById("viewSanction");
-const viewDescription = document.getElementById("viewDescription");
-const viewDate = document.getElementById("viewDate");
+/* ---- Optional legacy input (if your form still has it) ---- */
+const violationInput   = document.getElementById("violation"); // kept for compatibility (not shown in table)
+
+/* ---- Past Offense UI ---- */
+const pastOffenseWrap   = document.getElementById("pastOffenseWrap");
+const pastOffenseList   = document.getElementById("pastOffenseList");
+const pastOffenseEmpty  = document.getElementById("pastOffenseEmpty");
+// Optional legacy elements (may not exist in DOM)
+const pastOffenseSelect = document.getElementById("pastOffenseSelect");
+const pastOffenseStatus = document.getElementById("pastOffenseStatus");
+
+/* ---- View modal elements ---- */
+const viewStudent      = document.getElementById("viewStudent");
+const viewGradeSection = document.getElementById("viewGradeSection");
+const viewPastOffenseRow = document.getElementById("viewPastOffenseRow");
+const viewPastOffense  = document.getElementById("viewPastOffense");
+const viewViolationType= document.getElementById("viewViolationType");
+const viewSanction     = document.getElementById("viewSanction");
+const viewDescription  = document.getElementById("viewDescription");
+const viewDate         = document.getElementById("viewDate");
 const viewEvidenceWrap = document.getElementById("viewEvidenceWrap");
-const viewEvidenceBox = document.getElementById("viewEvidence");
+const viewEvidenceBox  = document.getElementById("viewEvidence");
 
 /* ================= Evidence uploader ================= */
 const ev = {
@@ -39,7 +54,6 @@ const ev = {
 };
 let evidenceData = [];  // array of dataURLs (max 3)
 
-// Resize to keep files small
 async function fileToDataURL(file, maxEdge = 1024, quality = 0.85) {
   const url = URL.createObjectURL(file);
   const img = new Image();
@@ -56,6 +70,7 @@ async function fileToDataURL(file, maxEdge = 1024, quality = 0.85) {
 }
 
 function renderEvidenceThumbs() {
+  if (!ev.preview) return;
   ev.preview.innerHTML = "";
   evidenceData.forEach((src, i) => {
     const img = document.createElement("img");
@@ -65,9 +80,9 @@ function renderEvidenceThumbs() {
     ev.preview.appendChild(img);
   });
   const has = evidenceData.length > 0;
-  ev.preview.classList.toggle("is-hidden", !has);
-  ev.actions.classList.toggle("is-hidden", !has);
-  ev.drop.classList.toggle("is-hidden", has);
+  ev.preview?.classList.toggle("is-hidden", !has);
+  ev.actions?.classList.toggle("is-hidden", !has);
+  ev.drop?.classList.toggle("is-hidden", has);
 }
 
 async function addFiles(files) {
@@ -97,7 +112,6 @@ function initEvidenceUploader() {
   );
   ev.drop?.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 
-  // expose to other handlers
   window._evidence = {
     get: () => evidenceData.slice(),
     set: (arr=[]) => { evidenceData = arr.slice(0,3); renderEvidenceThumbs(); },
@@ -107,17 +121,92 @@ function initEvidenceUploader() {
 }
 initEvidenceUploader();
 
+/* ================= Past Offense data via API only ================= */
+// Read API configuration (set in js/config.js). Fallbacks for safety.
+const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '/api';
+
+const ApiPastOffenseStore = {
+  async getByName(name) {
+    const res = await fetch(`${API_BASE}/api/past-offenses?name=${encodeURIComponent(name)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  },
+  async addOffense(name, label, dateISO) {
+    const res = await fetch(`${API_BASE}/api/past-offenses`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name, label, date: dateISO })
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+};
+const PastOffenseService = ApiPastOffenseStore;
+
+function levelFromCount(n) {
+  if (n <= 0) return 'None';
+  if (n === 1) return '1st Offense';
+  if (n === 2) return '2nd Offense';
+  if (n === 3) return '3rd Offense';
+  return 'Repeat/Chronic';
+}
+
+const debounce = (fn, ms = 300) => {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+};
+
+/* ================= Refresh Past Offense UI ================= */
+async function refreshPastOffenseUI() {
+  if (!pastOffenseWrap || !pastOffenseList || !pastOffenseEmpty) return;
+
+  const name = (studentNameInput && studentNameInput.value || '').trim();
+
+  // Hide until there's a name
+  if (!name) {
+    pastOffenseWrap.classList.add('is-hidden');
+    pastOffenseList.innerHTML = '';
+    pastOffenseEmpty.textContent = 'No past offenses.';
+    return;
+  }
+
+  pastOffenseWrap.classList.remove('is-hidden');
+
+  // Get history from API
+  const offenses = await PastOffenseService.getByName(name);
+
+  // Render list
+  pastOffenseList.innerHTML = '';
+  if (!offenses.length) {
+    pastOffenseEmpty.classList.remove('is-hidden');
+    pastOffenseEmpty.textContent = 'No past offenses.';
+  } else {
+    pastOffenseEmpty.classList.add('is-hidden');
+    offenses.forEach(o => {
+      const li = document.createElement('li');
+      li.textContent = o;
+      pastOffenseList.appendChild(li);
+    });
+  }
+}
+
+
 /* ================= Open/Close Modals ================= */
-// open add modal
 addViolationBtn.addEventListener("click", () => {
   violationForm.reset();
   editIndexInput.value = "";
   modalTitle.textContent = "Add Violation";
-  window._evidence.clear();             // reset images
+  window._evidence?.clear();             // reset images
+
+  // Ensure Past Offense is hidden on open
+  if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
+  if (pastOffenseList) pastOffenseList.innerHTML = '';
+  if (pastOffenseEmpty) pastOffenseEmpty.textContent = 'No past offenses.';
+
   violationModal.style.display = "block";
 });
 
-// close modals
 closeBtns.forEach(btn => {
   btn.addEventListener("click", () => {
     violationModal.style.display = "none";
@@ -126,18 +215,41 @@ closeBtns.forEach(btn => {
 });
 
 /* ================= Save form ================= */
-violationForm.addEventListener("submit", (e) => {
+violationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const studentName = studentNameInput.value.trim();
-  const violation = violationInput.value;
-  const sanction = sanctionInput.value;
-  const description = descriptionInput.value.trim();
-  const date = dateInput.value;
+  const studentName   = (studentNameInput.value || "").trim();
+  const gradeSection  = (gradeSectionInput?.value || "").trim();
+  const violationType = (violationTypeInput?.value || "").trim();
+  const sanction      = (sanctionInput.value || "").trim();
+  const description   = (descriptionInput.value || "").trim();
+  const date          = dateInput.value || "";
+
+  // Keep legacy field if present (not shown in table)
+  const violation     = violationInput ? (violationInput.value || "").trim() : "";
+
+  // Build a readable label for history, e.g., "Improper Uniform | Minor | Sanction: Verbal Warning — 2025-09-20"
+  const parts = [];
+  if (description) parts.push(description);
+  if (violationType) parts.push(violationType);
+  if (sanction) parts.push(`Sanction: ${sanction}`);
+  const label = parts.join(" | ") + (date ? ` — ${date}` : "");
+  let offensesAfter = [];
+  if (studentName) {
+    offensesAfter = await PastOffenseService.addOffense(studentName, label, date);
+  }
 
   const violationData = {
-    studentName, violation, sanction, description, date,
-    evidence: window._evidence.get() // << attach images
+    studentName,
+    gradeSection,
+    pastOffense: offensesAfter.length ? offensesAfter.join(' • ') : 'No past offenses.',
+    date,
+    description,
+    violationType,
+    sanction,
+    // keep the older 'violation' in case you still use it somewhere else
+    violation,
+    evidence: window._evidence?.get ? window._evidence.get() : []
   };
 
   if (editIndexInput.value === "") {
@@ -153,7 +265,10 @@ violationForm.addEventListener("submit", (e) => {
   window.dispatchEvent(new Event('sdms:data-changed'));
 });
 
-/* ================= Render table ================= */
+/* ================= Render table =================
+   Columns:
+   Student Name | Grade & Section | Past Offense | Date | Violation's Description | Violation Type | Sanction | Actions
+================================================= */
 function renderTable() {
   violationTable.innerHTML = "";
 
@@ -164,9 +279,12 @@ function renderTable() {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${item.studentName} ${paperclip}</td>
-      <td>${item.violation}</td>
-      <td>${item.sanction}</td>
-      <td>${item.date}</td>
+      <td>${item.gradeSection || '-'}</td>
+      <td>${item.pastOffense || 'None'}</td>
+      <td>${item.date || '-'}</td>
+      <td>${item.description || '—'}</td>
+      <td>${item.violationType || '-'}</td>
+      <td>${item.sanction || '-'}</td>
       <td>
         <button onclick="viewViolationDetails(${index})" title="View"><i class="fa fa-eye"></i></button>
         <button onclick="editViolation(${index})" title="Edit"><i class="fa fa-edit"></i></button>
@@ -180,25 +298,34 @@ function renderTable() {
 /* ================= View details ================= */
 window.viewViolationDetails = function (index) {
   const item = violations[index];
-  viewStudent.textContent = item.studentName;
-  viewViolation.textContent = item.violation;
-  viewSanction.textContent = item.sanction;
-  viewDescription.textContent = item.description || "No description provided.";
-  viewDate.textContent = item.date;
+
+  if (viewStudent)      viewStudent.textContent = item.studentName || '-';
+  if (viewGradeSection) viewGradeSection.textContent = item.gradeSection || '-';
+
+  const offenseText = item.pastOffense || 'None';
+  if (viewPastOffense)  viewPastOffense.textContent = offenseText;
+  if (viewPastOffenseRow) viewPastOffenseRow.classList.toggle('is-hidden', !offenseText || offenseText === 'None');
+
+  if (viewViolationType) viewViolationType.textContent = item.violationType || '-';
+  if (viewSanction)     viewSanction.textContent = item.sanction || '-';
+  if (viewDescription)  viewDescription.textContent = item.description || "No description provided.";
+  if (viewDate)         viewDate.textContent = item.date || '-';
 
   // render evidence thumbs
-  viewEvidenceBox.innerHTML = "";
-  if (item.evidence && item.evidence.length) {
-    item.evidence.forEach((src, i) => {
-      const img = document.createElement("img");
-      img.src = src; img.className = "evidence-thumb"; img.alt = `Evidence ${i+1}`;
-      img.title = "Click to open";
-      img.addEventListener("click", () => window.open(src, "_blank"));
-      viewEvidenceBox.appendChild(img);
-    });
-    viewEvidenceWrap.classList.remove("is-hidden");
-  } else {
-    viewEvidenceWrap.classList.add("is-hidden");
+  if (viewEvidenceBox && viewEvidenceWrap) {
+    viewEvidenceBox.innerHTML = "";
+    if (item.evidence && item.evidence.length) {
+      item.evidence.forEach((src, i) => {
+        const img = document.createElement("img");
+        img.src = src; img.className = "evidence-thumb"; img.alt = `Evidence ${i+1}`;
+        img.title = "Click to open";
+        img.addEventListener("click", () => window.open(src, "_blank"));
+        viewEvidenceBox.appendChild(img);
+      });
+      viewEvidenceWrap.classList.remove("is-hidden");
+    } else {
+      viewEvidenceWrap.classList.add("is-hidden");
+    }
   }
 
   viewModal.style.display = "block";
@@ -208,15 +335,19 @@ window.viewViolationDetails = function (index) {
 window.editViolation = function (index) {
   const item = violations[index];
 
-  studentNameInput.value = item.studentName;
-  violationInput.value = item.violation;
-  sanctionInput.value = item.sanction;
-  descriptionInput.value = item.description || "";
-  dateInput.value = item.date;
-  editIndexInput.value = index;
+  studentNameInput.value    = item.studentName || '';
+  gradeSectionInput && (gradeSectionInput.value = item.gradeSection || '');
+  violationTypeInput && (violationTypeInput.value = item.violationType || '');
+  sanctionInput.value       = item.sanction || '';
+  descriptionInput.value    = item.description || '';
+  dateInput.value           = item.date || '';
+  editIndexInput.value      = index;
+
+  // Update Past Offense UI for this student (and show the block)
+  refreshPastOffenseUI();
 
   // preload evidence
-  window._evidence.set(item.evidence || []);
+  window._evidence?.set(item.evidence || []);
 
   modalTitle.textContent = "Edit Violation";
   violationModal.style.display = "block";
@@ -244,7 +375,26 @@ window.searchViolation = function () {
 /* ================= Init ================= */
 renderTable();
 
+// Hide Past Offense on load
+if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
+if (pastOffenseSelect) pastOffenseSelect.value = 'None';
+if (pastOffenseStatus) pastOffenseStatus.textContent = 'No past offenses.';
+
+// Show/refresh past offense after typing student name
+if (studentNameInput) {
+  studentNameInput.addEventListener("input", debounce(refreshPastOffenseUI, 250));
+}
+
+// Allow other parts (like autocomplete) to set the student programmatically:
+document.addEventListener('studentSelected', (e) => {
+  const name = e?.detail?.name || '';
+  if (name && studentNameInput) {
+    studentNameInput.value = name;
+  }
+  refreshPastOffenseUI();
+});
+
 // Logout
-document.getElementById("logoutBtn").addEventListener("click", () => {
+document.getElementById("logoutBtn")?.addEventListener("click", () => {
   window.location.href = "index.html";
 });
