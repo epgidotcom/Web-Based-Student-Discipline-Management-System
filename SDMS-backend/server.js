@@ -6,6 +6,7 @@ import accountsRoute from './src/routes/accounts.js';
 import offensesRoute from './src/routes/offenses.js';
 import smsRoute from './src/routes/sms.js';
 import studentsRoute from './src/routes/students.js';
+import { runMigrations } from './src/migrate.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,6 +45,16 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
+// Friendly root for humans
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'SDMS API',
+    status: 'ok',
+    health: '/api/health',
+    docs: 'Use /api/* routes from the frontend.'
+  });
+});
+
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 app.use('/api/accounts', accountsRoute);
@@ -59,6 +70,19 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`SDMS backend listening on ${PORT}`);
-});
+// Wrap startup so we can await migrations first
+(async () => {
+  try {
+    if (process.env.AUTO_MIGRATE !== 'false') { // default: run
+      console.log('Running migrations (startup)...');
+      await runMigrations();
+    } else {
+      console.log('AUTO_MIGRATE disabled; skipping migrations.');
+    }
+  } catch (e) {
+    console.error('Migration error during startup:', e);
+  }
+  app.listen(PORT, () => {
+    console.log(`SDMS backend listening on ${PORT}`);
+  });
+})();

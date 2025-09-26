@@ -1,6 +1,6 @@
 import { query } from './db.js';
 
-async function migrate() {
+export async function runMigrations() {
   const sql = `
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -30,15 +30,30 @@ CREATE TABLE IF NOT EXISTS sms_logs (
   message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Students table used by frontend student list
+CREATE TABLE IF NOT EXISTS students (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lrn TEXT UNIQUE,
+  first_name TEXT NOT NULL,
+  middle_name TEXT,
+  last_name TEXT NOT NULL,
+  birthdate DATE,
+  address TEXT,
+  grade TEXT,
+  section TEXT,
+  parent_contact TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 `;
-  try {
-    await query(sql);
-    console.log('Migration complete');
-    process.exit(0);
-  } catch (e) {
-    console.error('Migration failed', e);
-    process.exit(1);
-  }
+  await query(sql);
+  console.log('Migration complete');
 }
 
-migrate();
+// If invoked directly via: node src/migrate.js
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runMigrations().catch(e => {
+    console.error('Migration failed', e);
+    process.exit(1);
+  });
+}
