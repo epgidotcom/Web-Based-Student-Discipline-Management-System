@@ -1,4 +1,3 @@
-fetch('js/student_list.js').then(r=>r.text()).then(t => console.log('student_list.js length', t.length, 'contains [StudentList]?', t.includes('[StudentList]')));import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
@@ -100,3 +99,4 @@ app.use((err, _req, res, _next) => {
     console.log(`SDMS backend listening on ${PORT}`);
   });
 })();
+
