@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
@@ -16,17 +17,27 @@ const allowed = (process.env.ALLOWED_ORIGINS || '')
   .map(s => s.trim().replace(/\/+$/, '')) // trim and remove trailing slashes
   .filter(Boolean);
 
-// Helper to test an origin against allowed list, supporting wildcard subdomains (e.g., *.vercel.app)
+// Helper to test an origin against allowed list.
+// Supports wildcard subdomains in these formats:
+//   *.vercel.app
+//   vercel.app (exact root)
+//   https://*.vercel.app  (protocol form)
+// Normalizes by stripping protocol before comparison.
 const isAllowedOrigin = (origin) => {
-  if (!origin) return true; // allow same-origin/non-browser tools
-  const clean = String(origin).replace(/\/+$/, '');
+  if (!origin) return true; // allow same-origin/non-browser tools (e.g. curl, server-to-server)
+  const normalize = (url) => String(url)
+    .replace(/\/+$/, '')            // trim trailing slashes
+    .replace(/^https?:\/\//i, '')   // drop scheme
+    .toLowerCase();
+  const client = normalize(origin);
   if (!allowed.length) return true; // if not configured, allow all
-  return allowed.some(item => {
+  return allowed.some(raw => {
+    const item = normalize(raw);
     if (item.startsWith('*.')) {
-      const suffix = item.slice(1); // remove leading '*'
-      return clean.endsWith(suffix);
+      const suffix = item.slice(2); // remove '*.'
+      return client === suffix || client.endsWith('.' + suffix);
     }
-    return clean === item;
+    return client === item;
   });
 };
 
@@ -99,4 +110,3 @@ app.use((err, _req, res, _next) => {
     console.log(`SDMS backend listening on ${PORT}`);
   });
 })();
-
