@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - My Violations</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Toggle button for mobile -->
+<button class="sidebar-toggle" id="sidebarToggle">
+  <i class="fa fa-bars"></i>
+</button>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html" class="active"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
+    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+<!-- Backdrop for mobile -->
+<div class="backdrop" id="sidebarBackdrop"></div>
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Student Discipline Management System</h1>
+        <span class="subtitle">My Violations</span>
+      </div>
+    </header>
+
+    <!-- Charts -->
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><h3>My Violations Over Time</h3></div>
+        <canvas id="lineChart" height="140"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Violation Breakdown</h3></div>
+        <canvas id="barChart" height="140"></canvas>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filters">
+      <div class="row">
+        <div class="field">
+          <label for="fromDate">From</label>
+          <input type="date" id="fromDate"/>
+        </div>
+        <div class="field">
+          <label for="toDate">To</label>
+          <input type="date" id="toDate"/>
+        </div>
+        <div class="field">
+          <label for="typeFilter">Type</label>
+          <select id="typeFilter">
+            <option value="All">All</option>
+            <option value="Tardiness">Tardiness</option>
+            <option value="No ID">No ID</option>
+            <option value="Uniform">Uniform</option>
+            <option value="Disrespect">Disrespect</option>
+            <option value="Cheating">Cheating</option>
+          </select>
+        </div>
+        <button id="applyBtn" class="btn primary"><i class="fa fa-filter"></i> Apply</button>
+        <button id="resetBtn" class="btn"><i class="fa fa-rotate-left"></i> Reset</button>
+      </div>
+    </section>
+
+    <!-- Violations Table -->
+    <section class="panel">
+      <div class="panel-header"><h3>Violation History</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Remarks</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="violationRows">
+            <!-- auto-filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // 🔹 Sample Data
+    const violations = [
+      { date: "2025-06-10", type: "Tardiness", remarks: "Arrived late for class", status: "Resolved" },
+      { date: "2025-06-22", type: "No ID", remarks: "Forgot school ID", status: "Resolved" },
+      { date: "2025-07-01", type: "Uniform", remarks: "Incomplete uniform", status: "Resolved" },
+      { date: "2025-07-12", type: "Disrespect", remarks: "Talking back to teacher", status: "Pending" },
+      { date: "2025-07-20", type: "Tardiness", remarks: "15 mins late", status: "Resolved" },
+      { date: "2025-08-02", type: "Cheating", remarks: "Phone visible during quiz", status: "Pending" },
+      { date: "2025-08-15", type: "No ID", remarks: "Lost ID", status: "Resolved" },
+      { date: "2025-08-22", type: "Uniform", remarks: "Wearing PE uniform on non-PE day", status: "Pending" },
+      { date: "2025-09-05", type: "Disrespect", remarks: "Shouting in class", status: "Resolved" },
+      { date: "2025-09-10", type: "Tardiness", remarks: "Late arrival", status: "Pending" }
+    ];
+
+    // 🔹 Fill Table
+    function renderTable(rows) {
+      const tbody = document.getElementById("violationRows");
+      tbody.innerHTML = "";
+      rows.forEach(v => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${v.date}</td>
+          <td>${v.type}</td>
+          <td>${v.remarks}</td>
+          <td><span class="status ${v.status.toLowerCase()}">${v.status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 🔹 Charts
+    let lineChart, barChart;
+    function renderCharts(rows) {
+      // Destroy old charts para di mag-stack
+      if (lineChart) lineChart.destroy();
+      if (barChart) barChart.destroy();
+
+      // Line chart (by date)
+      const labels = rows.map(v => v.date);
+      const counts = rows.map((_, i) => i + 1);
+
+      lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "Violations",
+            data: counts,
+            borderColor: "#e74c3c",
+            backgroundColor: "rgba(231, 76, 60, 0.3)",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+
+      // Bar chart (by type)
+      const byType = {};
+      rows.forEach(v => { byType[v.type] = (byType[v.type] || 0) + 1; });
+
+      barChart = new Chart(document.getElementById("barChart"), {
+        type: "bar",
+        data: {
+          labels: Object.keys(byType),
+          datasets: [{
+            label: "Count",
+            data: Object.values(byType),
+            backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+    }
+    
+    // 🔹 Filters
+    function applyFilters() {
+      const from = document.getElementById("fromDate").value;
+      const to = document.getElementById("toDate").value;
+      const type = document.getElementById("typeFilter").value;
+
+      let filtered = violations.slice();
+      if (from) filtered = filtered.filter(v => v.date >= from);
+      if (to) filtered = filtered.filter(v => v.date <= to);
+      if (type !== "All") filtered = filtered.filter(v => v.type === type);
+
+      renderTable(filtered);
+      renderCharts(filtered);
+    }
+
+    function resetFilters() {
+      document.getElementById("fromDate").value = "";
+      document.getElementById("toDate").value = "";
+      document.getElementById("typeFilter").value = "All";
+      renderTable(violations);
+      renderCharts(violations);
+    }
+
+    // 🔹 Init
+    document.getElementById("applyBtn").addEventListener("click", applyFilters);
+    document.getElementById("resetBtn").addEventListener("click", resetFilters);
+    renderTable(violations);
+    renderCharts(violations);
+  </script>
+  <script src="js/sidebar.js"></script>
+  <script src="JAVA/main.js"></script>
+</body>
+</html>
