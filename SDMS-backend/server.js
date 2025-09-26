@@ -1,4 +1,4 @@
-import 'dotenv/config';
+fetch('js/student_list.js').then(r=>r.text()).then(t => console.log('student_list.js length', t.length, 'contains [StudentList]?', t.includes('[StudentList]')));import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
@@ -31,8 +31,17 @@ const isAllowedOrigin = (origin) => {
   });
 };
 
+// Track first-time denied origins to avoid log spam
+const deniedOriginsLogged = new Set();
 const corsOptions = {
-  origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
+  origin: (origin, cb) => {
+    const ok = isAllowedOrigin(origin);
+    if (!ok && origin && !deniedOriginsLogged.has(origin)) {
+      console.warn('[CORS] Denied origin:', origin, '| Allowed list:', allowed);
+      deniedOriginsLogged.add(origin);
+    }
+    cb(null, ok);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: false, // set to true only if using cookies/auth headers across sites
@@ -56,6 +65,11 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// Debug endpoint to introspect allowed origins (remove or protect later)
+app.get('/_debug/allowed-origins', (_req, res) => {
+  res.json({ allowed, note: 'Modify ALLOWED_ORIGINS env var (comma-separated). Wildcards supported via *.domain.tld' });
+});
 
 app.use('/api/accounts', accountsRoute);
 app.use('/api/past-offenses', offensesRoute);
