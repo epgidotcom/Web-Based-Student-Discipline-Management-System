@@ -72,35 +72,65 @@ WHERE full_name IS NOT NULL;
 UPDATE students SET grade = COALESCE(grade, grade_level) WHERE grade IS NULL;
 
 -- Ensure required constraints (id primary key)
+-- Primary key normalization logic (safe & dependency-aware)
 DO $$
+DECLARE
+  pk_on_student_id BOOLEAN := FALSE;
+  pk_constraint_name TEXT;
+  student_id_attnum INT;
+  dependent_fk_count INT := 0;
 BEGIN
-  -- Drop old primary key on student_id if exists
-  IF EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'students'::regclass AND contype = 'p'
-      AND conname = 'students_pkey'
-  ) THEN
-    BEGIN
-      -- Check if current PK uses student_id; if so drop
-      IF EXISTS (
-        SELECT 1 FROM pg_attribute a
-        JOIN pg_index i ON i.indrelid = a.attrelid AND a.attnum = ANY(i.indkey)
-        WHERE i.indrelid = 'students'::regclass AND i.indisprimary AND a.attname = 'student_id'
-      ) THEN
-        ALTER TABLE students DROP CONSTRAINT students_pkey;
-      END IF;
-    END;
-  END IF;
-END$$;
+  -- Locate attnum for legacy student_id column if it exists
+  SELECT a.attnum INTO student_id_attnum
+  FROM pg_attribute a
+  WHERE a.attrelid = 'students'::regclass AND a.attname = 'student_id' AND a.attnum > 0;
 
--- Recreate PK on id if not already
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'students'::regclass AND contype = 'p'
-      AND conname = 'students_pkey') THEN
-    ALTER TABLE students ADD CONSTRAINT students_pkey PRIMARY KEY (id);
+  -- Determine current primary key constraint
+  SELECT c.conname,
+         EXISTS (
+           SELECT 1 FROM pg_attribute a
+           JOIN pg_index i ON i.indrelid = a.attrelid AND a.attnum = ANY(i.indkey)
+           WHERE i.indrelid = 'students'::regclass
+             AND i.indisprimary
+             AND a.attname = 'student_id'
+         )
+  INTO pk_constraint_name, pk_on_student_id
+  FROM pg_constraint c
+  WHERE c.conrelid = 'students'::regclass AND c.contype = 'p'
+  LIMIT 1;
+
+  IF pk_on_student_id THEN
+    -- Count foreign keys in other tables referencing students(student_id)
+    IF student_id_attnum IS NOT NULL THEN
+      SELECT COUNT(*) INTO dependent_fk_count
+      FROM pg_constraint c
+      WHERE c.contype = 'f'
+        AND c.confrelid = 'students'::regclass
+        AND student_id_attnum = ANY (c.confkey);
+    END IF;
+
+    IF dependent_fk_count = 0 THEN
+      -- Safe to switch primary key to id
+      EXECUTE 'ALTER TABLE students DROP CONSTRAINT ' || quote_ident(pk_constraint_name);
+      EXECUTE 'ALTER TABLE students ADD CONSTRAINT students_pkey PRIMARY KEY (id)';
+      RAISE NOTICE 'Primary key on students switched to (id).';
+    ELSE
+      -- Defer change; ensure a unique index on id instead
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'idx_students_id_unique'
+      ) THEN
+        EXECUTE 'CREATE UNIQUE INDEX idx_students_id_unique ON students(id)';
+      END IF;
+      RAISE NOTICE 'Skipped switching students primary key (student_id still PK) because % foreign key(s) depend on it. Unique index on id ensured instead.', dependent_fk_count;
+    END IF;
+  ELSE
+    -- If PK already on id or table empty of PK (unlikely), ensure constraint exists
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'students'::regclass AND contype = 'p'
+    ) THEN
+      EXECUTE 'ALTER TABLE students ADD CONSTRAINT students_pkey PRIMARY KEY (id)';
+    END IF;
   END IF;
 END$$;
 
