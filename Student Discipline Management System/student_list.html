@@ -187,14 +187,13 @@
 <!-- Page scripts -->
 <script src="js/main.js" defer></script>
 <script src="js/config.js" defer></script>
-<!-- Fallback: if config.js fails or not deployed, define SDMS_CONFIG so student_list.js has API_BASE -->
 <script>
 if (!window.SDMS_CONFIG) {
   console.warn('[FallbackConfig] config.js missing; using hard-coded API base');
   window.SDMS_CONFIG = { API_BASE: 'https://web-based-student-discipline-management.onrender.com', USE_API: true };
 }
 </script>
-<script src="js/student_list.js" defer></script>
+<script src="js/students_page.js?v=1" defer></script>
 <script>
 // Diagnostics: verify student_list.js executed
 window.addEventListener('DOMContentLoaded', () => {
