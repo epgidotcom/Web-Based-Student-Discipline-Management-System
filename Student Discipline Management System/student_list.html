@@ -187,7 +187,30 @@
 <!-- Page scripts -->
 <script src="js/main.js" defer></script>
 <script src="js/config.js" defer></script>
+<!-- Fallback: if config.js fails or not deployed, define SDMS_CONFIG so student_list.js has API_BASE -->
+<script>
+if (!window.SDMS_CONFIG) {
+  console.warn('[FallbackConfig] config.js missing; using hard-coded API base');
+  window.SDMS_CONFIG = { API_BASE: 'https://web-based-student-discipline-management.onrender.com', USE_API: true };
+}
+</script>
 <script src="js/student_list.js" defer></script>
+<script>
+// Diagnostics: verify student_list.js executed
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof window.viewStudent !== 'function') {
+    console.error('[Diagnostics] student_list.js did NOT load or failed early. Attempting fallback load...');
+    // Try to load again without defer so we can see errors directly
+    const s = document.createElement('script');
+    s.src = 'js/student_list.js?_fallback=' + Date.now();
+    s.onload = () => console.log('[Diagnostics] Fallback student_list.js loaded');
+    s.onerror = () => console.error('[Diagnostics] Fallback load failed');
+    document.body.appendChild(s);
+  } else {
+    console.log('[Diagnostics] student_list.js present. API_BASE =', (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE));
+  }
+});
+</script>
 
 
 <!-- Inline page logic (self-contained) -->
@@ -213,6 +236,18 @@ document.addEventListener('DOMContentLoaded', function () {
     menuBtn.dataset.bound = '1';
   }
     });
+</script>
+
+<script>
+// Immediate probe (runs after DOMContentLoaded block above)
+(function probe(){
+  const base = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
+  if (!base) { console.warn('[Probe] No API_BASE yet when probing'); return; }
+  fetch(base + '/api/students', {cache:'no-store'})
+    .then(r => r.text().then(t => ({status:r.status,body:t})))
+    .then(({status,body}) => console.log('[Probe] GET /api/students status', status, 'body length', body.length))
+    .catch(err => console.error('[Probe] fetch failed', err));
+})();
 </script>
 </body>
 </html>
