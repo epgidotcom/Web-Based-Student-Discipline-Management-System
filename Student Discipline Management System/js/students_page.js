@@ -15,7 +15,7 @@ async function apiFetch(path, init) {
   if (!res.ok) {
     const text = await res.text().catch(()=> '');
     console.error('[StudentsPage] HTTP error', res.status, res.statusText, text.slice(0,200));
-    throw new Error(`HTTP ${res.status}`);
+    throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ' - ' + text : ''}`);
   }
   if (res.status === 204) return null;
   return res.json();
@@ -141,7 +141,10 @@ studentForm && (studentForm.onsubmit = async (e) => {
       students[idx] = updatedUi;
     }
     renderTable(); studentModal.style.display='none';
-  } catch(err) { console.error('[StudentsPage] save failed', err); alert('Failed to save student.'); }
+  } catch(err) {
+    console.error('[StudentsPage] save failed', err);
+    alert('Failed to save student. ' + (err?.message || '')); 
+  }
 });
 
 function initialsFromName(name){ return name.split(/\s+/).filter(Boolean).map(s=>s[0]).join('').slice(0,2).toUpperCase() || '?'; }

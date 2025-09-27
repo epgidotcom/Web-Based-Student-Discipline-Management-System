@@ -1,5 +1,86 @@
-/* ================= In-memory list for current page ================= */
+/* ================= Persistence via API (replaces previous in-memory only list) ================= */
 let violations = [];
+let studentsIndex = []; // array of student objects from /api/students
+let studentNameMap = new Map(); // lower(full name) -> student
+const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
+
+async function apiFetch(path, init) {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
+  if (!res.ok) {
+    let txt = '';
+    try { txt = await res.text(); } catch {}
+    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt}`.trim());
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ================= Student resolution & repeat logic =================
+function buildStudentDisplay(s){
+  return [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+}
+
+function rebuildStudentMap(){
+  studentNameMap.clear();
+  studentsIndex.forEach(s=> {
+    const name = buildStudentDisplay(s);
+    if(name) studentNameMap.set(name.toLowerCase(), {...s, _display: name});
+  });
+}
+
+function resolveStudent(name){
+  if(!name) return null;
+  return studentNameMap.get(name.toLowerCase()) || null;
+}
+
+async function loadStudents(){
+  try {
+    const list = await apiFetch('/api/students');
+    studentsIndex = Array.isArray(list)? list : [];
+  } catch(e){
+    console.error('[Violations] Failed to load students', e);
+    studentsIndex = [];
+  }
+  rebuildStudentMap();
+}
+
+async function fetchRepeatCount(studentId, violationType){
+  if(!studentId || !violationType) return 0;
+  try {
+    const data = await apiFetch(`/api/violations/repeat/check?student_id=${encodeURIComponent(studentId)}&offense_type=${encodeURIComponent(violationType)}`);
+    return data?.count || 0;
+  } catch(e){
+    console.warn('[Violations] repeat check failed', e);
+    return 0;
+  }
+}
+
+function fromServerViolation(row){
+  // Accept legacy or new field names, normalizing to frontend shape
+  const evidenceRaw = row.evidence || null; // new: server stores JSON object {files: [...], notes: ...}
+  let evidenceArr = [];
+  if (evidenceRaw) {
+    if (Array.isArray(evidenceRaw)) {
+      evidenceArr = evidenceRaw; // legacy array form
+    } else if (typeof evidenceRaw === 'object') {
+      if (Array.isArray(evidenceRaw.files)) evidenceArr = evidenceRaw.files;
+    }
+  }
+  return {
+    id: row.id,
+    studentId: row.student_id || null,
+    studentName: row.student_name || '',
+    gradeSection: row.grade_section || '',
+    violationType: row.offense_type || row.violation_type || '',
+    description: row.description || '',
+    sanction: row.sanction || '',
+    violation: row.violation || '', // legacy optional
+    date: row.incident_date || row.date || '',
+    evidence: evidenceArr,
+    repeatCount: row.repeat_count != null ? row.repeat_count : (row.repeat_count_at_insert != null ? row.repeat_count_at_insert : 0)
+  };
+}
 
 /* ================= Elements ================= */
 const violationForm  = document.getElementById("violationForm");
@@ -18,6 +99,23 @@ const sanctionInput    = document.getElementById("sanction");
 const descriptionInput = document.getElementById("description");
 const dateInput        = document.getElementById("date");
 const editIndexInput   = document.getElementById("editIndex");
+const saveBtn = violationForm?.querySelector('button[type="submit"]') || violationForm?.querySelector('button');
+// dynamic info elements (create if missing)
+let studentLookupStatus = document.getElementById('studentLookupStatus');
+if(!studentLookupStatus && studentNameInput){
+  studentLookupStatus = document.createElement('div');
+  studentLookupStatus.id = 'studentLookupStatus';
+  studentLookupStatus.className = 'field-hint';
+  studentNameInput.parentElement.appendChild(studentLookupStatus);
+}
+let repeatInfoEl = document.getElementById('violationRepeatInfo');
+if(!repeatInfoEl && violationTypeInput){
+  repeatInfoEl = document.createElement('div');
+  repeatInfoEl.id = 'violationRepeatInfo';
+  repeatInfoEl.className = 'field-hint';
+  violationTypeInput.parentElement.appendChild(repeatInfoEl);
+}
+let resolvedStudent = null; // cache of currently matched student
 
 /* ---- Optional legacy input (if your form still has it) ---- */
 const violationInput   = document.getElementById("violation"); // kept for compatibility (not shown in table)
@@ -123,7 +221,7 @@ initEvidenceUploader();
 
 /* ================= Past Offense data via API only ================= */
 // Read API configuration (set in js/config.js). Fallbacks for safety.
-const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '/api';
+// (API_BASE now declared near top; keep legacy comment)
 
 const ApiPastOffenseStore = {
   async getByName(name) {
@@ -205,6 +303,10 @@ addViolationBtn.addEventListener("click", () => {
   if (pastOffenseEmpty) pastOffenseEmpty.textContent = 'No past offenses.';
 
   violationModal.style.display = "block";
+  if(studentLookupStatus) studentLookupStatus.textContent = '';
+  if(repeatInfoEl) repeatInfoEl.textContent = '';
+  resolvedStudent = null;
+  if(saveBtn) saveBtn.disabled = true; // disable until student resolved
 });
 
 closeBtns.forEach(btn => {
@@ -214,7 +316,7 @@ closeBtns.forEach(btn => {
   });
 });
 
-/* ================= Save form ================= */
+/* ================= Save form (create/update via API) ================= */
 violationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -252,17 +354,49 @@ violationForm.addEventListener("submit", async (e) => {
     evidence: window._evidence?.get ? window._evidence.get() : []
   };
 
-  if (editIndexInput.value === "") {
-    violations.push(violationData);
-  } else {
-    violations[editIndexInput.value] = violationData;
+  // Ensure we have a resolved student
+  if(!resolvedStudent){
+    alert('Please select/enter a valid existing student from the Students list first.');
+    return;
   }
-
-  renderTable();
-  violationModal.style.display = "none";
-
-  // optional: refresh dashboard
-  window.dispatchEvent(new Event('sdms:data-changed'));
+  // Prepare evidence as object {files: [...]} for new schema
+  const evidencePayload = (window._evidence?.get && window._evidence.get().length)
+    ? { files: window._evidence.get() }
+    : null;
+  try {
+    if (editIndexInput.value === "") {
+      // Create
+      const created = await apiFetch('/api/violations', { method: 'POST', body: JSON.stringify({
+        student_id: resolvedStudent.id,
+        grade_section: gradeSection,
+        offense_type: violationType,
+        sanction,
+        description,
+        incident_date: date,
+        evidence: evidencePayload
+      }) });
+      violations.unshift(fromServerViolation(created)); // newest first
+    } else {
+      // Update
+      const id = violations[editIndexInput.value].id;
+      const updated = await apiFetch(`/api/violations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({
+        student_id: resolvedStudent.id,
+        grade_section: gradeSection,
+        offense_type: violationType,
+        sanction,
+        description,
+        incident_date: date,
+        evidence: evidencePayload
+      }) });
+      violations[editIndexInput.value] = fromServerViolation(updated);
+    }
+    renderTable();
+    violationModal.style.display = "none";
+    window.dispatchEvent(new Event('sdms:data-changed'));
+  } catch(err) {
+    console.error('Failed to save violation', err);
+    alert('Failed to save violation: ' + err.message);
+  }
 });
 
 /* ================= Render table =================
@@ -277,18 +411,21 @@ function renderTable() {
     const paperclip = hasAttach ? `<span class="has-attachment" title="Has evidence"><i class="fa fa-paperclip"></i></span>` : "";
 
     const row = document.createElement("tr");
+    row.className = 'violation-row';
     row.innerHTML = `
-      <td>${item.studentName} ${paperclip}</td>
-      <td>${item.gradeSection || '-'}</td>
-      <td>${item.pastOffense || 'None'}</td>
-      <td>${item.date || '-'}</td>
-      <td>${item.description || '—'}</td>
-      <td>${item.violationType || '-'}</td>
-      <td>${item.sanction || '-'}</td>
-      <td>
-        <button onclick="viewViolationDetails(${index})" title="View"><i class="fa fa-eye"></i></button>
-        <button onclick="editViolation(${index})" title="Edit"><i class="fa fa-edit"></i></button>
-        <button onclick="deleteViolation(${index})" title="Delete"><i class="fa fa-trash"></i></button>
+      <td class="cell-student" data-label="Student">${paperclip} <span class="cell-text">${item.studentName}</span></td>
+      <td class="cell-grade" data-label="Grade & Section">${item.gradeSection || '-'}</td>
+      <td class="cell-past" data-label="Past Offense">${item.pastOffense || 'None'}</td>
+      <td class="cell-date" data-label="Date">${item.date || '-'}</td>
+      <td class="cell-description" data-label="Description">${item.description || '—'}</td>
+      <td class="cell-type" data-label="Violation Type">${item.violationType || '-'}</td>
+      <td class="cell-sanction" data-label="Sanction">${item.sanction || '-'}</td>
+      <td class="cell-actions" data-label="Actions">
+        <div class="actions-wrap">
+          <button class="tbl-btn view" onclick="viewViolationDetails(${index})" title="View" aria-label="View details for ${item.studentName}"><i class="fa fa-eye" aria-hidden="true"></i></button>
+          <button class="tbl-btn edit" onclick="editViolation(${index})" title="Edit" aria-label="Edit violation for ${item.studentName}"><i class="fa fa-edit" aria-hidden="true"></i></button>
+          <button class="tbl-btn delete" onclick="deleteViolation(${index})" title="Delete" aria-label="Delete violation for ${item.studentName}"><i class="fa fa-trash" aria-hidden="true"></i></button>
+        </div>
       </td>
     `;
     violationTable.appendChild(row);
@@ -342,6 +479,19 @@ window.editViolation = function (index) {
   descriptionInput.value    = item.description || '';
   dateInput.value           = item.date || '';
   editIndexInput.value      = index;
+  // set resolvedStudent using current table data (will attempt by id or name)
+  resolvedStudent = item.studentId ? studentsIndex.find(s=> s.id === item.studentId) : resolveStudent(item.studentName);
+  if(studentLookupStatus){
+    if(resolvedStudent){
+      studentLookupStatus.textContent = 'Student resolved ✔';
+      studentLookupStatus.style.color = '#2e7d32';
+    } else {
+      studentLookupStatus.textContent = 'Unresolved student (cannot save until fixed)';
+      studentLookupStatus.style.color = '#c62828';
+    }
+  }
+  if(saveBtn) saveBtn.disabled = !resolvedStudent;
+  updateRepeatDisplay();
 
   // Update Past Offense UI for this student (and show the block)
   refreshPastOffenseUI();
@@ -354,11 +504,17 @@ window.editViolation = function (index) {
 };
 
 /* ================= Delete violation ================= */
-window.deleteViolation = function (index) {
-  if (confirm("Are you sure you want to delete this violation?")) {
+window.deleteViolation = async function (index) {
+  if (!confirm("Delete this violation?")) return;
+  const id = violations[index].id;
+  try {
+    await apiFetch(`/api/violations/${encodeURIComponent(id)}`, { method: 'DELETE' });
     violations.splice(index, 1);
     renderTable();
     window.dispatchEvent(new Event('sdms:data-changed'));
+  } catch(err) {
+    console.error('Failed to delete violation', err);
+    alert('Failed to delete violation: ' + err.message);
   }
 };
 
@@ -372,8 +528,19 @@ window.searchViolation = function () {
   });
 };
 
-/* ================= Init ================= */
-renderTable();
+/* ================= Initial load from API ================= */
+async function loadViolations() {
+  try {
+    const list = await apiFetch('/api/violations');
+    violations = Array.isArray(list) ? list.map(fromServerViolation) : [];
+  } catch (err) {
+    console.error('Failed to load violations', err);
+    violations = [];
+  }
+  renderTable();
+}
+// Load students then violations
+loadStudents().then(()=> loadViolations());
 
 // Hide Past Offense on load
 if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
@@ -381,8 +548,47 @@ if (pastOffenseSelect) pastOffenseSelect.value = 'None';
 if (pastOffenseStatus) pastOffenseStatus.textContent = 'No past offenses.';
 
 // Show/refresh past offense after typing student name
+function updateResolvedStudent(){
+  const name = (studentNameInput.value || '').trim();
+  resolvedStudent = resolveStudent(name);
+  if(studentLookupStatus){
+    if(!name){
+      studentLookupStatus.textContent='';
+    } else if(resolvedStudent){
+      studentLookupStatus.textContent = 'Student found ✔';
+      studentLookupStatus.style.color = '#2e7d32';
+    } else {
+      studentLookupStatus.textContent = 'Student not found. Add them in Students page first.';
+      studentLookupStatus.style.color = '#c62828';
+    }
+  }
+  if(saveBtn) saveBtn.disabled = !resolvedStudent;
+  updateRepeatDisplay();
+}
+
+async function updateRepeatDisplay(){
+  if(!repeatInfoEl){ return; }
+  const violationType = (violationTypeInput?.value || '').trim();
+  if(resolvedStudent && violationType){
+    const count = await fetchRepeatCount(resolvedStudent.id, violationType);
+    if(count === 0) {
+      repeatInfoEl.textContent = 'First recorded occurrence of this violation.';
+      repeatInfoEl.style.color = '#2e7d32';
+    } else {
+      repeatInfoEl.textContent = `Previously recorded ${count} time${count>1?'s':''}.`;
+      repeatInfoEl.style.color = '#ef6c00';
+    }
+  } else {
+    repeatInfoEl.textContent = '';
+  }
+}
+
 if (studentNameInput) {
-  studentNameInput.addEventListener("input", debounce(refreshPastOffenseUI, 250));
+  studentNameInput.addEventListener("input", debounce(()=>{ refreshPastOffenseUI(); updateResolvedStudent(); }, 250));
+}
+if (violationTypeInput){
+  violationTypeInput.addEventListener('change', ()=> updateRepeatDisplay());
+  violationTypeInput.addEventListener('input', debounce(updateRepeatDisplay, 250));
 }
 
 // Allow other parts (like autocomplete) to set the student programmatically:
