@@ -25,6 +25,67 @@ CREATE TABLE IF NOT EXISTS past_offenses (
 );
 CREATE INDEX IF NOT EXISTS idx_past_offenses_student_name ON past_offenses(student_name);
 
+-- Violations (new persistent store replacing in-memory frontend list)
+CREATE TABLE IF NOT EXISTS violations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_name TEXT NOT NULL,
+  grade_section TEXT,
+  violation_type TEXT,
+  sanction TEXT,
+  description TEXT,
+  violation TEXT, -- legacy single-field (optional)
+  date DATE,
+  evidence JSONB, -- array of data URL strings (base64) or future structured refs
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_violations_student_name ON violations(student_name);
+CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(date);
+
+-- Add student_id column (UUID) to violations if missing and create FK to students(id)
+ALTER TABLE violations ADD COLUMN IF NOT EXISTS student_id UUID;
+
+-- Backfill student_id by name best-effort (matching full name concatenation) if null
+DO $$
+BEGIN
+  UPDATE violations v
+  SET student_id = s.id
+  FROM students s
+  WHERE v.student_id IS NULL
+    AND LOWER(v.student_name) = LOWER(
+      trim(
+        COALESCE(s.first_name,'') || ' ' ||
+        COALESCE(s.middle_name,'') || ' ' ||
+        COALESCE(s.last_name,'')
+      )
+    );
+EXCEPTION WHEN others THEN
+  RAISE NOTICE 'Skipped backfill of violations.student_id: %', SQLERRM;
+END$$;
+
+-- Add FK (ignore if cannot because of bad data)
+DO $$
+BEGIN
+  ALTER TABLE violations
+    ADD CONSTRAINT violations_student_fk
+    FOREIGN KEY (student_id) REFERENCES students(id)
+    ON DELETE SET NULL;
+EXCEPTION WHEN others THEN
+  RAISE NOTICE 'Could not add FK violations_student_fk (maybe already exists or data mismatch): %', SQLERRM;
+END$$;
+
+-- Helpful index for lookups by student_id
+CREATE INDEX IF NOT EXISTS idx_violations_student_id ON violations(student_id);
+
+-- View for frontend to easily detect repeat violation counts per student & type
+CREATE OR REPLACE VIEW violation_stats AS
+SELECT
+  student_id,
+  violation_type,
+  COUNT(*) AS count
+FROM violations
+WHERE violation_type IS NOT NULL AND student_id IS NOT NULL
+GROUP BY student_id, violation_type;
+
 -- SMS logs
 CREATE TABLE IF NOT EXISTS sms_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
