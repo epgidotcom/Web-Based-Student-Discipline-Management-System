@@ -220,7 +220,7 @@ async function scheduleReload(){
 
 // Listen for localStorage flag changes (cross-tab)
 window.addEventListener('storage', (e)=>{
-  if(e.key === 'sdms_violations_dirty'){ scheduleReload(); }
+  if(e.key === 'sdms_violations_dirty' || e.key === 'sdms_students_dirty' || e.key === 'sdms_data_dirty'){ scheduleReload(); }
 });
 
 // Also listen to custom event dispatched within same tab

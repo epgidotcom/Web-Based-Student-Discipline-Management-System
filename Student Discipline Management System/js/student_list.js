@@ -198,6 +198,9 @@ studentForm.onsubmit = async (e) => {
     renderTable();
     studentModal.style.display = 'none';
     window.dispatchEvent(new Event('sdms:data-changed'));
+    // Mark students data as dirty for dashboard auto-refresh
+    try { localStorage.setItem('sdms_students_dirty', String(Date.now())); } catch(_) {}
+    try { localStorage.setItem('sdms_data_dirty', String(Date.now())); } catch(_) {}
   } catch (err) {
     console.error(err);
     alert('Failed to save student. Please try again.');
@@ -307,6 +310,8 @@ async function deleteStudent(i) {
     students.splice(i, 1);
     renderTable();
     window.dispatchEvent(new Event('sdms:data-changed'));
+    try { localStorage.setItem('sdms_students_dirty', String(Date.now())); } catch(_) {}
+    try { localStorage.setItem('sdms_data_dirty', String(Date.now())); } catch(_) {}
   } catch (err) {
     console.error(err);
     alert('Failed to delete student.');
