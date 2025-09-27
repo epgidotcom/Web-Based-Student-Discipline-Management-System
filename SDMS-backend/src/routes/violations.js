@@ -93,19 +93,7 @@ router.get('/stats', async (req, res) => {
 });
 
 // Single
-router.get('/:id', async (req, res) => {
-  try {
-    const { rows } = await query('SELECT id, student_id, student_name, grade_section, offense_type, sanction, description, incident_date, status, repeat_count_at_insert, evidence, created_at, updated_at FROM violations WHERE id = $1', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    const row = rows[0];
-    row.repeat_count = row.repeat_count_at_insert;
-    res.json(row);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Repeat count preview endpoint (still used by frontend real-time)
+// Repeat count preview endpoint (must be before :id)
 router.get('/repeat/check', async (req, res) => {
   try {
     const studentId = req.query.student_id;
@@ -116,6 +104,19 @@ router.get('/repeat/check', async (req, res) => {
       [studentId, offenseType]
     );
     res.json({ count: rows[0]?.count || 0 });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Single (placed after specific sub-routes)
+router.get('/:id', async (req, res) => {
+  try {
+    const { rows } = await query('SELECT id, student_id, student_name, grade_section, offense_type, sanction, description, incident_date, status, repeat_count_at_insert, evidence, created_at, updated_at FROM violations WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const row = rows[0];
+    row.repeat_count = row.repeat_count_at_insert;
+    res.json(row);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

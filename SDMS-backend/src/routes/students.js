@@ -65,6 +65,10 @@ router.post('/', async (req, res) => {
     }
     res.status(201).json(rows[0]);
   } catch (e) {
+    // Unique violation for LRN (Postgres code 23505). Provide friendlier message & 409 Conflict.
+    if (e && e.code === '23505' && /lrn/i.test(e.detail || '') ) {
+      return res.status(409).json({ error: 'LRN already exists' });
+    }
     res.status(500).json({ error: e.message });
   }
 });
@@ -136,6 +140,9 @@ router.put('/:id', async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
+    if (e && e.code === '23505' && /lrn/i.test(e.detail || '')) {
+      return res.status(409).json({ error: 'LRN already exists' });
+    }
     res.status(500).json({ error: e.message });
   }
 });
