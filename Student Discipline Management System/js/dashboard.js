@@ -13,10 +13,11 @@ let violations = []; // populated from API
 let violationStats = null; // stats from /api/violations/stats
 
 async function loadData(){
+  const cacheBust = `?_=${Date.now()}`; // avoid any stale CDN caching
   const [stu, vio, stats] = await Promise.all([
-    apiJSON('/api/students').catch(()=>[]),
-    apiJSON('/api/violations').catch(()=>[]),
-    apiJSON('/api/violations/stats').catch(()=>null)
+    apiJSON('/api/students'+cacheBust).catch(err=>{ console.warn('[Dashboard] students fetch failed', err); return []; }),
+    apiJSON('/api/violations'+cacheBust).catch(err=>{ console.warn('[Dashboard] violations fetch failed', err); return []; }),
+    apiJSON('/api/violations/stats'+cacheBust).catch(err=>{ console.warn('[Dashboard] stats fetch failed', err); return null; })
   ]);
   students = Array.isArray(stu)? stu : [];
   // Normalize violations: align field names used in charts (type, date, grade, section)
@@ -31,6 +32,7 @@ async function loadData(){
     section: (v.grade_section && v.grade_section.split('-')[1]) || v.section || null
   }));
   violationStats = stats;
+  console.info('[Dashboard] Data loaded',{ studentCount: students.length, violationCount: violations.length, hasStats: !!violationStats });
 }
 
 function showLoading(on){
