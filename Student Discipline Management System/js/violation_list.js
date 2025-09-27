@@ -521,15 +521,29 @@ window.editViolation = function (index) {
 /* ================= Delete violation ================= */
 window.deleteViolation = async function (index) {
   if (!confirm("Delete this violation?")) return;
-  const id = violations[index].id;
+  // Guard against stale index or race
+  if (index < 0 || index >= violations.length) {
+    alert('Item no longer exists in current view. Refreshing...');
+    await loadViolations();
+    return;
+  }
+  const v = violations[index];
+  const id = v.id;
+  // Optimistic removal
+  const snapshot = violations.slice();
+  violations.splice(index, 1);
+  renderTable();
   try {
     await apiFetch(`/api/violations/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    violations.splice(index, 1);
-    renderTable();
+    // After successful delete, refetch to stay in sync (in case server applies ordering / filters)
+    try { await loadViolations(); } catch(_) {}
     window.dispatchEvent(new Event('sdms:data-changed'));
     try { localStorage.setItem('sdms_violations_dirty', String(Date.now())); } catch(_) {}
   } catch(err) {
     console.error('Failed to delete violation', err);
+    // Rollback optimistic UI change
+    violations = snapshot;
+    renderTable();
     alert('Failed to delete violation: ' + err.message);
   }
 };
