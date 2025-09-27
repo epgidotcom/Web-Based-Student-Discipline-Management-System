@@ -195,6 +195,41 @@ async function init(){
 
 init();
 
+// === Auto-refresh when violations change elsewhere ===
+let refreshTimer = null; let lastReload = 0;
+async function scheduleReload(){
+  const now = Date.now();
+  if(now - lastReload < 1000) return; // guard: don't reload more than once per second
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(async ()=>{
+    lastReload = Date.now();
+    try {
+      await loadData();
+      // Rebuild filters (add any new grades/sections/types if they appeared)
+      // Simple approach: clear existing dynamic <option>s except the first blank.
+      ['filterGrade','filterSection','filterType'].forEach(id=>{
+        const sel = document.getElementById(id); if(!sel) return;
+        for(let i=sel.options.length-1;i>0;i--) sel.remove(i);
+      });
+      initFilters();
+      applyFilters();
+      console.info('[Dashboard] Auto-refreshed due to violations change');
+    } catch(e){ console.warn('[Dashboard] Auto-refresh failed', e); }
+  }, 250); // slight debounce for burst events
+}
+
+// Listen for localStorage flag changes (cross-tab)
+window.addEventListener('storage', (e)=>{
+  if(e.key === 'sdms_violations_dirty'){ scheduleReload(); }
+});
+
+// Also listen to custom event dispatched within same tab
+window.addEventListener('sdms:data-changed', scheduleReload);
+
+// Refresh when tab becomes visible again (in case user left it open)
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') scheduleReload(); });
+window.addEventListener('focus', scheduleReload);
+
 // Logout (retained)
 document.getElementById("logoutBtn")?.addEventListener("click", () => { window.location.href = "index.html"; });
 });

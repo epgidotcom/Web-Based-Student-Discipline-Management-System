@@ -95,6 +95,11 @@
     <form id="violationForm">
       <input type="hidden" id="editIndex">
 
+  <!-- 0) LRN (optional fast lookup) -->
+  <label>LRN (Lookup):</label>
+  <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" pattern="[0-9A-Za-z\- ]+" title="Alphanumeric LRN" />
+  <!-- Status message injected dynamically -->
+
       <!-- 1) Student Name -->
       <label>Student Name:</label>
       <input type="text" id="studentName" autocomplete="off" required>

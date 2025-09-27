@@ -2,6 +2,7 @@
 let violations = [];
 let studentsIndex = []; // array of student objects from /api/students
 let studentNameMap = new Map(); // lower(full name) -> student
+let studentLrnMap = new Map(); // lrn -> student
 const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
 async function apiFetch(path, init) {
@@ -23,9 +24,13 @@ function buildStudentDisplay(s){
 
 function rebuildStudentMap(){
   studentNameMap.clear();
+  studentLrnMap.clear();
   studentsIndex.forEach(s=> {
     const name = buildStudentDisplay(s);
     if(name) studentNameMap.set(name.toLowerCase(), {...s, _display: name});
+    if(s.lrn){
+      studentLrnMap.set(String(s.lrn).trim(), {...s, _display: name});
+    }
   });
 }
 
@@ -116,6 +121,15 @@ if(!repeatInfoEl && violationTypeInput){
   violationTypeInput.parentElement.appendChild(repeatInfoEl);
 }
 let resolvedStudent = null; // cache of currently matched student
+// LRN input + status (created if missing)
+const studentLrnInput = document.getElementById('studentLRN');
+let lrnLookupStatus = document.getElementById('lrnLookupStatus');
+if(!lrnLookupStatus && studentLrnInput){
+  lrnLookupStatus = document.createElement('div');
+  lrnLookupStatus.id = 'lrnLookupStatus';
+  lrnLookupStatus.className = 'field-hint';
+  studentLrnInput.parentElement.appendChild(lrnLookupStatus);
+}
 
 /* ---- Optional legacy input (if your form still has it) ---- */
 const violationInput   = document.getElementById("violation"); // kept for compatibility (not shown in table)
@@ -393,6 +407,7 @@ violationForm.addEventListener("submit", async (e) => {
     renderTable();
     violationModal.style.display = "none";
     window.dispatchEvent(new Event('sdms:data-changed'));
+    try { localStorage.setItem('sdms_violations_dirty', String(Date.now())); } catch(_) {}
   } catch(err) {
     console.error('Failed to save violation', err);
     alert('Failed to save violation: ' + err.message);
@@ -512,6 +527,7 @@ window.deleteViolation = async function (index) {
     violations.splice(index, 1);
     renderTable();
     window.dispatchEvent(new Event('sdms:data-changed'));
+    try { localStorage.setItem('sdms_violations_dirty', String(Date.now())); } catch(_) {}
   } catch(err) {
     console.error('Failed to delete violation', err);
     alert('Failed to delete violation: ' + err.message);
@@ -566,6 +582,37 @@ function updateResolvedStudent(){
   updateRepeatDisplay();
 }
 
+// Attempt resolve by LRN first (non-destructive). If an exact LRN match is found,
+// we populate the name field (if empty or mismatched) and auto-fill grade/section when blank.
+async function updateResolvedStudentByLRN(){
+  if(!studentLrnInput) return;
+  const lrn = (studentLrnInput.value || '').trim();
+  if(!lrn){
+    if(lrnLookupStatus){ lrnLookupStatus.textContent=''; }
+    return;
+  }
+  const s = studentLrnMap.get(lrn);
+  if(s){
+    // Set resolvedStudent and sync name field if different
+    resolvedStudent = s;
+    const displayName = buildStudentDisplay(s);
+    if(studentNameInput && (!studentNameInput.value.trim() || studentNameInput.value.trim().toLowerCase() !== displayName.toLowerCase())){
+      studentNameInput.value = displayName;
+    }
+    if(gradeSectionInput && (!gradeSectionInput.value.trim())){
+      if(s.grade && s.section){ gradeSectionInput.value = `${s.grade}-${s.section}`; }
+      else if(s.grade){ gradeSectionInput.value = s.grade; }
+    }
+    if(lrnLookupStatus){ lrnLookupStatus.textContent = 'LRN found ✔'; lrnLookupStatus.style.color = '#2e7d32'; }
+    // refresh name-based status too
+    updateResolvedStudent();
+  } else {
+    if(lrnLookupStatus){ lrnLookupStatus.textContent = 'LRN not found in loaded students.'; lrnLookupStatus.style.color = '#c62828'; }
+  }
+  if(saveBtn) saveBtn.disabled = !resolvedStudent;
+  updateRepeatDisplay();
+}
+
 async function updateRepeatDisplay(){
   if(!repeatInfoEl){ return; }
   const violationType = (violationTypeInput?.value || '').trim();
@@ -589,6 +636,10 @@ if (studentNameInput) {
 if (violationTypeInput){
   violationTypeInput.addEventListener('change', ()=> updateRepeatDisplay());
   violationTypeInput.addEventListener('input', debounce(updateRepeatDisplay, 250));
+}
+if(studentLrnInput){
+  studentLrnInput.addEventListener('input', debounce(updateResolvedStudentByLRN, 250));
+  studentLrnInput.addEventListener('change', updateResolvedStudentByLRN);
 }
 
 // Allow other parts (like autocomplete) to set the student programmatically:
