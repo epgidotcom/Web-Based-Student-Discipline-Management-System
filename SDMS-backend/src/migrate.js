@@ -30,16 +30,51 @@ CREATE TABLE IF NOT EXISTS violations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_name TEXT NOT NULL,
   grade_section TEXT,
-  violation_type TEXT,
+  offense_type TEXT, -- renamed from violation_type
   sanction TEXT,
   description TEXT,
   violation TEXT, -- legacy single-field (optional)
-  date DATE,
+  incident_date DATE, -- renamed from date
   evidence JSONB, -- array of data URL strings (base64) or future structured refs
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_violations_student_name ON violations(student_name);
-CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(date);
+
+-- Legacy rename handling (idempotent): date -> incident_date, violation_type -> offense_type
+DO $$
+BEGIN
+  -- date -> incident_date
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='violations' AND column_name='date'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='violations' AND column_name='incident_date'
+  ) THEN
+    EXECUTE 'ALTER TABLE violations RENAME COLUMN date TO incident_date';
+  END IF;
+  -- violation_type -> offense_type
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='violations' AND column_name='violation_type'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='violations' AND column_name='offense_type'
+  ) THEN
+    EXECUTE 'ALTER TABLE violations RENAME COLUMN violation_type TO offense_type';
+  END IF;
+EXCEPTION WHEN others THEN
+  RAISE NOTICE 'Skipped legacy rename(s): %', SQLERRM;
+END$$;
+
+-- Drop obsolete index if still present
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_indexes WHERE tablename='violations' AND indexname='idx_violations_date'
+  ) THEN
+    EXECUTE 'DROP INDEX idx_violations_date';
+  END IF;
+END$$;
+
+-- Create index on new incident_date column
+CREATE INDEX IF NOT EXISTS idx_violations_incident_date ON violations(incident_date);
 
 -- Add student_id column (UUID) to violations if missing and create FK to students(id)
 ALTER TABLE violations ADD COLUMN IF NOT EXISTS student_id UUID;
@@ -80,11 +115,11 @@ CREATE INDEX IF NOT EXISTS idx_violations_student_id ON violations(student_id);
 CREATE OR REPLACE VIEW violation_stats AS
 SELECT
   student_id,
-  violation_type,
+  offense_type AS violation_type, -- preserve legacy view column name for compatibility
   COUNT(*) AS count
 FROM violations
-WHERE violation_type IS NOT NULL AND student_id IS NOT NULL
-GROUP BY student_id, violation_type;
+WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
+GROUP BY student_id, offense_type;
 
 -- SMS logs
 CREATE TABLE IF NOT EXISTS sms_logs (
