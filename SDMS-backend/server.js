@@ -6,6 +6,7 @@ import accountsRoute from './src/routes/accounts.js';
 import offensesRoute from './src/routes/offenses.js';
 import smsRoute from './src/routes/sms.js';
 import studentsRoute from './src/routes/students.js';
+import violationsRoute from './src/routes/violations.js';
 import { runMigrations } from './src/migrate.js';
 
 const app = express();
@@ -85,6 +86,31 @@ app.use('/api/accounts', accountsRoute);
 app.use('/api/past-offenses', offensesRoute);
 app.use('/api/sms', smsRoute);
 app.use('/api/students', studentsRoute);
+// IMPORTANT: Add violations route (missing earlier caused 404 on /api/violations)
+app.use('/api/violations', violationsRoute);
+
+// Optional debug route to list mounted paths (enable by setting DEBUG_ROUTES=true)
+if (process.env.DEBUG_ROUTES === 'true') {
+  app.get('/_debug/routes', (_req, res) => {
+    const listed = [];
+    app._router.stack.forEach(layer => {
+      if (layer.route && layer.route.path) {
+        const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
+        listed.push(`${methods} ${layer.route.path}`);
+      } else if (layer.name === 'router' && layer.handle?.stack) {
+        layer.handle.stack.forEach(r => {
+          if (r.route && r.route.path) {
+            const methods = Object.keys(r.route.methods).join(',').toUpperCase();
+            // layer.regexp is internal; we just show the route path prefix if available
+            listed.push(`${methods} (sub) ${r.route.path}`);
+          }
+        });
+      }
+    });
+    res.json({ routes: listed });
+  });
+  console.log('[DEBUG_ROUTES] Enabled. Visit /_debug/routes to see mounted routes.');
+}
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
