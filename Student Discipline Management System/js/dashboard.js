@@ -21,16 +21,24 @@ async function loadData(){
   ]);
   students = Array.isArray(stu)? stu : [];
   // Normalize violations: align field names used in charts (type, date, grade, section)
-  violations = (Array.isArray(vio)? vio: []).map(v=>({
-    id: v.id,
-    studentId: v.student_id,
-    studentName: v.student_name,
-    type: v.offense_type || v.violation_type || '',
-    status: v.status || 'Pending',
-    date: v.incident_date || v.date || v.created_at,
-    grade: (v.grade_section && v.grade_section.split('-')[0]) || v.grade || null,
-    section: (v.grade_section && v.grade_section.split('-')[1]) || v.section || null
-  }));
+  violations = (Array.isArray(vio)? vio: []).map(v=>{
+    // Prefer explicit incident/legacy date; fallback to created_at (extract date part if timestamp)
+    let rawDate = v.incident_date || v.date || null;
+    if(!rawDate && v.created_at){
+      const m = String(v.created_at).match(/^\d{4}-\d{2}-\d{2}/);
+      if(m) rawDate = m[0];
+    }
+    return {
+      id: v.id,
+      studentId: v.student_id,
+      studentName: v.student_name,
+      type: v.offense_type || v.violation_type || '',
+      status: v.status || 'Pending',
+      date: rawDate,
+      grade: (v.grade_section && v.grade_section.split('-')[0]) || v.grade || null,
+      section: (v.grade_section && v.grade_section.split('-')[1]) || v.section || null
+    };
+  });
   violationStats = stats;
   console.info('[Dashboard] Data loaded',{ studentCount: students.length, violationCount: violations.length, hasStats: !!violationStats });
 }
@@ -50,8 +58,19 @@ function showLoading(on){
   }
 }
 
-/* ===== Helpers (unchanged) ===== */
-const toDate = (s) => (s instanceof Date ? s : new Date(s + "T00:00:00"));
+/* ===== Helpers ===== */
+// Robust date parser: accepts 'YYYY-MM-DD' OR full ISO timestamp; previous version broke timestamps by appending T00:00:00 always
+const toDate = (s) => {
+  if(!s) return new Date('Invalid');
+  if(s instanceof Date) return s;
+  if(typeof s === 'string'){
+    const t = s.trim();
+    if(!t) return new Date('Invalid');
+    if(t.includes('T')) return new Date(t); // already ISO
+    return new Date(t + 'T00:00:00');
+  }
+  return new Date(s);
+};
 const fmt = (d) => DATE_FMT.format(d);
 const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
 const startOfDay = (d)=>new Date(d.getFullYear(), d.getMonth(), d.getDate());
