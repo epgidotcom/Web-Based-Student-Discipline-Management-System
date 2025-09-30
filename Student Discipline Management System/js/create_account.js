@@ -8,8 +8,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Logout
   document.getElementById("logoutBtn").addEventListener("click", () => {
+    sessionStorage.removeItem('sdmsUser');
     window.location.href = "index.html";
   });
+
+  // Auth guard: only allow Admin
+  try {
+    const rawUser = sessionStorage.getItem('sdmsUser');
+    if (rawUser){
+      const user = JSON.parse(rawUser);
+      if (user?.role !== 'Admin') {
+        alert('Admin access required.');
+        window.location.href = 'dashboard.html';
+        return;
+      }
+      // Set display name/avatar if available
+      const nameEl = document.getElementById('userName');
+      const avEl = document.getElementById('userAvatar');
+      if (nameEl) nameEl.textContent = user.fullName || user.username;
+      if (avEl) avEl.textContent = (user.fullName || user.username || '?').charAt(0).toUpperCase();
+    } else {
+      window.location.href = 'index.html';
+      return;
+    }
+  } catch(e){
+    console.warn('Auth parse failed', e);
+    window.location.href = 'index.html';
+    return;
+  }
 
   // Toggle grade field based on role
   roleSelect.addEventListener("change", () => {
@@ -25,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadAccounts(){
     try{
       msg.textContent = 'Loading accounts…';
-      const res = await fetch(`${API_BASE}/api/accounts`);
+  const res = await fetch(`${API_BASE}/api/accounts`, { headers: SDMSAuth.authHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const list = await res.json();
       renderTable(list);
@@ -61,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!id) return;
         if (!confirm('Delete this account?')) return;
         try{
-          const res = await fetch(`${API_BASE}/api/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          const res = await fetch(`${API_BASE}/api/accounts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: SDMSAuth.authHeaders() });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           await loadAccounts();
         }catch(err){
@@ -102,7 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try{
       const res = await fetch(`${API_BASE}/api/accounts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: SDMSAuth.authHeaders(),
         body: JSON.stringify(newUser)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

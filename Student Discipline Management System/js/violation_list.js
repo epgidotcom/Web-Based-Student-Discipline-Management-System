@@ -1,3 +1,6 @@
+/* ================= Auth guard ================= */
+if (window.SDMSAuth) { const u = SDMSAuth.requireLogin(); if(!u) { /* redirected */ throw new Error('Auth required'); } SDMSAuth.showUser(); }
+
 /* ================= Persistence via API (replaces previous in-memory only list) ================= */
 let violations = [];
 let studentsIndex = []; // array of student objects from /api/students
@@ -7,7 +10,8 @@ const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
 async function apiFetch(path, init) {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
+  const headers = window.SDMSAuth ? SDMSAuth.authHeaders() : { 'Content-Type':'application/json' };
+  const res = await fetch(url, { headers, ...init });
   if (!res.ok) {
     let txt = '';
     try { txt = await res.text(); } catch {}

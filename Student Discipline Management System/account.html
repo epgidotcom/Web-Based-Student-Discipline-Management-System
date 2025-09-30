@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/create_account.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
 </head>
 <body>
 
@@ -69,8 +71,9 @@
       <label for="role">Role:</label>
       <select id="role" required>
         <option value="">-- Select Role --</option>
+        <option value="Admin">Admin</option>
         <option value="Student">Student</option>
-        <option value="Teacher">Teacher</option>
+  <option value="Teacher">Guidance Counselor</option>
       </select>
 
       <div id="gradeGroup" style="display: none;">

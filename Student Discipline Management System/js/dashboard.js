@@ -1,9 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
+// Require login
+if (window.SDMSAuth) { const user = SDMSAuth.requireLogin(); if(!user) return; SDMSAuth.showUser(); }
 const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
 async function apiJSON(path){
-  const res = await fetch(API_BASE+path,{headers:{'Content-Type':'application/json'}});
+  const headers = window.SDMSAuth ? SDMSAuth.authHeaders() : { 'Content-Type':'application/json' };
+  const res = await fetch(API_BASE+path,{headers});
   if(!res.ok) throw new Error(path+': '+res.status);
   return res.json();
 }
