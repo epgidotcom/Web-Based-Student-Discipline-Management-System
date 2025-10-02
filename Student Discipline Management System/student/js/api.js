@@ -1,8 +1,18 @@
 // Generic API helper for student pages
 // Relies on global window.API_BASE provided by ../js/config.js
+const rawBase = (window.API_BASE || window.SDMS_CONFIG?.API_BASE || '').replace(/\/+$/,'');
+function buildUrl(path){
+  if(!rawBase){
+    console.warn('[api] Missing API_BASE, defaulting to /api');
+    return '/api'+path;
+  }
+  // If rawBase already ends with /api allow path starting with /violations etc.
+  return rawBase.endsWith('/api') ? rawBase + path : rawBase + path;
+}
+
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   const token = localStorage.getItem('token');
-  const res = await fetch(`${window.API_BASE}${path}`, {
+  const res = await fetch(buildUrl(path), {
     method,
     headers: {
       'Content-Type': 'application/json',
