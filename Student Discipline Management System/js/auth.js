@@ -17,11 +17,6 @@ function requireRole(roles){
   const role = (user.role||'').toLowerCase();
   const needed = (Array.isArray(roles)? roles: []).map(r=>r.toLowerCase());
   if(needed.length && !needed.includes(role)){
-    // legacy path cleanup: if old spaced folder path somehow used, force correct one
-    if(location.pathname.match(/MPNAG%20STUDENT|MPNAG STUDENT/i)){
-      location.replace('/student/student_dashboard.html?v=2');
-      return false;
-    }
     if(role === 'student'){
       window.location.href = '/student/student_dashboard.html?v=2';
     } else {
