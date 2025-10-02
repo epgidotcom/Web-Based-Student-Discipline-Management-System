@@ -12,14 +12,15 @@
   --danger: #dc3545;
 }
 
-* {
+/* Narrow box-sizing to just the UI pieces that need it */
+input, select, textarea, button, .panel, .form-grid > * {
   box-sizing: border-box;
 }
+
 
 html, body {
   height: 100%;
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica Neue, Arial;
   background: var(--bg);
   color: var(--text);
 }
@@ -310,5 +311,88 @@ textarea {
   background-color: #c82333;
 }
 
+
+
+/* Responsive */
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr; }
+}
+
+.sidebar img {
+  display: block;
+  width: 160px;        /* or 100% if it’s in a constrained container */
+  height: auto;
+  max-width: 100%;
+  box-sizing: content-box; /* explicitly opt out */
+}
+
+
+
+
+/* === SMS Page Layout (Form left • Preview right) === */
+.sms-container{
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;   /* form | preview */
+  gap: 20px;
+  align-items: start;
+}
+
+/* Form card look (optional, matches your .panel style) */
+.sms-form{
+  background: var(--panel);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+/* Preview column acts like a panel and stays visible */
+.sms-preview{
+  background: var(--panel);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 96px;             /* adjust if your topbar height differs */
+}
+
+/* Header inside the preview */
+.sms-preview .chat-header{
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--outline);
+  background: #f1f3f5;
+  font-weight: 600;
+}
+
+/* Body/scroll area for the preview bubbles */
+.sms-preview #chat{
+  padding: 16px;
+  background: #f8f9fa;
+  max-height: calc(100vh - 180px);   /* keeps it inside the viewport */
+  overflow: auto;
+}
+
+/* Tidy the first system bubble */
+.sms-preview #chat .msg:first-child{
+  background: #fff;
+  border: 1px solid var(--outline);
+}
+
+/* Buttons inside form rows */
+.button-row{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Counter & meta text */
+.sms-counter{ color: var(--muted); font-size: 12px; margin: 8px 0; }
+.meta-info .help{ margin-top: 6px; }
+
+/* Responsive: stack on small screens */
+@media (max-width: 1100px){
+  .sms-container{ grid-template-columns: 1fr; }
+  .sms-preview{ position: static; max-height: none; }
+}
 
 

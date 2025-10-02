@@ -12,22 +12,22 @@
 <body>
 
   <!-- Toggle button for mobile -->
-<button class="sidebar-toggle" id="sidebarToggle">
-  <i class="fa fa-bars"></i>
-</button>
+  <button class="sidebar-toggle" id="sidebarToggle">
+    <i class="fa fa-bars"></i>
+  </button>
 
   <!-- Sidebar -->
   <aside class="sidebar">
     <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
     <a href="student_dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
-    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
     <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
-    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
     <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
-<!-- Backdrop for mobile -->
-<div class="backdrop" id="sidebarBackdrop"></div>
+
+  <!-- Backdrop for mobile -->
+  <div class="backdrop" id="sidebarBackdrop"></div>
+
   <!-- Main -->
   <main class="main">
     <header class="topbar">
@@ -37,8 +37,8 @@
       </div>
       <div class="profile">
         <div class="name-grade">
-          <strong>Juan Dela Cruz</strong>
-          <small>Grade 9 • Section Emerald</small>
+          <strong id="studentName">Juan Dela Cruz</strong>
+          <small id="studentSection">Grade 9 • Emerald</small>
         </div>
         <img src="images/sample_avatar.png"
              onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
@@ -46,29 +46,17 @@
       </div>
     </header>
 
-    <!-- Dashboard Cards -->
-    <section class="cards">
-      <div class="card">
-        <i class="fa fa-exclamation-circle"></i>
-        <h2 id="totalViolations">0</h2>
-        <p>Total Violations</p>
+    <!-- Welcome Banner -->
+    <section class="welcome-banner">
+      <div class="welcome-text">
+        <h2>Welcome back, Juan!</h2>
+        <p>Keep track of your conduct and stay informed about your student discipline records.</p>
       </div>
-      <div class="card">
-        <i class="fa fa-folder-open"></i>
-        <h2 id="openCases">0</h2>
-        <p>Open Cases</p>
-      </div>
-      <div class="card">
-        <i class="fa fa-calendar"></i>
-        <h2 id="lastViolation">—</h2>
-        <p>Last Violation</p>
-      </div>
-      <div class="card">
-        <i class="fa fa-user-check"></i>
-        <span class="status" id="studentStatus">Good Standing</span>
-        <p>Status</p>
+      <div class="welcome-illustration">
+        <i class="fa-solid fa-user-graduate"></i>
       </div>
     </section>
+
 
     <!-- Charts -->
     <section class="grid-2">
@@ -96,90 +84,112 @@
             </tr>
           </thead>
           <tbody id="violationRows">
-            <!-- auto-filled by JS -->
+            <!-- Dynamically filled from backend -->
           </tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <!-- Script -->
+  <!-- JS -->
   <script>
-    // 🔹 Sample Data (10 lang!)
-    const violations = [
-      { date: "2025-06-10", type: "Tardiness", remarks: "Arrived late for class", status: "Resolved" },
-      { date: "2025-06-22", type: "No ID", remarks: "Forgot school ID", status: "Resolved" },
-      { date: "2025-07-01", type: "Uniform", remarks: "Incomplete uniform", status: "Resolved" },
-      { date: "2025-07-12", type: "Disrespect", remarks: "Talking back to teacher", status: "Pending" },
-      { date: "2025-07-20", type: "Tardiness", remarks: "15 mins late", status: "Resolved" },
-      { date: "2025-08-02", type: "Cheating", remarks: "Phone visible during quiz", status: "Pending" },
-      { date: "2025-08-15", type: "No ID", remarks: "Lost ID", status: "Resolved" },
-      { date: "2025-08-22", type: "Uniform", remarks: "Wearing PE uniform on non-PE day", status: "Pending" },
-      { date: "2025-09-05", type: "Disrespect", remarks: "Shouting in class", status: "Resolved" },
-      { date: "2025-09-10", type: "Tardiness", remarks: "Late arrival", status: "Pending" }
-    ];
+    let allViolations = [];
+    let lineChart, barChart;
 
-    // 🔹 Update Cards
-    const total = violations.length;
-    const open = violations.filter(v => v.status === "Pending").length;
-    const last = violations[violations.length - 1].date;
-    document.getElementById("totalViolations").textContent = total;
-    document.getElementById("openCases").textContent = open;
-    document.getElementById("lastViolation").textContent = last;
-    document.getElementById("studentStatus").textContent =
-      open >= 3 ? "On Probation" : "Good Standing";
+    // Load dashboard data from backend
+    async function loadDashboardData() {
+      try {
+        const res = await fetch('/api/dashboard/student'); // <-- replace with your endpoint
+        if (!res.ok) throw new Error('Failed to fetch dashboard data');
+        const data = await res.json();
 
-    // 🔹 Fill Table
-    const tbody = document.getElementById("violationRows");
-    violations.forEach(v => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${v.date}</td>
-        <td>${v.type}</td>
-        <td>${v.remarks}</td>
-        <td><span class="status ${v.status.toLowerCase()}">${v.status}</span></td>
-      `;
-      tbody.appendChild(tr);
-    });
+        // Expect structure: { student: {...}, violations: [...] }
+        if (data.student) {
+          document.getElementById("studentName").textContent = data.student.name || "—";
+          document.getElementById("studentSection").textContent = data.student.section || "—";
+        }
 
-    // 🔹 Charts
-    const lineCtx = document.getElementById("lineChart");
-    const barCtx = document.getElementById("barChart");
+        if (data.violations && Array.isArray(data.violations)) {
+          allViolations = data.violations;
+          renderTable(allViolations);
+          renderCharts(allViolations);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Unable to load dashboard data. Please try again later.");
+      }
+    }
 
-    // Line Chart (timeline)
-    new Chart(lineCtx, {
-      type: "line",
-      data: {
-        labels: violations.map(v => v.date),
-        datasets: [{
-          label: "Violations",
-          data: violations.map((_, i) => i + 1),
-          borderColor: "#e74c3c",
-          backgroundColor: "rgba(231, 76, 60, 0.3)",
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: { plugins: { legend: { display: false } }, responsive: true }
-    });
+    // Render table
+    function renderTable(rows) {
+      const tbody = document.getElementById("violationRows");
+      tbody.innerHTML = "";
+      rows.forEach(v => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${v.date || '-'}</td>
+          <td>${v.type || '-'}</td>
+          <td>${v.remarks || '-'}</td>
+          <td><span class="status ${v.status?.toLowerCase() || ''}">${v.status || '-'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
 
-    // Bar Chart (by type)
-    const byType = {};
-    violations.forEach(v => { byType[v.type] = (byType[v.type] || 0) + 1; });
-    new Chart(barCtx, {
-      type: "bar",
-      data: {
-        labels: Object.keys(byType),
-        datasets: [{
-          label: "Count",
-          data: Object.values(byType),
-          backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
-        }]
-      },
-      options: { plugins: { legend: { display: false } }, responsive: true }
-    });
+    // Render charts
+    function renderCharts(rows) {
+      if (lineChart) lineChart.destroy();
+      if (barChart) barChart.destroy();
+
+      const sorted = rows.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+      const labels = sorted.map(v => v.date);
+      const counts = sorted.map((_, i) => i + 1);
+
+      // Line chart
+      lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "Violations",
+            data: counts,
+            borderColor: "#e74c3c",
+            backgroundColor: "rgba(231, 76, 60, 0.3)",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+
+      // Bar chart
+      const byType = {};
+      rows.forEach(v => { if(v.type) byType[v.type] = (byType[v.type] || 0) + 1; });
+
+      barChart = new Chart(document.getElementById("barChart"), {
+        type: "bar",
+        data: {
+          labels: Object.keys(byType),
+          datasets: [{
+            label: "Count",
+            data: Object.values(byType),
+            backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+    }
+
+    // Sidebar toggle
+    const sidebar = document.querySelector(".sidebar");
+    const toggleBtn = document.getElementById("sidebarToggle");
+    toggleBtn.addEventListener("click", () => sidebar.classList.toggle("closed"));
+
+    // Init
+    loadDashboardData();
   </script>
+
   <script src="js/sidebar.js"></script>
-  <script src="JAVA/main.js"></script>
+  <script src="js/main.js"></script>
 </body>
-</html> 
+</html>

@@ -4,34 +4,46 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SDMS - My Violations</title>
-  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="css/student.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <!-- Toggle button for mobile -->
-<button class="sidebar-toggle" id="sidebarToggle">
-  <i class="fa fa-bars"></i>
-</button>
+  <!-- Toggle button for mobile -->
+  <button class="sidebar-toggle" id="sidebarToggle">
+    <i class="fa fa-bars"></i>
+  </button>
+
   <!-- Sidebar -->
   <aside class="sidebar">
     <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
     <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="violations.html" class="active"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
-    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
     <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
-    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
     <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
-<!-- Backdrop for mobile -->
-<div class="backdrop" id="sidebarBackdrop"></div>
+
+  <!-- Backdrop for mobile -->
+  <div class="backdrop" id="sidebarBackdrop"></div>
+
   <!-- Main -->
   <main class="main">
     <header class="topbar">
       <div class="title">
         <h1>Student Discipline Management System</h1>
         <span class="subtitle">My Violations</span>
+      </div>
+
+      <!-- Profile Section -->
+      <div class="profile">
+        <div class="name-grade">
+          <strong id="studentName">Juan Dela Cruz</strong>
+          <small id="studentSection">Grade 9 • Emerald</small>
+        </div>
+        <img src="images/sample_avatar.png"
+             onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
+             alt="Avatar" class="avatar"/>
       </div>
     </header>
 
@@ -62,11 +74,6 @@
           <label for="typeFilter">Type</label>
           <select id="typeFilter">
             <option value="All">All</option>
-            <option value="Tardiness">Tardiness</option>
-            <option value="No ID">No ID</option>
-            <option value="Uniform">Uniform</option>
-            <option value="Disrespect">Disrespect</option>
-            <option value="Cheating">Cheating</option>
           </select>
         </div>
         <button id="applyBtn" class="btn primary"><i class="fa fa-filter"></i> Apply</button>
@@ -88,7 +95,7 @@
             </tr>
           </thead>
           <tbody id="violationRows">
-            <!-- auto-filled by JS -->
+            <!-- Filled dynamically -->
           </tbody>
         </table>
       </div>
@@ -96,46 +103,62 @@
   </main>
 
   <script>
-    // 🔹 Sample Data
-    const violations = [
-      { date: "2025-06-10", type: "Tardiness", remarks: "Arrived late for class", status: "Resolved" },
-      { date: "2025-06-22", type: "No ID", remarks: "Forgot school ID", status: "Resolved" },
-      { date: "2025-07-01", type: "Uniform", remarks: "Incomplete uniform", status: "Resolved" },
-      { date: "2025-07-12", type: "Disrespect", remarks: "Talking back to teacher", status: "Pending" },
-      { date: "2025-07-20", type: "Tardiness", remarks: "15 mins late", status: "Resolved" },
-      { date: "2025-08-02", type: "Cheating", remarks: "Phone visible during quiz", status: "Pending" },
-      { date: "2025-08-15", type: "No ID", remarks: "Lost ID", status: "Resolved" },
-      { date: "2025-08-22", type: "Uniform", remarks: "Wearing PE uniform on non-PE day", status: "Pending" },
-      { date: "2025-09-05", type: "Disrespect", remarks: "Shouting in class", status: "Resolved" },
-      { date: "2025-09-10", type: "Tardiness", remarks: "Late arrival", status: "Pending" }
-    ];
+    let allViolations = [];
+    let lineChart, barChart;
 
-    // 🔹 Fill Table
+    // Fetch violations from backend
+    async function loadViolations() {
+      try {
+        const res = await fetch('/api/violations/student'); // ← replace with your endpoint
+        if (!res.ok) throw new Error('Failed to load violations');
+        const data = await res.json();
+        allViolations = data || [];
+        populateTypeFilter(allViolations);
+        renderTable(allViolations);
+        renderCharts(allViolations);
+      } catch (err) {
+        console.error(err);
+        alert('Unable to load violations. Please try again later.');
+      }
+    }
+
+    // Populate Type Filter
+    function populateTypeFilter(rows) {
+      const types = [...new Set(rows.map(v => v.type))];
+      const select = document.getElementById("typeFilter");
+      types.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        select.appendChild(opt);
+      });
+    }
+
+    // Render Table
     function renderTable(rows) {
       const tbody = document.getElementById("violationRows");
       tbody.innerHTML = "";
       rows.forEach(v => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${v.date}</td>
-          <td>${v.type}</td>
-          <td>${v.remarks}</td>
-          <td><span class="status ${v.status.toLowerCase()}">${v.status}</span></td>
+          <td>${v.date || '-'}</td>
+          <td>${v.type || '-'}</td>
+          <td>${v.remarks || '-'}</td>
+          <td><span class="status ${v.status?.toLowerCase() || ''}">${v.status || '-'}</span></td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // 🔹 Charts
-    let lineChart, barChart;
+    // Render Charts
     function renderCharts(rows) {
-      // Destroy old charts para di mag-stack
       if (lineChart) lineChart.destroy();
       if (barChart) barChart.destroy();
 
       // Line chart (by date)
-      const labels = rows.map(v => v.date);
-      const counts = rows.map((_, i) => i + 1);
+      const sorted = rows.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+      const labels = sorted.map(v => v.date);
+      const counts = sorted.map((_, i) => i + 1);
 
       lineChart = new Chart(document.getElementById("lineChart"), {
         type: "line",
@@ -155,7 +178,7 @@
 
       // Bar chart (by type)
       const byType = {};
-      rows.forEach(v => { byType[v.type] = (byType[v.type] || 0) + 1; });
+      rows.forEach(v => { if(v.type) byType[v.type] = (byType[v.type] || 0) + 1; });
 
       barChart = new Chart(document.getElementById("barChart"), {
         type: "bar",
@@ -170,14 +193,14 @@
         options: { plugins: { legend: { display: false } }, responsive: true }
       });
     }
-    
-    // 🔹 Filters
+
+    // Filter logic
     function applyFilters() {
       const from = document.getElementById("fromDate").value;
       const to = document.getElementById("toDate").value;
       const type = document.getElementById("typeFilter").value;
 
-      let filtered = violations.slice();
+      let filtered = allViolations.slice();
       if (from) filtered = filtered.filter(v => v.date >= from);
       if (to) filtered = filtered.filter(v => v.date <= to);
       if (type !== "All") filtered = filtered.filter(v => v.type === type);
@@ -190,17 +213,24 @@
       document.getElementById("fromDate").value = "";
       document.getElementById("toDate").value = "";
       document.getElementById("typeFilter").value = "All";
-      renderTable(violations);
-      renderCharts(violations);
+      renderTable(allViolations);
+      renderCharts(allViolations);
     }
 
-    // 🔹 Init
+    // Event Listeners
     document.getElementById("applyBtn").addEventListener("click", applyFilters);
     document.getElementById("resetBtn").addEventListener("click", resetFilters);
-    renderTable(violations);
-    renderCharts(violations);
+
+    // Sidebar toggle
+    const sidebar = document.querySelector(".sidebar");
+    const toggleBtn = document.getElementById("sidebarToggle");
+    toggleBtn.addEventListener("click", () => sidebar.classList.toggle("closed"));
+
+    // Initialize
+    loadViolations();
   </script>
+
   <script src="js/sidebar.js"></script>
-  <script src="JAVA/main.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

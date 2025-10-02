@@ -1,5 +1,3 @@
-// js/sms.js  — full replacement
-
 document.addEventListener('DOMContentLoaded', () => {
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -14,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const getVal = (id) => $(`#${id}`)?.value?.trim() ?? '';
 
-  // Welcome clock (if present)
+  // Welcome clock (if present in the HTML)
   const welcomeClock = $('#welcomeClock');
   if (welcomeClock) {
     welcomeClock.textContent = `Today · ${new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}`;
@@ -23,49 +21,53 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Message builder -------------------------------------------------------
   function buildMessage(templateKey) {
     const student   = getVal('student');
-    const grade     = getVal('grade');
-    const violation = getVal('violation');
+    const gradeVal  = getVal('grade');    // "7".."12"
+    const section   = getVal('section');
+    const violation = getVal('violation'); // text input
     const sanction  = getVal('sanction');
     const date      = fmtDateUS($('#date')?.value ?? '');
     const teacher   = getVal('teacher');
 
+    const gradeLabel = gradeVal ? `Grade ${gradeVal}` : '';
+    const classStr = [gradeLabel, section].filter(Boolean).join(' – '); // "Grade 7 – Section A"
+
     const firstName = (student.split(' ')[0] || 'your child');
-    const base = `Parent/Guardian of ${student} (${grade}),`;
+    const base = `Parent/Guardian of ${student}${classStr ? ` (${classStr})` : ''},`;
     let body;
 
     switch (templateKey) {
-      case 'minor':
-        body = `${base} this is to inform you of a minor offense recorded on ${date}: ${violation}. The sanction is ${sanction}. Kindly remind ${firstName} to follow school rules. Teacher-in-Charge: ${teacher}.`;
+      case 'first':
+        body = `${base} this is to inform you of a first offense recorded on ${date}: ${violation}. The sanction is ${sanction}. Kindly remind ${firstName} to follow school rules. Teacher-in-Charge: ${teacher}.`;
         break;
-      case 'major':
-        body = `${base} a major offense was recorded on ${date} for ${violation}. Sanction: ${sanction}. Please expect a follow-up from the Discipline Office. Teacher-in-Charge: ${teacher}.`;
+      case 'second':
+        body = `${base} a second offense was recorded on ${date} for ${violation}. Sanction: ${sanction}. Please expect a follow-up from the Discipline Office. Teacher-in-Charge: ${teacher}.`;
         break;
-      case 'suspension':
-        body = `${base} due to ${violation} on ${date}, the sanction is ${sanction}. Please check your email for full details and next steps. TIC: ${teacher}.`;
+      case 'third':
+        body = `${base} a third offense was recorded on ${date} due to ${violation}. Sanction: ${sanction}. Please check your email for full details and next steps. TIC: ${teacher}.`;
         break;
       default:
-        body = `${base} we wish to inform you that on ${date}, an incident of ${violation} was noted. Sanction: ${sanction}. This is a warning notice for your guidance. Teacher-in-Charge: ${teacher}.`;
+        body = `${base} we wish to inform you that on ${date}, an incident of ${violation} was noted. Sanction: ${sanction}. This is a notice for your guidance. Teacher-in-Charge: ${teacher}.`;
     }
 
     return `School Discipline Notice:\n${body}\n\nThis is a one-way SMS. Replies are not monitored.`;
   }
 
-  // --- Counter ---------------------------------------------------------------
+  // --- Counter (no parenthetical) -------------------------------------------
   function updateCounter() {
     const msg = $('#message');
     const counter = $('#counter');
     if (!msg || !counter) return;
     const len = msg.value.length;
     const seg = len === 0 ? 0 : Math.ceil(len / 160);
-    counter.textContent = `${len} characters • ${seg} SMS segments (160 chars per SMS)`;
+    counter.textContent = `${len} characters • ${seg} SMS segments`;
   }
   $('#message')?.addEventListener('input', updateCounter);
   updateCounter();
 
   // --- Validation ------------------------------------------------------------
   function validateRequired() {
-    // template is optional (defaults to 'default')
-    const ids = ['phone','student','grade','violation','sanction','date','teacher'];
+    // template optional
+    const ids = ['phone','student','grade','section','violation','sanction','date','teacher'];
     const missing = ids.filter(id => !getVal(id) && !$('#' + id)?.value);
     if (missing.length) {
       alert('Please complete all fields before generating the message.');
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Form behaviour --------------------------------------------------------
-  // Never allow native submit reloads
+  // Prevent native submit reloads
   $('#formPanel')?.addEventListener('submit', (e) => e.preventDefault());
 
   // Generate
@@ -99,13 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (box) { box.value = text; updateCounter(); box.focus(); }
   });
 
-  // Preview
-  $('#previewBtn')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const text = getVal('message');
-    if (!text) { alert('Nothing to preview. Generate a message first.'); return; }
-    pushBubble(text, 'right');
-  });
+  // (No Preview button in this HTML, so no handler)
 
   // Send
   $('#sendBtn')?.addEventListener('click', (e) => {
@@ -123,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
       phone,
       student:   getVal('student'),
       grade:     getVal('grade'),
+      section:   getVal('section'),
       violation: getVal('violation'),
       sanction:  getVal('sanction'),
       date:      $('#date')?.value || '',
@@ -131,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       message
     };
 
-    // Replace with your real POST fetch when ready
+    // Replace with real POST when ready
     console.log('POST /api/sms/sanctions/send', payload);
 
     pushBubble(`✔️ Sent to ${payload.phone}:\n\n${payload.message}`, 'right');
@@ -154,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const chat = $('#chat');
     if (chat) {
-      chat.innerHTML = `<div class="msg">Hello Parent/Guardian, you will receive important discipline updates here. Replies are not monitored.<br><small id="welcomeClock"></small></div>`;
+      chat.innerHTML = `Hello Parent/Guardian, you will receive important discipline updates here. Replies are not monitored.<br><small id="welcomeClock"></small>`;
       const clock = $('#welcomeClock');
       if (clock) clock.textContent = `Today · ${new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}`;
     }

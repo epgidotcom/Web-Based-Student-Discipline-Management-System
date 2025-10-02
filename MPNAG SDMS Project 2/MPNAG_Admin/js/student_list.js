@@ -12,8 +12,7 @@ const editIndex = document.getElementById("editIndex");
 
 const viewLRN = document.getElementById("viewLRN");
 const viewName = document.getElementById("viewName");
-const viewBirthdate = document.getElementById("viewBirthdate");
-const viewAddress = document.getElementById("viewAddress");
+const viewAge = document.getElementById("viewAge");
 const viewGrade = document.getElementById("viewGrade");
 const viewSection = document.getElementById("viewSection");
 const viewParent = document.getElementById("viewParent");
@@ -106,32 +105,42 @@ closeBtns.forEach(btn => btn.onclick = () => {
   viewModal.style.display = "none";
 });
 
+/* =================== Helpers =================== */
+function todayISO() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
 /* =================== Save Student =================== */
 studentForm.onsubmit = (e) => {
   e.preventDefault();
 
   const prevLRN = editIndex.value === "" ? null : students[editIndex.value]?.lrn;
 
+  // if editing, keep existing addedDate; if new, set to today
+  const existingAdded = editIndex.value === "" ? null : (students[editIndex.value]?.addedDate || null);
+  const computedAddedDate = existingAdded || todayISO();
+
+  const ageRaw = document.getElementById("age").value;
   const student = {
     lrn: document.getElementById("lrn").value.trim(),
     firstName: document.getElementById("firstName").value.trim(),
     middleName: document.getElementById("middleName").value.trim(),
     lastName: document.getElementById("lastName").value.trim(),
-    birthdate: document.getElementById("birthdate").value,
-    address: document.getElementById("address").value.trim(),
+    age: ageRaw === "" ? "" : parseInt(ageRaw, 10),
     grade: document.getElementById("grade").value,
     section: document.getElementById("section").value.trim(),
-    parentContact: document.getElementById("parentContact").value.trim()
+    parentContact: document.getElementById("parentContact").value.trim(),
+    addedDate: computedAddedDate  // NEW
   };
 
   // Save/move photo in storage by LRN
   const uploadedDataUrl = photoPreview?.dataset?.dataurl;
   if (editIndex.value === "") {
-    // new record
     if (uploadedDataUrl) StudentPhotos.save(student.lrn, uploadedDataUrl);
     students.push(student);
   } else {
-    // editing
     if (prevLRN && prevLRN !== student.lrn) {
       StudentPhotos.move(prevLRN, student.lrn);
     }
@@ -141,7 +150,6 @@ studentForm.onsubmit = (e) => {
 
   renderTable();
   studentModal.style.display = "none";
-  // optional: dispatch to refresh dashboard counts/charts
   window.dispatchEvent(new Event('sdms:data-changed'));
 };
 
@@ -152,6 +160,13 @@ function initialsFromName(name) {
 
 function renderTable() {
   studentTable.innerHTML = "";
+  if (!students.length) {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td colspan="7" style="text-align:center;color:#6b7280;">No data</td>`;
+    studentTable.appendChild(row);
+    return;
+  }
+
   students.forEach((s, i) => {
     const row = document.createElement("tr");
     const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, " ").trim();
@@ -168,9 +183,10 @@ function renderTable() {
           <span class="student-name">${fullName}</span>
         </div>
       </td>
-      <td>${s.birthdate}</td>
+      <td>${s.age ?? ""}</td>
       <td>${s.grade}</td>
       <td>${s.section}</td>
+      <td>${s.addedDate || ""}</td> <!-- NEW -->
       <td>
         <button class="action-btn" onclick="viewStudent(${i})" title="View"><i class="fa fa-eye"></i></button>
         <button class="action-btn edit-btn" onclick="editStudent(${i})" title="Edit"><i class="fa fa-edit"></i></button>
@@ -188,8 +204,7 @@ function viewStudent(i) {
 
   viewLRN.textContent = s.lrn;
   viewName.textContent = fullName;
-  viewBirthdate.textContent = s.birthdate;
-  viewAddress.textContent = s.address;
+  viewAge.textContent = s.age === "" || s.age == null ? "" : `${s.age} yrs`;
   viewGrade.textContent = s.grade;
   viewSection.textContent = s.section;
   viewParent.textContent = s.parentContact;
@@ -215,15 +230,13 @@ function editStudent(i) {
   document.getElementById("firstName").value = s.firstName;
   document.getElementById("middleName").value = s.middleName;
   document.getElementById("lastName").value = s.lastName;
-  document.getElementById("birthdate").value = s.birthdate;
-  document.getElementById("address").value = s.address;
+  document.getElementById("age").value = s.age ?? "";
   document.getElementById("grade").value = s.grade;
   document.getElementById("section").value = s.section;
   document.getElementById("parentContact").value = s.parentContact;
   editIndex.value = i;
   modalTitle.textContent = "Edit Student";
 
-  // preload existing photo for this LRN
   const photo = StudentPhotos.get(s.lrn);
   if (photo) {
     photoPreview.src = photo;
@@ -263,7 +276,7 @@ function searchStudent() {
 /* =================== Init =================== */
 renderTable();
 
-// expose functions to window (since you call via onclick in HTML)
+// expose functions to window
 window.viewStudent = viewStudent;
 window.editStudent = editStudent;
 window.deleteStudent = deleteStudent;

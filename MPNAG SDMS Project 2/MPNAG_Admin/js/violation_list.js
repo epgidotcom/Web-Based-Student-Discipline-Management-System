@@ -16,7 +16,9 @@ const gradeSectionInput= document.getElementById("gradeSection");     // NEW
 const violationTypeInput = document.getElementById("violationType");  // NEW
 const sanctionInput    = document.getElementById("sanction");
 const descriptionInput = document.getElementById("description");
-const dateInput        = document.getElementById("date");
+/* replace Date -> Incident Date; Added Date is auto (no input) */
+const incidentDateInput = document.getElementById("incidentDate");
+
 const editIndexInput   = document.getElementById("editIndex");
 
 /* ---- Optional legacy input (if your form still has it) ---- */
@@ -35,7 +37,10 @@ const viewPastOffense  = document.getElementById("viewPastOffense");
 const viewViolationType= document.getElementById("viewViolationType");
 const viewSanction     = document.getElementById("viewSanction");
 const viewDescription  = document.getElementById("viewDescription");
-const viewDate         = document.getElementById("viewDate");
+/* replace viewDate -> viewIncidentDate + viewAddedDate */
+const viewIncidentDate = document.getElementById("viewIncidentDate");
+const viewAddedDate    = document.getElementById("viewAddedDate");
+
 const viewEvidenceWrap = document.getElementById("viewEvidenceWrap");
 const viewEvidenceBox  = document.getElementById("viewEvidence");
 
@@ -238,7 +243,7 @@ addViolationBtn.addEventListener("click", () => {
   if (pastOffenseList) pastOffenseList.innerHTML = '';
   if (pastOffenseEmpty) pastOffenseEmpty.textContent = 'No past offenses.';
 
-  violationModal.style.display = "block";
+  violationModal.style.display = "flex";
 });
 
 closeBtns.forEach(btn => {
@@ -257,7 +262,9 @@ violationForm.addEventListener("submit", async (e) => {
   const violationType = (violationTypeInput?.value || "").trim();
   const sanction      = (sanctionInput.value || "").trim();
   const description   = (descriptionInput.value || "").trim();
-  const date          = dateInput.value || "";
+  /* use Incident + automatic Added date */
+  const incidentDate  = incidentDateInput.value || "";
+  const addedDate     = new Date(Date.now() - (new Date()).getTimezoneOffset()*60000).toISOString().slice(0,10);
 
   // Keep legacy field if present (not shown in table)
   const violation     = violationInput ? (violationInput.value || "").trim() : "";
@@ -266,7 +273,8 @@ violationForm.addEventListener("submit", async (e) => {
     studentName,
     gradeSection,
     pastOffense: offensesAfter.length ? offensesAfter.join(' • ') : 'No past offenses.',
-    date,
+    incidentDate,
+    addedDate,
     description,
     violationType,
     sanction,
@@ -287,10 +295,10 @@ violationForm.addEventListener("submit", async (e) => {
   if (description) parts.push(description);
   if (violationType) parts.push(violationType);
   if (sanction) parts.push(`Sanction: ${sanction}`);
-  const label = parts.join(" | ") + (date ? ` — ${date}` : "");
+  const label = parts.join(" | ") + (incidentDate ? ` — ${incidentDate}` : "");
   let offensesAfter = [];
   if (studentName) {
-    offensesAfter = await PastOffenseService.addOffense(studentName, label, date);
+    offensesAfter = await PastOffenseService.addOffense(studentName, label, incidentDate);
   }
 
   renderTable();
@@ -302,7 +310,7 @@ violationForm.addEventListener("submit", async (e) => {
 
 /* ================= Render table =================
    Columns:
-   Student Name | Grade & Section | Past Offense | Date | Violation's Description | Violation Type | Sanction | Actions
+   Student Name | Grade & Section | Past Offense | Incident Date | Violation's Description | Violation Type | Sanction | Added Date | Actions
 ================================================= */
 function renderTable() {
   violationTable.innerHTML = "";
@@ -316,10 +324,11 @@ function renderTable() {
       <td>${item.studentName} ${paperclip}</td>
       <td>${item.gradeSection || '-'}</td>
       <td>${item.pastOffense || 'None'}</td>
-      <td>${item.date || '-'}</td>
+      <td>${item.incidentDate || '-'}</td>
       <td>${item.description || '—'}</td>
       <td>${item.violationType || '-'}</td>
       <td>${item.sanction || '-'}</td>
+      <td>${item.addedDate || '-'}</td>
       <td>
         <button onclick="viewViolationDetails(${index})" title="View"><i class="fa fa-eye"></i></button>
         <button onclick="editViolation(${index})" title="Edit"><i class="fa fa-edit"></i></button>
@@ -344,7 +353,9 @@ window.viewViolationDetails = function (index) {
   if (viewViolationType) viewViolationType.textContent = item.violationType || '-';
   if (viewSanction)     viewSanction.textContent = item.sanction || '-';
   if (viewDescription)  viewDescription.textContent = item.description || "No description provided.";
-  if (viewDate)         viewDate.textContent = item.date || '-';
+  /* show both dates */
+  if (viewIncidentDate) viewIncidentDate.textContent = item.incidentDate || '-';
+  if (viewAddedDate)    viewAddedDate.textContent = item.addedDate || '-';
 
   // render evidence thumbs
   if (viewEvidenceBox && viewEvidenceWrap) {
@@ -375,7 +386,8 @@ window.editViolation = function (index) {
   violationTypeInput && (violationTypeInput.value = item.violationType || '');
   sanctionInput.value       = item.sanction || '';
   descriptionInput.value    = item.description || '';
-  dateInput.value           = item.date || '';
+  /* set incident date; added date is automatic (no input to set) */
+  incidentDateInput.value   = item.incidentDate || '';
   editIndexInput.value      = index;
 
   // Update Past Offense UI for this student (and show the block)

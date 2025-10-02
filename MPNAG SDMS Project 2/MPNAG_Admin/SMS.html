@@ -18,9 +18,8 @@
     <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
     <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
-    <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
     <a href="SMS.html" class="active"><i class="fa fa-message"></i> Message</a>
-    <a href="create_account.html"><i class="fa fa-user-plus"></i> Create Account</a>
+    <a href="create_account.html"><i class="fa fa-user-plus"></i> Accounts</a>
         <div class="sidebar-footer">
     <button id="logoutBtn" class="logout-side" type="button">
       <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
@@ -73,7 +72,7 @@
                   inputmode="numeric"
                   maxlength="11"
                   pattern="\d{11}"
-                  placeholder="e.g., 09171234567"
+                  placeholder=""
                   required
                 />
                 <small class="help">11 digits, numbers only.</small>
@@ -81,41 +80,39 @@
 
               <div>
                 <label for="student">Student Name:</label>
-                <input id="student" type="text" placeholder="e.g., Juan Dela Cruz" required />
+                <input id="student" type="text" placeholder="" required />
               </div>
 
               <div>
-                <label for="grade">Grade &amp; Section:</label>
+                <label for="grade">Grade: </label>
                 <select id="grade" required>
-                  <option value="">— Select Grade &amp; Section —</option>
-                  <option>Grade 7 - Section A</option>
-                  <option>Grade 8 - Section B</option>
-                  <option>Grade 9 - Section C</option>
-                  <option>Grade 10 - Section D</option>
-                  <option>Grade 11 - ABM</option>
-                  <option>Grade 12 - AB2</option>
+                  <option value="">— Select Grade —</option>
+                  <option>7</option>
+                  <option>8</option>
+                  <option>9</option>
+                  <option>10</option>
+                  <option>11</option>
+                  <option>12</option>
                 </select>
+              </div>
+
+              <div>
+                <label for="section">Section:</label>
+                <input id="section" name="section" type="text" placeholder="" required />
               </div>
 
               <div>
                 <label for="violation">Violation / Incident:</label>
-                <select id="violation" required>
-                  <option value="">— Select Violation —</option>
-                  <option>Bullying</option>
-                  <option>Cheating</option>
-                  <option>Improper Uniform</option>
-                  <option>Tardiness</option>
-                  <option>Others</option>
-                </select>
+                <input id="violation" name="violation" type="text" placeholder="" required />
               </div>
 
               <div>
                 <label for="sanction">Sanction:</label>
                 <select id="sanction" required>
                   <option value="">— Select Sanction —</option>
-                  <option>Warning</option>
-                  <option>Written Reprimand</option>
-                  <option>Extra Homework</option>
+                  <option>Verbal Warning</option>
+                  <option>Counseling</option>
+                  <option>Parent Conference</option>
                   <option>Suspension</option>
                   <option>Expulsion</option>
                 </select>
@@ -128,17 +125,16 @@
 
               <div>
                 <label for="teacher">Teacher-in-Charge:</label>
-                <input id="teacher" type="text" placeholder="e.g., Ms. Santos" required />
+                <input id="teacher" type="text" placeholder="" required />
               </div>
 
               <div>
                 <label for="template">Violation Type:</label>
                 <select id="template">
                   <option value="">— Select Type —</option>
-                  <option value="warning">Warning Notice</option>
-                  <option value="minor">Minor Offense Notice</option>
-                  <option value="major">Major Offense Notice</option>
-                  <option value="suspension">Suspension Notice</option>
+                  <option value="first">First Offense Notice</option>
+                  <option value="second">Second Offense Notice</option>
+                  <option value="third">Third Offense Notice</option>
                 </select>
               </div>
 
@@ -159,21 +155,17 @@
 
                 <!-- live counter (JS updates this) -->
                 <div id="counter" class="sms-counter" aria-live="polite">
-                  0 characters • 0 SMS segments (160 chars per SMS)
+                  0 characters • 0 SMS segments
                 </div>
 
                 <div class="button-row">
                   <button class="btn primary" id="sendBtn" type="button">
                     <i class="fa fa-paper-plane"></i> Send Sanction SMS
                   </button>
-                  <button class="btn outline" id="previewBtn" type="button">
-                    <i class="fa fa-eye"></i> Preview Only
-                  </button>
                 </div>
 
                 <div class="meta-info">
                   <div class="help">
-                    POST to <code>/api/sms/sanctions/send</code> with JSON payload (see console log on send).
                   </div>
                 </div>
               </div>
