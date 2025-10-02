@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>SDMS - Appeals</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="js/student_auth_guard.js"></script>
+</head>
+<body>
+  <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
+  <aside class="sidebar">
+    <img src="../images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="appeals.html" class="active"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
+    <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+  <div class="backdrop" id="sidebarBackdrop"></div>
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Appeals & Clarifications</h1>
+        <span class="subtitle">Submit and track your appeals</span>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-header"><h3>Submit Appeal</h3></div>
+      <form id="appealForm" class="appeal-form">
+        <div class="field">
+          <label for="violationId">Violation ID (optional)</label>
+          <input type="text" id="violationId" placeholder="e.g. 42" />
+        </div>
+        <div class="field">
+          <label for="appealType">Type</label>
+          <select id="appealType" required>
+            <option value="Clarification">Clarification</option>
+            <option value="Dispute">Dispute</option>
+            <option value="Mitigating Circumstance">Mitigating Circumstance</option>
+          </select>
+        </div>
+        <div class="field">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+            <title>SDMS - Appeals</title>
+            <link rel="stylesheet" href="css/student.css" />
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+            <script src="../js/config.js"></script>
+            <script src="../js/auth.js"></script>
+            <script src="js/student_auth_guard.js"></script>
+          </head>
+          <body>
+            <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
+            <aside class="sidebar">
+              <img src="../images/mpnag_logo.png" alt="School Logo" class="logo"/>
+              <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+              <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+              <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+              <a href="appeals.html" class="active"><i class="fa fa-file-circle-question"></i> Appeals</a>
+              <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
+              <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+            </aside>
+            <div class="backdrop" id="sidebarBackdrop"></div>
+            <main class="main">
+              <header class="topbar">
+                <div class="title">
+                  <h1>Appeals & Clarifications</h1>
+                  <span class="subtitle">Submit and track your appeals</span>
+                </div>
+              </header>
+
+              <section class="panel">
+                <div class="panel-header"><h3>Submit Appeal</h3></div>
+                <form id="appealForm" class="appeal-form">
+                  <div class="field">
+                    <label for="violationId">Violation ID (optional)</label>
+                    <input type="text" id="violationId" placeholder="e.g. 42" />
+                  </div>
+                  <div class="field">
+                    <label for="appealType">Type</label>
+                    <select id="appealType" required>
+                      <option value="Clarification">Clarification</option>
+                      <option value="Dispute">Dispute</option>
+                      <option value="Mitigating Circumstance">Mitigating Circumstance</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="appealText">Explanation</label>
+                    <textarea id="appealText" placeholder="Explain respectfully..." required></textarea>
+                  </div>
+                  <button type="submit" class="btn primary"><i class="fa fa-paper-plane"></i> Submit Appeal</button>
+                </form>
+                <p class="hint" id="appealStatus" style="display:none"></p>
+              </section>
+
+              <section class="panel">
+                <div class="panel-header"><h3>My Appeals</h3></div>
+                <div class="table-wrap">
+                  <table class="table">
+                    <thead><tr><th>Date</th><th>Type</th><th>Violation</th><th>Status</th><th>Response</th></tr></thead>
+                    <tbody id="appealRows"></tbody>
+                  </table>
+                </div>
+              </section>
+            </main>
+
+            <script type="module">
+              import { api, getStudentId } from './js/api.js';
+
+              async function loadAppeals(){
+                const tbody = document.getElementById('appealRows');
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Loading...</td></tr>';
+                try {
+                  const studentId = getStudentId();
+                  const data = await api(`/appeals?studentId=${encodeURIComponent(studentId||'me')}`);
+                  const rows = Array.isArray(data) ? data : (data.rows||[]);
+                  tbody.innerHTML='';
+                  if(!rows.length){
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No appeals yet</td></tr>';
+                    return;
+                  }
+                  rows.forEach(a=>{
+                    const tr=document.createElement('tr');
+                    tr.innerHTML = `<td>${(a.created_at||a.date||'').slice(0,10)}</td><td>${a.type||a.appeal_type||'—'}</td><td>${a.violation_id||a.violationId||'—'}</td><td><span class="status ${(a.status||'Pending').toLowerCase()}">${a.status||'Pending'}</span></td><td>${a.response||'—'}</td>`;
+                    tbody.appendChild(tr);
+                  });
+                } catch(err){
+                  console.error(err);
+                  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#e74c3c;">Failed to load appeals</td></tr>';
+                }
+              }
+
+              document.getElementById('appealForm').addEventListener('submit', async (e)=>{
+                e.preventDefault();
+                const status = document.getElementById('appealStatus');
+                status.style.display='block';
+                status.textContent='Submitting...';
+                try {
+                  const studentId = getStudentId();
+                  const payload = {
+                    studentId,
+                    violationId: document.getElementById('violationId').value.trim() || null,
+                    type: document.getElementById('appealType').value,
+                    text: document.getElementById('appealText').value.trim()
+                  };
+                  await api('/appeals', { method:'POST', body: JSON.stringify(payload) });
+                  status.textContent='Appeal submitted.';
+                  e.target.reset();
+                  loadAppeals();
+                } catch(err){
+                  console.error(err);
+                  status.textContent='Failed to submit appeal.';
+                }
+                setTimeout(()=>{status.style.display='none';},4000);
+              });
+
+              loadAppeals();
+            </script>
+            <script src="js/sidebar.js"></script>
+            <script src="js/main.js"></script>
+          </body>
+          </html>
+  const toggleBtn = document.getElementById("sidebarToggle");
+
+  toggleBtn.addEventListener("click", () => {
+    sidebar.classList.toggle("closed");
+  });
+  </script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
