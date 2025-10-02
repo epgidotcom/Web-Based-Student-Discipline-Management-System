@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // Require admin/teacher role
+  if(!window.SDMSAuth?.requireRole(['Admin','Teacher'])) return;
   const roleSelect = document.getElementById("role");
   const gradeGroup = document.getElementById("gradeGroup");
   const form = document.getElementById("accountForm");
@@ -25,7 +27,9 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadAccounts(){
     try{
       msg.textContent = 'Loading accounts…';
-      const res = await fetch(`${API_BASE}/api/accounts`);
+      const res = await fetch(`${API_BASE}/api/accounts`, {
+        headers: authHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const list = await res.json();
       renderTable(list);
@@ -61,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!id) return;
         if (!confirm('Delete this account?')) return;
         try{
-          const res = await fetch(`${API_BASE}/api/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          const res = await fetch(`${API_BASE}/api/accounts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           await loadAccounts();
         }catch(err){
@@ -102,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try{
       const res = await fetch(`${API_BASE}/api/accounts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(newUser)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -116,7 +120,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // initial load
+  function authHeaders(){
+    const token = window.SDMSAuth?.getToken();
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  }
+
+  // initial load (may fail if unauthorized)
   loadAccounts();
 });
 
