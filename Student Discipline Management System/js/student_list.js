@@ -1,6 +1,3 @@
-// Auth guard
-if (window.SDMSAuth) { const u = SDMSAuth.requireLogin(); if(!u) { throw new Error('Auth required'); } SDMSAuth.showUser(); }
-
 // In-memory cache loaded from the API
 let students = [];
 
@@ -8,8 +5,10 @@ let students = [];
 const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 console.log('[StudentList] API_BASE =', API_BASE || '(empty - using relative)');
 async function apiFetch(path, init) {
-  const headers = window.SDMSAuth ? SDMSAuth.authHeaders() : { 'Content-Type':'application/json' };
-  const res = await fetch(`${API_BASE}${path}`, { headers, ...init });
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...init
+  });
   if (!res.ok) {
     const text = await res.text().catch(()=> '');
     throw new Error(`HTTP ${res.status} ${res.statusText}: ${text}`);

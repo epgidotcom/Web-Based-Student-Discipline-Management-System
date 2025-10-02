@@ -48,16 +48,6 @@ console.log("Main JS loaded");
       close: () => setOpen(false),
       toggle
     };
-
-    // Global logout button session clear (if present)
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn && !logoutBtn.dataset.bound) {
-      logoutBtn.addEventListener('click', () => {
-        try { sessionStorage.removeItem('sdmsUser'); sessionStorage.removeItem('sdmsToken'); } catch {}
-        window.location.href = 'index.html';
-      });
-      logoutBtn.dataset.bound = '1';
-    }
   });
 })();
 

@@ -1,7 +1,6 @@
 // js/sms.js — SMS compose/send (lowercase filename for case-sensitive hosts)
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.SDMSAuth) { const u = SDMSAuth.requireLogin(); if(!u) return; SDMSAuth.showUser(); }
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
@@ -36,16 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     switch (templateKey) {
       case 'minor':
-  body = `${base} this is to inform you of a minor offense recorded on ${date}: ${violation}. The sanction is ${sanction}. Kindly remind ${firstName} to follow school rules. Guidance Counselor: ${teacher}.`;
+        body = `${base} this is to inform you of a minor offense recorded on ${date}: ${violation}. The sanction is ${sanction}. Kindly remind ${firstName} to follow school rules. Teacher-in-Charge: ${teacher}.`;
         break;
       case 'major':
-  body = `${base} a major offense was recorded on ${date} for ${violation}. Sanction: ${sanction}. Please expect a follow-up from the Discipline Office. Guidance Counselor: ${teacher}.`;
+        body = `${base} a major offense was recorded on ${date} for ${violation}. Sanction: ${sanction}. Please expect a follow-up from the Discipline Office. Teacher-in-Charge: ${teacher}.`;
         break;
       case 'suspension':
-  body = `${base} due to ${violation} on ${date}, the sanction is ${sanction}. Please check your email for full details and next steps. Guidance Counselor: ${teacher}.`;
+        body = `${base} due to ${violation} on ${date}, the sanction is ${sanction}. Please check your email for full details and next steps. TIC: ${teacher}.`;
         break;
       default:
-  body = `${base} we wish to inform you that on ${date}, an incident of ${violation} was noted. Sanction: ${sanction}. This is a warning notice for your guidance. Guidance Counselor: ${teacher}.`;
+        body = `${base} we wish to inform you that on ${date}, an incident of ${violation} was noted. Sanction: ${sanction}. This is a warning notice for your guidance. Teacher-in-Charge: ${teacher}.`;
     }
 
     return `School Discipline Notice:\n${body}\n\nThis is a one-way SMS. Replies are not monitored.`;
@@ -136,10 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
     (async () => {
       const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
       try {
-        const headers = window.SDMSAuth ? SDMSAuth.authHeaders() : { 'Content-Type':'application/json' };
         const res = await fetch(`${API_BASE}/api/sms/sanctions/send`, {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

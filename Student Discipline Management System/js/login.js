@@ -1,4 +1,9 @@
-// Replaced hardcoded credentials with backend authentication
+// -----------------------------
+// Temporary login credentials
+// -----------------------------
+const validUsername = "admin";
+const validEmail = "admin@gmail.com";
+const validPassword = "adminpw123";
 
 // -----------------------------
 // Elements
@@ -164,7 +169,7 @@ modalCancelBtn.addEventListener("click", closeModal);
 // -----------------------------
 // Login submission flow 
 // -----------------------------
-form.addEventListener("submit", async function (event) {
+form.addEventListener("submit", function (event) {
   event.preventDefault();
   errorMessage.textContent = "";
 
@@ -177,23 +182,15 @@ form.addEventListener("submit", async function (event) {
     return;
   }
 
-  try {
-    const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ username: usernameInput, password: passwordInput })
-    });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Login failed');
-  const { token, user } = data;
-  if (!token || !user) throw new Error('Malformed auth response');
-  sessionStorage.setItem('sdmsUser', JSON.stringify(user));
-  sessionStorage.setItem('sdmsToken', token);
-    window.location.href = 'dashboard.html';
-  } catch (err) {
-    console.error(err);
-    errorMessage.textContent = 'Invalid username/email or password!';
+  // Credentials check
+  if (
+    (usernameInput === validUsername || usernameInput === validEmail) &&
+    passwordInput === validPassword
+  ) {
+    window.location.href = "dashboard.html";
+  } else {
+    errorMessage.textContent = "Invalid username/email or password!";
+    // If login failed, require CAPTCHA again to mitigate brute-force
     resetCaptcha();
   }
 });
