@@ -1,15 +1,23 @@
-const sidebar = document.querySelector('.sidebar');// Moved from JAVA/js/sidebar.js
+(function(){
+  const sidebar = document.querySelector('.sidebar');
+  const toggleBtn = document.getElementById('sidebarToggle');
+  const backdrop = document.getElementById('sidebarBackdrop');
 
-const toggleBtn = document.getElementById('sidebarToggle');const sidebar = document.querySelector('.sidebar');
+  function open(){
+    sidebar?.classList.add('open');
+    backdrop?.classList.add('active');
+  }
+  function close(){
+    sidebar?.classList.remove('open');
+    backdrop?.classList.remove('active');
+  }
+  function toggle(){
+    if(sidebar?.classList.contains('open')) close(); else open();
+  }
 
-if (sidebar && toggleBtn) {const toggleBtn = document.getElementById('sidebarToggle');
+  // Ensure hidden by default if JS loads after initial paint
+  close();
 
-  toggleBtn.addEventListener('click', () => {if (sidebar && toggleBtn) {
-
-    sidebar.classList.toggle('closed');  toggleBtn.addEventListener('click', () => {
-
-  });    sidebar.classList.toggle('closed');
-
-}  });
-
-}
+  toggleBtn?.addEventListener('click', toggle);
+  backdrop?.addEventListener('click', close);
+})();
