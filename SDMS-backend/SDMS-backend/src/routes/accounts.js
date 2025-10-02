@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import bcrypt from 'bcrypt';
-import { authRequired, adminOnly } from '../middleware/auth.js';
-import { audit } from '../util/audit.js';
 
 const router = Router();
 
-router.get('/', authRequired, adminOnly, async (_req, res) => {
+router.get('/', async (_req, res) => {
   try {
     const { rows } = await query(
       `SELECT id, full_name AS "fullName", email, username, role, grade, created_at AS "createdAt"
@@ -19,14 +17,11 @@ router.get('/', authRequired, adminOnly, async (_req, res) => {
   }
 });
 
-router.post('/', authRequired, adminOnly, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { fullName, email, username, password, role, grade } = req.body;
     if (!fullName || !email || !username || !password || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
-    }
-    if (!['Admin','Student','GuidanceCounselor'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
     }
     const hash = await bcrypt.hash(password, 12);
     const { rows } = await query(
@@ -42,9 +37,7 @@ router.post('/', authRequired, adminOnly, async (req, res) => {
         role === 'Student' ? (grade || null) : null
       ]
     );
-  const created = rows[0];
-  audit(req.user, 'create_account', 'account', created.id, { role: created.role });
-  res.status(201).json(created);
+    res.status(201).json(rows[0]);
   } catch (e) {
     if (e.code === '23505') {
       return res.status(409).json({ error: 'Email or username already exists' });
@@ -54,12 +47,11 @@ router.post('/', authRequired, adminOnly, async (req, res) => {
   }
 });
 
-router.delete('/:id', authRequired, adminOnly, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { rowCount } = await query('DELETE FROM accounts WHERE id = $1', [req.params.id]);
     if (!rowCount) return res.status(404).json({ error: 'Not found' });
-  audit(req.user, 'delete_account', 'account', req.params.id, null);
-  res.json({ ok: true });
+    res.json({ ok: true });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to delete account' });

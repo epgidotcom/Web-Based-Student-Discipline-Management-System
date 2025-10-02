@@ -4,14 +4,6 @@ export async function runMigrations() {
   const sql = `
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Enum for violation status used in inserts/updates (idempotent)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'violation_status_type') THEN
-    CREATE TYPE violation_status_type AS ENUM ('Pending','Ongoing','Resolved','Dismissed');
-  END IF;
-END$$;
-
 -- Accounts
 CREATE TABLE IF NOT EXISTS accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,74 +11,10 @@ CREATE TABLE IF NOT EXISTS accounts (
   email TEXT UNIQUE NOT NULL,
   username TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('Admin','Teacher','Student','GuidanceCounselor')),
+  role TEXT NOT NULL CHECK (role IN ('Admin','Teacher','Student')),
   grade TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
--- Role rename: Teacher -> GuidanceCounselor (idempotent)
-DO $$
-DECLARE cname text; def text; needs_change boolean := false; BEGIN
-  -- Detect existing constraint referencing 'Teacher' but not yet adjusted
-  SELECT conname, pg_get_constraintdef(oid) INTO cname, def
-    FROM pg_constraint
-   WHERE conrelid = 'accounts'::regclass
-     AND contype = 'c'
-     AND pg_get_constraintdef(oid) ILIKE '%role%';
-  IF def ILIKE '%Teacher%' AND def NOT ILIKE '%GuidanceCounselor%' THEN
-    needs_change := true;
-  END IF;
-  IF needs_change THEN
-    -- Update existing rows first
-    UPDATE accounts SET role='GuidanceCounselor' WHERE role='Teacher';
-    -- Drop old constraint and add new
-    EXECUTE 'ALTER TABLE accounts DROP CONSTRAINT '||quote_ident(cname);
-    EXECUTE $$ALTER TABLE accounts ADD CONSTRAINT accounts_role_check CHECK (role IN ('Admin','Student','GuidanceCounselor'))$$;
-  END IF;
-  -- Clean up: remove legacy Teacher value still present accidentally
-  UPDATE accounts SET role='GuidanceCounselor' WHERE role='Teacher';
-END$$;
-
--- Password reset tokens (one-time use)
-CREATE TABLE IF NOT EXISTS password_resets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL,
-  token_sha256 TEXT,
-  expires_at TIMESTAMPTZ NOT NULL,
-  used_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT password_resets_single_active UNIQUE (account_id, token_hash)
-);
-CREATE INDEX IF NOT EXISTS idx_password_resets_account_id ON password_resets(account_id);
-CREATE INDEX IF NOT EXISTS idx_password_resets_expires_at ON password_resets(expires_at);
-ALTER TABLE password_resets ADD COLUMN IF NOT EXISTS token_sha256 TEXT;
-CREATE INDEX IF NOT EXISTS idx_password_resets_token_sha256 ON password_resets(token_sha256);
-
--- Audit logs
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID,
-  action TEXT NOT NULL,
-  entity TEXT,
-  entity_id TEXT,
-  meta JSONB,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity);
-
--- Refresh tokens
-CREATE TABLE IF NOT EXISTS refresh_tokens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  revoked_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_account_id ON refresh_tokens(account_id);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 
 -- Past offenses
 CREATE TABLE IF NOT EXISTS past_offenses (

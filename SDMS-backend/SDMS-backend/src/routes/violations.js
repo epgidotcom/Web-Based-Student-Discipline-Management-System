@@ -1,7 +1,5 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { authRequired } from '../middleware/auth.js';
-import { audit } from '../util/audit.js';
 
 const router = Router();
 
@@ -37,7 +35,7 @@ function normalizeEvidence(raw) {
 }
 
 // List with optional filters (student_id, offense_type, q)
-router.get('/', authRequired, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { student_id, offense_type, q, limit = 200 } = req.query;
     const clauses = []; const params = []; 
@@ -59,7 +57,7 @@ router.get('/', authRequired, async (req, res) => {
 });
 
 // Stats endpoint (must be BEFORE /:id to avoid being captured as id)
-router.get('/stats', authRequired, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     // total
     const totalQ = await query('SELECT COUNT(*)::int AS total FROM violations');
@@ -96,7 +94,7 @@ router.get('/stats', authRequired, async (req, res) => {
 
 // Single
 // Repeat count preview endpoint (must be before :id)
-router.get('/repeat/check', authRequired, async (req, res) => {
+router.get('/repeat/check', async (req, res) => {
   try {
     const studentId = req.query.student_id;
     const offenseType = req.query.offense_type || req.query.violation_type; // backward compatibility
@@ -112,7 +110,7 @@ router.get('/repeat/check', authRequired, async (req, res) => {
 });
 
 // Single (placed after specific sub-routes)
-router.get('/:id', authRequired, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const { rows } = await query('SELECT id, student_id, student_name, grade_section, offense_type, sanction, description, incident_date, status, repeat_count_at_insert, evidence, created_at, updated_at FROM violations WHERE id = $1', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
@@ -125,8 +123,7 @@ router.get('/:id', authRequired, async (req, res) => {
 });
 
 // Create
-router.post('/', authRequired, async (req, res) => {
-  if (!['Admin','GuidanceCounselor'].includes(req.user.role)) return res.status(403).json({ error: 'Admin or Guidance Counselor required' });
+router.post('/', async (req, res) => {
   try {
     const { student_id, grade_section, offense_type, description, sanction, incident_date, status, evidence } = req.body || {};
     if (!student_id) return res.status(400).json({ error: 'student_id required' });
@@ -166,16 +163,14 @@ router.post('/', authRequired, async (req, res) => {
     const { rows } = await query(insertSQL, params);
     const row = rows[0];
     row.repeat_count = row.repeat_count_at_insert;
-  audit(req.user, 'create_violation', 'violation', row.id, { offense_type: row.offense_type });
-  res.status(201).json(row);
+    res.status(201).json(row);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 // Update
-router.put('/:id', authRequired, async (req, res) => {
-  if (!['Admin','GuidanceCounselor'].includes(req.user.role)) return res.status(403).json({ error: 'Admin or Guidance Counselor required' });
+router.put('/:id', async (req, res) => {
   try {
     const { student_id, grade_section, offense_type, description, sanction, incident_date, status, evidence } = req.body || {};
 
@@ -224,21 +219,18 @@ router.put('/:id', authRequired, async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const row = rows[0];
     row.repeat_count = row.repeat_count_at_insert;
-  audit(req.user, 'update_violation', 'violation', row.id, { offense_type: row.offense_type });
-  res.json(row);
+    res.json(row);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 // Delete
-router.delete('/:id', authRequired, async (req, res) => {
-  if (!['Admin','GuidanceCounselor'].includes(req.user.role)) return res.status(403).json({ error: 'Admin or Guidance Counselor required' });
+router.delete('/:id', async (req, res) => {
   try {
     const { rowCount } = await query('DELETE FROM violations WHERE id = $1', [req.params.id]);
     if (!rowCount) return res.status(404).json({ error: 'Not found' });
-  audit(req.user, 'delete_violation', 'violation', req.params.id, null);
-  res.status(204).end();
+    res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

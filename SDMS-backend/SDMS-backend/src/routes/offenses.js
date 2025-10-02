@@ -1,11 +1,9 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { authRequired } from '../middleware/auth.js';
-import { audit } from '../util/audit.js';
 
 const router = Router();
 
-router.get('/', authRequired, async (req, res) => {
+router.get('/', async (req, res) => {
   const name = (req.query.name || '').trim();
   if (!name) return res.json([]);
   try {
@@ -23,8 +21,7 @@ router.get('/', authRequired, async (req, res) => {
   }
 });
 
-router.post('/', authRequired, async (req, res) => {
-  if (!['Admin','GuidanceCounselor'].includes(req.user.role)) return res.status(403).json({ error: 'Admin or Guidance Counselor required' });
+router.post('/', async (req, res) => {
   try {
     const { name, label } = req.body;
     if (!name || !label) return res.status(400).json({ error: 'Missing name or label' });
@@ -39,8 +36,7 @@ router.post('/', authRequired, async (req, res) => {
        LIMIT 50`,
       [name.trim()]
     );
-  audit(req.user, 'add_past_offense', 'past_offense', null, { student_name: name.trim(), label: label.trim() });
-  res.status(201).json(rows.map(r => r.label));
+    res.status(201).json(rows.map(r => r.label));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to add offense' });

@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { authRequired } from '../middleware/auth.js';
-import { audit } from '../util/audit.js';
 
 const router = Router();
 
 // List students
-router.get('/', authRequired, async (_req, res) => {
+router.get('/', async (_req, res) => {
   try {
     const { rows } = await query(
       `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at
@@ -20,7 +18,7 @@ router.get('/', authRequired, async (_req, res) => {
 });
 
 // Get one student
-router.get('/:id', authRequired, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const { rows } = await query(
       `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at
@@ -35,8 +33,7 @@ router.get('/:id', authRequired, async (req, res) => {
 });
 
 // Create student
-router.post('/', authRequired, async (req, res) => {
-  if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin required' });
+router.post('/', async (req, res) => {
   const { lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact } = req.body ?? {};
   if (!first_name || !last_name) return res.status(400).json({ error: 'first_name and last_name are required' });
   try {
@@ -66,9 +63,7 @@ router.post('/', authRequired, async (req, res) => {
         throw err;
       }
     }
-  const created = rows[0];
-  audit(req.user, 'create_student', 'student', created.id, { lrn: created.lrn });
-  res.status(201).json(created);
+    res.status(201).json(rows[0]);
   } catch (e) {
     // Unique violation for LRN (Postgres code 23505). Provide friendlier message & 409 Conflict.
     if (e && e.code === '23505' && /lrn/i.test(e.detail || '') ) {
@@ -79,8 +74,7 @@ router.post('/', authRequired, async (req, res) => {
 });
 
 // Update student
-router.put('/:id', authRequired, async (req, res) => {
-  if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin required' });
+router.put('/:id', async (req, res) => {
   const { lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact } = req.body ?? {};
   try {
     // We may need to recompute full_name / grade_level if any related fields changed.
@@ -144,9 +138,7 @@ router.put('/:id', authRequired, async (req, res) => {
       }
     }
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-  const updated = rows[0];
-  audit(req.user, 'update_student', 'student', updated.id, null);
-  res.json(updated);
+    res.json(rows[0]);
   } catch (e) {
     if (e && e.code === '23505' && /lrn/i.test(e.detail || '')) {
       return res.status(409).json({ error: 'LRN already exists' });
@@ -156,13 +148,11 @@ router.put('/:id', authRequired, async (req, res) => {
 });
 
 // Delete student
-router.delete('/:id', authRequired, async (req, res) => {
-  if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin required' });
+router.delete('/:id', async (req, res) => {
   try {
     const { rowCount } = await query('delete from students where id = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
-  audit(req.user, 'delete_student', 'student', req.params.id, null);
-  res.status(204).end();
+    res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
