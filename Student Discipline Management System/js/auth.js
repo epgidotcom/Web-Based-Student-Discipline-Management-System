@@ -1,17 +1,17 @@
-// Simple auth helper using localStorage
+// Simple auth helper using localStorage (browser-safe: removed ES module exports)
 const AUTH_KEY = 'sdms_auth_v1';
 
-export function saveAuth(data){
-  try { localStorage.setItem(AUTH_KEY, JSON.stringify(data)); } catch(_){}
+function saveAuth(data){
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(data)); console.debug('[auth] saved auth payload'); } catch(_){}
 }
-export function getAuth(){
+function getAuth(){
   try { return JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); } catch(_) { return null; }
 }
-export function getToken(){ return getAuth()?.token || null; }
-export function getUser(){ return getAuth()?.account || null; }
-export function logout(){ localStorage.removeItem(AUTH_KEY); window.location.href='index.html'; }
+function getToken(){ return getAuth()?.token || null; }
+function getUser(){ return getAuth()?.account || null; }
+function logout(){ localStorage.removeItem(AUTH_KEY); window.location.href='index.html'; }
 
-export function requireRole(roles){
+function requireRole(roles){
   const user = getUser();
   if(!user){ window.location.href = 'index.html'; return false; }
   const role = (user.role||'').toLowerCase();
@@ -32,5 +32,5 @@ export function requireRole(roles){
   return true;
 }
 
-// Attach to window for non-module scripts
+// Attach to window for other scripts
 window.SDMSAuth = { saveAuth, getAuth, getToken, getUser, logout, requireRole };
