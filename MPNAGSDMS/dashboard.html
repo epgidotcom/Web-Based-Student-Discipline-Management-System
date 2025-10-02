@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SDMS - Dashboard</title>
+
+  <!-- Global + Page Specific CSS -->
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Mobile-friendly overrides (unchanged) -->
+  <style>
+    :root{ --sidebar-w: 220px; --gap: 16px; }
+    html, body { min-height: 100dvh; }
+    body { margin:0; overflow-x:hidden; background:#f5f7fb; }
+
+    .kpi-grid, .charts-grid { display:grid; gap:var(--gap); }
+    .kpi-grid   { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .charts-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+    .topbar{
+      position:sticky; top:0; z-index:900;
+      display:flex; align-items:center; justify-content:space-between;
+      background:#fff; padding:10px 16px; box-shadow:0 2px 6px rgba(0,0,0,.08);
+    }
+    .menu-btn{
+      display:none; align-items:center; gap:.5rem;
+      background:#43699c; color:#fff; border:0; border-radius:10px;
+      padding:.6rem .8rem; font-size:1rem; line-height:1; cursor:pointer; min-height:44px;
+    }
+    .menu-btn i{ pointer-events:none; }
+
+    .card{ background:#fff; border-radius:12px; box-shadow:0 1px 8px rgba(0,0,0,.06); padding:14px; }
+    .chart-wrap{ position:relative; height:280px; }
+
+    .backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.38); z-index:850; }
+    .backdrop.show{ display:block; }
+
+    .sidebar{ transition:left .28s ease; }
+
+    @media (max-width: 1024px){
+      .kpi-grid   { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .charts-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+
+    @media (max-width: 768px){
+      .sidebar{
+        position:fixed; top:0; left:calc(-1 * var(--sidebar-w));
+        width:var(--sidebar-w); height:100dvh; z-index:1000;
+        background:#43699c; padding-top:20px; box-shadow:0 8px 24px rgba(0,0,0,.18);
+        display:flex; flex-direction:column;
+      }
+      .sidebar.open{ left:0; }
+      .sidebar a{ padding:14px 18px; }
+      .main{ padding:16px; }
+      .menu-btn{ display:inline-flex; }
+      .topbar h1{ font-size:18px; margin:0; }
+      .kpi-grid{ grid-template-columns:1fr; }
+      .charts-grid{ grid-template-columns:1fr; }
+      .chart-wrap{ height:240px; }
+    }
+
+    .calendar-widget iframe{
+      width:100%; height: clamp(360px, 60vh, 480px);
+      border-radius:12px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar (drawer) -->
+<nav class="sidebar" id="sidebar" aria-hidden="true">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo"
+       style="width:80px;display:block;margin:0 auto 12px;">
+
+  <a href="dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="calendar.html"><i class="fa fa-calendar"></i> Calendar</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+
+
+  <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Backdrop for drawer -->
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== KPIs ===== -->
+  <div class="kpi-grid">
+    <div class="kpi card" id="kpiTotalStudents">
+      <div class="kpi-icon"><i class="fa fa-users"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Students</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">Registered</div>
+      </div>
+    </div>
+
+    <div class="kpi card" id="kpiViolations30">
+      <div class="kpi-icon warn"><i class="fa fa-exclamation-triangle"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Violations</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">Last 30 days</div>
+      </div>
+    </div>
+
+    <div class="kpi card" id="kpiOpenCases">
+      <div class="kpi-icon info"><i class="fa fa-clipboard-list"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Open Cases</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">Needing follow-up</div>
+      </div>
+    </div>
+
+    <div class="kpi card" id="kpiRepeatOffenders">
+      <div class="kpi-icon danger"><i class="fa fa-user-times"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Repeat Offenders</div>
+        <div class="kpi-value" data-count="0">0</div>
+        <div class="kpi-sub">≥ 3 violations (90d)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Filters ===== -->
+  <div class="filters card">
+    <div class="filters-row">
+      <div class="field">
+        <label for="dateFrom">From</label>
+        <input type="date" id="dateFrom" />
+      </div>
+      <div class="field">
+        <label for="dateTo">To</label>
+        <input type="date" id="dateTo" />
+      </div>
+      <div class="field">
+        <label for="filterGrade">Grade</label>
+        <select id="filterGrade">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filterSection">Section</label>
+        <select id="filterSection">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filterType">Violation</label>
+        <select id="filterType">
+          <option value="">All</option>
+        </select>
+      </div>
+
+      <div class="buttons">
+        <button id="btnQuick7" class="btn subtle">Last 7d</button>
+        <button id="btnQuick30" class="btn subtle">Last 30d</button>
+        <button id="btnReset" class="btn outline">Reset</button>
+        <button id="btnApply" class="btn primary"><i class="fa fa-filter"></i> Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Charts ===== -->
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-header">
+        <h3>Violations Over Time</h3>
+        <span class="hint" id="rangeHint"></span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartTrend"></canvas>
+      </div>
+      <div class="empty hidden" id="emptyTrend">No violations in the selected range.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Top Violation Types</h3>
+        <span class="hint" id="typesHint"></span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartTopTypes"></canvas>
+      </div>
+      <div class="empty hidden" id="emptyTypes">No data to show.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Violations by Grade</h3>
+        <span class="hint">Current filters</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartByGrade"></canvas>
+      </div>
+      <div class="empty hidden" id="emptyByGrade">No data to show.</div>
+    </div>
+  </div>
+
+  <!-- ===== Calendar ===== -->
+  <div class="calendar-widget">
+    <h2>Calendar</h2>
+    <iframe
+      src="https://calendar.google.com/calendar/embed?src=en.philippines%23holiday%40group.v.calendar.google.com&ctz=Asia%2FManila"
+      style="border:0" frameborder="0" scrolling="no">
+    </iframe>
+  </div>
+
+</div> 
+
+<!-- Scripts (config first so dashboard picks up API_BASE) -->
+<script src="js/config.js"></script>
+<script src="js/app.js" defer></script>
+<script src="js/dashboard.js" defer></script>
+
+<!-- drawer toggle + logout + user name -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const sidebar  = document.getElementById('sidebar');
+    const menuBtn  = document.querySelector('.menu-btn');
+    const backdrop = document.getElementById('backdrop');
+
+    function setOpen(open){
+      sidebar.classList.toggle('open', open);
+      backdrop.classList.toggle('show', open);
+      document.body.style.overflow = open ? 'hidden' : '';
+      menuBtn?.setAttribute('aria-expanded', String(open));
+    }
+    const toggle = () => setOpen(!sidebar.classList.contains('open'));
+
+    menuBtn?.addEventListener('click', toggle);
+    backdrop?.addEventListener('click', () => setOpen(false));
+    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') setOpen(false); });
+    window.addEventListener('resize', ()=>{ if (innerWidth >= 769) setOpen(false); });
+
+    // Logout (now in sidebar footer)
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+
+    // User chip (Admin now, can be replaced with real name)
+    const name = (localStorage.getItem('sdms_user') || 'Admin').trim();
+    const userName = document.getElementById('userName');
+    const userAvatar = document.getElementById('userAvatar');
+    if (userName)  userName.textContent = name;
+    if (userAvatar) userAvatar.textContent = (name[0] || 'A').toUpperCase();
+  });
+</script>
+</body>
+</html>
