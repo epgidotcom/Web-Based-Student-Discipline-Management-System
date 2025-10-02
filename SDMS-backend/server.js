@@ -7,6 +7,7 @@ import offensesRoute from './src/routes/offenses.js';
 import smsRoute from './src/routes/sms.js';
 import studentsRoute from './src/routes/students.js';
 import violationsRoute from './src/routes/violations.js';
+import authRoute from './src/routes/auth.js';
 import { runMigrations } from './src/migrate.js';
 
 const app = express();
@@ -83,6 +84,7 @@ app.get('/_debug/allowed-origins', (_req, res) => {
 });
 
 app.use('/api/accounts', accountsRoute);
+app.use('/api/auth', authRoute);
 app.use('/api/past-offenses', offensesRoute);
 app.use('/api/sms', smsRoute);
 app.use('/api/students', studentsRoute);

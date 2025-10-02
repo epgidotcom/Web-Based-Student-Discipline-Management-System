@@ -1,0 +1,43 @@
+import jwt from 'jsonwebtoken';
+import { query } from '../db.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const TOKEN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
+
+export function signToken(account){
+  return jwt.sign({
+    sub: account.id,
+    role: account.role,
+    username: account.username
+  }, JWT_SECRET, { expiresIn: TOKEN_TTL_SECONDS });
+}
+
+export async function requireAuth(req, res, next){
+  try {
+    const hdr = req.headers.authorization || '';
+    const m = hdr.match(/^Bearer (.+)$/i);
+    if(!m) return res.status(401).json({ error: 'Missing token' });
+    let payload;
+    try {
+      payload = jwt.verify(m[1], JWT_SECRET);
+    } catch(e){
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    // Fetch user to ensure still exists
+    const { rows } = await query('SELECT id, full_name, email, username, role, grade FROM accounts WHERE id = $1', [payload.sub]);
+    if(!rows.length) return res.status(401).json({ error: 'Account not found' });
+    req.user = rows[0];
+    next();
+  } catch(e){
+    console.error('Auth error', e);
+    res.status(500).json({ error: 'Auth failure' });
+  }
+}
+
+export function requireAdmin(req, res, next){
+  if(!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if(!(req.user.role === 'Admin' || req.user.role === 'Teacher')){ // treat Teacher as guidance/admin level per requirement
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}

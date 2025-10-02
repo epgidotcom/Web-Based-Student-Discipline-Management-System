@@ -16,6 +16,16 @@ CREATE TABLE IF NOT EXISTS accounts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account ON password_reset_tokens(account_id);
+
 -- Past offenses
 CREATE TABLE IF NOT EXISTS past_offenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
