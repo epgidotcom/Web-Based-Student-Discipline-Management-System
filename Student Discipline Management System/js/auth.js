@@ -14,10 +14,16 @@ export function logout(){ localStorage.removeItem(AUTH_KEY); window.location.hre
 export function requireRole(roles){
   const user = getUser();
   if(!user){ window.location.href = 'index.html'; return false; }
-  if(Array.isArray(roles) && roles.length && !roles.includes(user.role)){
-    // redirect student to their dashboard if trying to access admin page
-    if(user.role === 'Student'){
-      window.location.href = 'MPNAG STUDENT/student_dashboard.html';
+  const role = (user.role||'').toLowerCase();
+  const needed = (Array.isArray(roles)? roles: []).map(r=>r.toLowerCase());
+  if(needed.length && !needed.includes(role)){
+    // legacy path cleanup: if old spaced folder path somehow used, force correct one
+    if(location.pathname.match(/MPNAG%20STUDENT|MPNAG STUDENT/i)){
+      location.replace('/student/student_dashboard.html?v=2');
+      return false;
+    }
+    if(role === 'student'){
+      window.location.href = '/student/student_dashboard.html?v=2';
     } else {
       window.location.href = 'dashboard.html';
     }

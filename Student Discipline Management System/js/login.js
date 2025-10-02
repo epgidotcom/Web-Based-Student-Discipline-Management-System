@@ -190,11 +190,18 @@ form.addEventListener("submit", async function (event) {
     }
     const data = await res.json();
     window.SDMSAuth?.saveAuth(data);
-    const role = data?.account?.role;
-    if(role === 'Student'){
-      window.location.href = 'MPNAG STUDENT/student_dashboard.html';
+    const role = (data?.account?.role || '').toLowerCase();
+    // If any legacy path shows up (bookmark), normalize
+    if(location.pathname.match(/MPNAG%20STUDENT|MPNAG STUDENT/i)){
+      location.replace('/student/student_dashboard.html?v=2');
+      return;
+    }
+    if(role === 'student'){
+      const target = '/student/student_dashboard.html?v=2';
+      console.log('Redirecting student to', target);
+      window.location.assign(target);
     } else {
-      window.location.href = 'dashboard.html';
+      window.location.assign('dashboard.html');
     }
   } catch(err){
     errorMessage.textContent = err.message || 'Login failed';
