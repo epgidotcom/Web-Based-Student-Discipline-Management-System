@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>SDMS - Messages</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="js/student_auth_guard.js"></script>
+</head>
+<body>
+  <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
+  <aside class="sidebar">
+    <img src="../images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="messages.html" class="active"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
+    <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+  <div class="backdrop" id="sidebarBackdrop"></div>
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Messages & Announcements</h1>
+        <span class="subtitle">Guidance / School Notices and Direct Messages</span>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-header"><h3>Announcements</h3></div>
+      <ul class="notices" id="noticeList"></ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header"><h3>Send a Message to Guidance</h3></div>
+      <form id="messageForm" class="msg-compose">
+        <textarea id="messageBody" placeholder="Write your question or concern..." required></textarea>
+        <div>
+          <button type="submit" class="btn primary"><i class="fa fa-paper-plane"></i> Send</button>
+        </div>
+      </form>
+      <p class="hint" id="messageStatus" style="display:none"></p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { api, getStudentId } from './js/api.js';
+
+    async function loadAnnouncements(){
+      const list = document.getElementById('noticeList');
+      list.innerHTML = '<li class="notice">Loading...</li>';
+      try {
+        const data = await api('/sms/announcements');
+        const rows = Array.isArray(data) ? data : (data.rows||[]);
+        if(!rows.length){
+          list.innerHTML = '<li class="notice">No announcements at this time.</li>';
+          return;
+        }
+        list.innerHTML = '';
+        rows.forEach(n => {
+          const li = document.createElement('li');
+          li.className = 'notice';
+          li.innerHTML = `<strong>${n.title || 'Announcement'}</strong><span>${n.message || n.body || ''}</span><small>${(n.created_at||'').slice(0,10)}</small>`;
+          list.appendChild(li);
+        });
+      } catch(err){
+        console.error(err);
+        list.innerHTML = '<li class="notice" style="color:#e74c3c;">Failed to load announcements.</li>';
+      }
+    }
+
+    document.getElementById('messageForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const body = document.getElementById('messageBody').value.trim();
+      if(!body) return;
+      const status = document.getElementById('messageStatus');
+      status.style.display='block';
+      status.textContent='Sending...';
+      try {
+        const studentId = getStudentId();
+        await api('/sms/send', { method:'POST', body: JSON.stringify({ message: body, studentId }) });
+        status.textContent='Message sent successfully.';
+        e.target.reset();
+      } catch(err){
+        console.error(err);
+        status.textContent='Failed to send message.';
+      }
+      setTimeout(()=>{status.style.display='none';},4000);
+    });
+
+    loadAnnouncements();
+  </script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
