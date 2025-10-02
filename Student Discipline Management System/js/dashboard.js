@@ -21,16 +21,27 @@ async function loadData(){
   ]);
   students = Array.isArray(stu)? stu : [];
   // Normalize violations: align field names used in charts (type, date, grade, section)
-  violations = (Array.isArray(vio)? vio: []).map(v=>({
-    id: v.id,
-    studentId: v.student_id,
-    studentName: v.student_name,
-    type: v.offense_type || v.violation_type || '',
-    status: v.status || 'Pending',
-    date: v.incident_date || v.date || v.created_at,
-    grade: (v.grade_section && v.grade_section.split('-')[0]) || v.grade || null,
-    section: (v.grade_section && v.grade_section.split('-')[1]) || v.section || null
-  }));
+  violations = (Array.isArray(vio)? vio: []).map(v=>{
+    const incident_date = v.incident_date || v.date || v.created_at;
+    const normalized = {
+      id: v.id,
+      studentId: v.student_id,
+      studentName: v.student_name,
+      type: v.offense_type || v.violation_type || '',
+      status: v.status || 'Pending',
+      date: incident_date,
+      grade: (v.grade_section && v.grade_section.split('-')[0]) || v.grade || null,
+      section: (v.grade_section && v.grade_section.split('-')[1]) || v.section || null
+    };
+    // Add debug info for date parsing
+    if (incident_date) {
+      const parsedDate = toDate(incident_date);
+      if (isNaN(parsedDate.getTime())) {
+        console.warn('[Dashboard] Invalid date for violation', v.id, ':', incident_date);
+      }
+    }
+    return normalized;
+  });
   violationStats = stats;
   console.info('[Dashboard] Data loaded',{ studentCount: students.length, violationCount: violations.length, hasStats: !!violationStats });
 }
@@ -50,8 +61,20 @@ function showLoading(on){
   }
 }
 
-/* ===== Helpers (unchanged) ===== */
-const toDate = (s) => (s instanceof Date ? s : new Date(s + "T00:00:00"));
+/* ===== Helpers (fixed date parsing) ===== */
+const toDate = (s) => {
+  if (s instanceof Date) return s;
+  if (!s) return new Date();
+  // Handle both date-only strings (2025-10-02) and datetime strings (2025-10-02T10:30:00Z)
+  const str = String(s);
+  if (str.includes('T') || str.includes(' ')) {
+    // Already has time component, parse as-is
+    return new Date(str);
+  } else {
+    // Date-only string, add T00:00:00 for local midnight
+    return new Date(str + "T00:00:00");
+  }
+};
 const fmt = (d) => DATE_FMT.format(d);
 const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
 const startOfDay = (d)=>new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -73,10 +96,20 @@ function animateCount(el, value) {
 }
 function violationsInRange(list, from, to) {
   const f = startOfDay(from), t = endOfDay(to);
-  return list.filter(v => {
+  const filtered = list.filter(v => {
+    if (!v.date) return false;
     const d = toDate(v.date);
+    if (isNaN(d.getTime())) return false;
     return d >= f && d <= t;
   });
+  console.log('[Dashboard] violationsInRange:', {
+    from: fmt(from), to: fmt(to), 
+    totalViolations: list.length,
+    validDates: list.filter(v => v.date && !isNaN(toDate(v.date).getTime())).length,
+    inRange: filtered.length,
+    sampleDates: list.slice(0,3).map(v => ({ id: v.id, rawDate: v.date, parsedDate: v.date ? toDate(v.date) : null }))
+  });
+  return filtered;
 }
 function unique(arr) { return [...new Set(arr)]; }
 function weeksBetween(from, to) {
@@ -86,13 +119,25 @@ function weeksBetween(from, to) {
 }
 function countByType(list) {
   const map = new Map();
-  for (const v of list) map.set(v.type, (map.get(v.type)||0)+1);
+  for (const v of list) {
+    const type = v.type?.trim() || 'Unknown';
+    map.set(type, (map.get(type)||0)+1);
+  }
   return [...map].map(([type,count])=>({type,count})).sort((a,b)=>b.count-a.count);
 }
 function countByGrade(list) {
   const map = new Map();
-  for (const v of list) map.set(v.grade, (map.get(v.grade)||0)+1);
-  return [...map].map(([grade,count])=>({grade,count})).sort((a,b)=>a.grade-b.grade);
+  for (const v of list) {
+    const grade = v.grade?.trim() || 'Unknown';
+    map.set(grade, (map.get(grade)||0)+1);
+  }
+  return [...map].map(([grade,count])=>({grade,count})).sort((a,b)=>{
+    // Sort numerically if both are numbers, otherwise alphabetically
+    const aNum = parseInt(a.grade, 10);
+    const bNum = parseInt(b.grade, 10);
+    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return String(a.grade).localeCompare(String(b.grade));
+  });
 }
 
 /* ===== Elements ===== */
@@ -174,17 +219,62 @@ function renderKPIs(from, to) {
 function renderTrend(list, from, to) {
   const weeks = weeksBetween(from, to);
   const labels = weeks.map(d => fmt(d));
-  const counts = weeks.map((start, i) => { const end = i < weeks.length - 1 ? addDays(weeks[i+1], -1) : to; return list.filter(v => { const vd = toDate(v.date); return vd >= start && vd <= end; }).length; });
-  const hasData = counts.some(c => c > 0); els.emptyTrend.classList.toggle("hidden", hasData);
-  chartTrend = ensureChart(document.getElementById("chartTrend").getContext("2d"), { type: "line", data: { labels, datasets: [{ label: "Violations / week", data: counts, tension: 0.35, fill: true, borderWidth: 2 }]}, options: { responsive:true, maintainAspectRatio:false, plugins: { legend:{ display:false }, tooltip:{ intersect:false } }, scales: { y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } }, chartTrend);
+  const counts = weeks.map((start, i) => { 
+    const end = i < weeks.length - 1 ? addDays(weeks[i+1], -1) : to; 
+    const weekViolations = list.filter(v => { 
+      const vd = toDate(v.date); 
+      return vd >= start && vd <= end; 
+    });
+    return weekViolations.length;
+  });
+  const hasData = counts.some(c => c > 0); 
+  console.log('[Dashboard] renderTrend:', { 
+    weeks: weeks.length, 
+    labels: labels.slice(0,3), 
+    counts: counts.slice(0,3), 
+    hasData, 
+    totalFiltered: list.length 
+  });
+  els.emptyTrend.classList.toggle("hidden", hasData);
+  chartTrend = ensureChart(document.getElementById("chartTrend").getContext("2d"), { 
+    type: "line", 
+    data: { labels, datasets: [{ label: "Violations / week", data: counts, tension: 0.35, fill: true, borderWidth: 2 }]}, 
+    options: { responsive:true, maintainAspectRatio:false, plugins: { legend:{ display:false }, tooltip:{ intersect:false } }, scales: { y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } 
+  }, chartTrend);
 }
 function renderTopTypes(list) {
-  const agg = countByType(list).slice(0, 5); const labels = agg.map(a => a.type); const values = agg.map(a => a.count); const hasData = values.some(v => v > 0); els.emptyTypes.classList.toggle("hidden", hasData);
-  chartTopTypes = ensureChart(document.getElementById("chartTopTypes").getContext("2d"), { type: "bar", data: { labels, datasets: [{ label:"Count", data: values, borderWidth:1 }] }, options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } }, chartTopTypes);
+  const agg = countByType(list).slice(0, 5); 
+  const labels = agg.map(a => a.type); 
+  const values = agg.map(a => a.count); 
+  const hasData = values.some(v => v > 0); 
+  console.log('[Dashboard] renderTopTypes:', { 
+    totalViolations: list.length, 
+    aggregated: agg, 
+    hasData 
+  });
+  els.emptyTypes.classList.toggle("hidden", hasData);
+  chartTopTypes = ensureChart(document.getElementById("chartTopTypes").getContext("2d"), { 
+    type: "bar", 
+    data: { labels, datasets: [{ label:"Count", data: values, borderWidth:1 }] }, 
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } 
+  }, chartTopTypes);
 }
 function renderByGrade(list) {
-  const agg = countByGrade(list); const labels = agg.map(a => a.grade); const values = agg.map(a => a.count); const hasData = values.some(v => v > 0); els.emptyByGrade.classList.toggle("hidden", hasData);
-  chartByGrade = ensureChart(document.getElementById("chartByGrade").getContext("2d"), { type: "bar", data: { labels, datasets: [{ label:"Violations", data: values, borderWidth:1 }] }, options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } }, chartByGrade);
+  const agg = countByGrade(list); 
+  const labels = agg.map(a => a.grade); 
+  const values = agg.map(a => a.count); 
+  const hasData = values.some(v => v > 0); 
+  console.log('[Dashboard] renderByGrade:', { 
+    totalViolations: list.length, 
+    aggregated: agg, 
+    hasData 
+  });
+  els.emptyByGrade.classList.toggle("hidden", hasData);
+  chartByGrade = ensureChart(document.getElementById("chartByGrade").getContext("2d"), { 
+    type: "bar", 
+    data: { labels, datasets: [{ label:"Violations", data: values, borderWidth:1 }] }, 
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } 
+  }, chartByGrade);
 }
 
 async function init(){
