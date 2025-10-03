@@ -159,26 +159,48 @@
 
 <!-- View Student Modal -->
 <div id="viewModal" class="modal">
-  <div class="modal-content">
+  <div class="modal-content student-modal">
     <div class="modal-header">
       <h2>Student Details</h2>
       <span class="close-btn">&times;</span>
     </div>
 
-    <div style="display:flex; align-items:center; gap:12px; margin:4px 0 8px;">
-      <img id="viewAvatar" class="avatar--lg is-hidden" alt="Student photo">
-      <div id="viewInitials" class="avatar--fallback is-hidden" style="width:48px;height:48px;font-size:16px;"></div>
-    </div>
+    <div class="student-info">
+      <div class="student-avatar">
+        <img id="viewAvatar" class="avatar--lg is-hidden" alt="Student photo">
+        <div id="viewInitials" class="avatar--fallback is-hidden"></div>
+      </div>
 
-    <p><strong>LRN:</strong> <span id="viewLRN"></span></p>
-    <p><strong>Name:</strong> <span id="viewName"></span></p>
-    <p><strong>Age:</strong> <span id="viewAge"></span></p>
-    <!-- Address removed -->
-    <p><strong>Grade:</strong> <span id="viewGrade"></span></p>
-    <p><strong>Section:</strong> <span id="viewSection"></span></p>
-    <p><strong>Parent's Contact:</strong> <span id="viewParent"></span></p>
+      <div class="student-details">
+        <div class="detail-row">
+          <span class="label">LRN</span>
+          <span class="value" id="viewLRN"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Name</span>
+          <span class="value" id="viewName"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Age</span>
+          <span class="value" id="viewAge"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Grade</span>
+          <span class="value" id="viewGrade"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Section</span>
+          <span class="value" id="viewSection"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Parent’s Contact</span>
+          <span class="value" id="viewParent"></span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
 
 <!-- Page scripts -->
 <script src="js/main.js" defer></script>

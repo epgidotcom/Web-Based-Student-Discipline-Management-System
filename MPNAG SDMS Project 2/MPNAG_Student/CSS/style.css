@@ -103,9 +103,6 @@ body {
   min-height: 600px;
 }
 
-
-
-
 /* === Mobile adjustments === */
 .menu-btn {
   display: none; /* hidden on desktop */

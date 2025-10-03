@@ -95,20 +95,15 @@
     <form id="violationForm">
       <input type="hidden" id="editIndex">
 
-      <!-- 0) LRN (optional fast lookup) -->
       <label>LRN (Lookup):</label>
       <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" pattern="[0-9A-Za-z\- ]+" title="Alphanumeric LRN" />
-      <!-- Status message injected dynamically -->
 
-      <!-- 1) Student Name -->
       <label>Student Name:</label>
       <input type="text" id="studentName" autocomplete="off" required>
 
-      <!-- 2) Grade & Section -->
       <label>Grade &amp; Section:</label>
       <input type="text" id="gradeSection" placeholder="e.g., Grade 10 - St. Matthew" required>
 
-      <!-- 3) Past Offense (hidden until a student name is entered/selected) -->
       <div id="pastOffenseWrap" class="is-hidden">
         <label>Past Offense:</label>
         <div id="pastOffenseBox" class="past-offense-box">
@@ -117,17 +112,12 @@
         </div>
       </div>
 
-      <!-- 4) Incident Date (when the violation happened) -->
       <label>Incident Date:</label>
       <input type="date" id="incidentDate" required>
 
-      <!-- (No Added Date field in the modal) -->
-
-      <!-- 5) Violation's Description (stored, not in table) -->
       <label>Violation's Description:</label>
       <textarea id="description" rows="3" placeholder="Describe the violation..." required></textarea>
 
-      <!-- 6) Violation Type -->
       <label>Violation Type:</label>
       <select id="violationType" required>
         <option value="" disabled selected>Select type</option>
@@ -136,7 +126,6 @@
         <option value="Third Offense">Third Offense</option>
       </select>
 
-      <!-- 7) Sanction -->
       <label>Sanction:</label>
       <select id="sanction" required>
         <option value="" disabled selected>Select sanction</option>
@@ -147,7 +136,6 @@
         <option value="Expulsion">Expulsion</option>
       </select>
 
-      <!-- (Optional) Evidence -->
       <div class="evidence-uploader" id="evidenceUploader">
         <div class="head"><strong>Evidence (optional)</strong></div>
         <div class="evidence-preview is-hidden" id="evidencePreview"></div>
@@ -170,29 +158,67 @@
 
 <!-- View Violation Modal -->
 <div id="viewModal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn">&times;</span>
-    <h2>Violation Details</h2>
-
-    <p><strong>Student:</strong> <span id="viewStudent"></span></p>
-    <p><strong>Grade &amp; Section:</strong> <span id="viewGradeSection"></span></p>
-
-    <div id="viewPastOffenseRow" class="is-hidden">
-      <p><strong>Past Offense:</strong> <span id="viewPastOffense"></span></p>
+  <div class="modal-content violation-modal">
+    <div class="modal-header">
+      <h2>Violation Details</h2>
+      <span class="close-btn">&times;</span>
     </div>
 
-    <p><strong>Incident Date:</strong> <span id="viewIncidentDate"></span></p>
-    <p><strong>Added Date:</strong> <span id="viewAddedDate"></span></p>
-    <p><strong>Violation's Description:</strong> <span id="viewDescription"></span></p>
-    <p><strong>Violation Type:</strong> <span id="viewViolationType"></span></p>
-    <p><strong>Sanction:</strong> <span id="viewSanction"></span></p>
+    <div class="violation-body">
+      <div class="detail-row">
+        <span class="label">Student</span>
+        <span class="value" id="viewStudent"></span>
+      </div>
 
-    <div id="viewEvidenceWrap" class="is-hidden" style="margin-top:10px;">
-      <strong>Evidence:</strong>
-      <div id="viewEvidence" class="evidence-preview" style="margin-top:6px;"></div>
+      <div class="detail-row">
+        <span class="label">Grade & Section</span>
+        <span class="value" id="viewGradeSection"></span>
+      </div>
+
+      <div id="viewPastOffenseRow" class="detail-row is-hidden">
+        <span class="label">Past Offense</span>
+        <span class="value" id="viewPastOffense"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Incident Date</span>
+        <span class="value" id="viewIncidentDate"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Added Date</span>
+        <span class="value" id="viewAddedDate"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Violation Description</span>
+        <span class="value multiline" id="viewDescription"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Violation Type</span>
+        <span class="value" id="viewViolationType"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Sanction</span>
+        <span class="value" id="viewSanction"></span>
+      </div>
+
+      <div id="viewEvidenceWrap" class="is-hidden evidence-section">
+        <strong>Evidence:</strong>
+        <div id="viewEvidence" class="evidence-preview"></div>
+      </div>
     </div>
   </div>
 </div>
+
+<!-- ===== Image Preview Modal ===== -->
+<div id="imagePreviewModal" class="modal image-preview-modal">
+  <span class="close-btn" id="imagePreviewClose">&times;</span>
+  <img id="imagePreviewFull" class="image-preview-full" alt="Preview">
+</div>
+
 
 <!-- Scripts -->
 <script src="js/config.js"></script>

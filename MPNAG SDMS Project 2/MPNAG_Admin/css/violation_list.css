@@ -106,6 +106,7 @@ table tr:hover {
   inset:0;
   z-index:1000;
   background:rgba(0,0,0,.5);
+  backdrop-filter: blur(2px);
 }
 
 /* Dialog */
@@ -174,6 +175,121 @@ body.modal-open{
 .modal form button:hover {
   background-color: #2980b9;
 }
+
+/* ===== Improved Violation Modal ===== */
+.violation-modal {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Header */
+.modal-header {
+  background: linear-gradient(135deg, #007bff, #4da3ff);
+  color: #fff !important;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: none;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff !important;
+}
+
+.modal-header .close-btn {
+  font-size: 22px;
+  font-weight: bold;
+  color: #fff !important;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.modal-header .close-btn:hover {
+  color: #ffcccc !important;
+}
+
+/* Body layout */
+.violation-body {
+  padding: 20px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed #e5e7eb;
+  padding-bottom: 6px;
+}
+
+.detail-row .label {
+  font-weight: 600;
+  color: #374151;
+  width: 40%;
+}
+
+.detail-row .value {
+  color: #1f2937;
+  text-align: right;
+  flex: 1;
+  font-weight: 500;
+}
+
+.detail-row .multiline {
+  white-space: pre-wrap;
+  text-align: right;
+}
+
+/* Evidence section */
+.evidence-section {
+  margin-top: 14px;
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+}
+
+.evidence-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.evidence-preview img {
+  width: 90px;
+  height: 90px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid #ddd;
+  transition: transform 0.2s ease;
+}
+
+.evidence-preview img:hover {
+  transform: scale(1.05);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 540px) {
+  .detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-row .label,
+  .detail-row .value {
+    text-align: left;
+    width: auto;
+  }
+
+  .violation-body {
+    padding: 16px 18px 24px;
+  }
+}
+
 
 /* make table rows clickable */
 #studentTable tr {
@@ -256,3 +372,37 @@ select option {
 .po-list li { margin:2px 0; }
 
 
+/* Image Preview Modal */
+
+.image-preview-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(3px);
+  justify-content: center;
+  align-items: center;
+}
+.image-preview-modal.is-open { display: flex; }
+.image-preview-full {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 8px;
+  box-shadow: 0 0 25px rgba(0,0,0,0.6);
+  animation: zoomIn 0.25s ease;
+}
+@keyframes zoomIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.image-preview-modal .close-btn {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.image-preview-modal .close-btn:hover { color: #ff5757; }

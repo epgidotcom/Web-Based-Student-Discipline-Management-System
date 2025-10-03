@@ -10,19 +10,17 @@ const viewModal      = document.getElementById("viewModal");
 const modalTitle     = document.getElementById("modalTitle");
 const closeBtns      = document.querySelectorAll(".close-btn");
 
-/* ---- Inputs (core) ---- */
+/* ---- Inputs ---- */
 const studentNameInput = document.getElementById("studentName");
-const gradeSectionInput= document.getElementById("gradeSection");     // NEW
-const violationTypeInput = document.getElementById("violationType");  // NEW
+const gradeSectionInput= document.getElementById("gradeSection");
+const violationTypeInput = document.getElementById("violationType");
 const sanctionInput    = document.getElementById("sanction");
 const descriptionInput = document.getElementById("description");
-/* replace Date -> Incident Date; Added Date is auto (no input) */
 const incidentDateInput = document.getElementById("incidentDate");
-
 const editIndexInput   = document.getElementById("editIndex");
 
-/* ---- Optional legacy input (if your form still has it) ---- */
-const violationInput   = document.getElementById("violation"); // kept for compatibility (not shown in table)
+/* Optional legacy input */
+const violationInput   = document.getElementById("violation");
 
 /* ---- Past Offense UI ---- */
 const pastOffenseWrap   = document.getElementById("pastOffenseWrap");
@@ -37,10 +35,8 @@ const viewPastOffense  = document.getElementById("viewPastOffense");
 const viewViolationType= document.getElementById("viewViolationType");
 const viewSanction     = document.getElementById("viewSanction");
 const viewDescription  = document.getElementById("viewDescription");
-/* replace viewDate -> viewIncidentDate + viewAddedDate */
 const viewIncidentDate = document.getElementById("viewIncidentDate");
 const viewAddedDate    = document.getElementById("viewAddedDate");
-
 const viewEvidenceWrap = document.getElementById("viewEvidenceWrap");
 const viewEvidenceBox  = document.getElementById("viewEvidence");
 
@@ -76,9 +72,11 @@ function renderEvidenceThumbs() {
   ev.preview.innerHTML = "";
   evidenceData.forEach((src, i) => {
     const img = document.createElement("img");
-    img.src = src; img.className = "evidence-thumb"; img.alt = `Evidence ${i+1}`;
-    img.title = "Click to open";
-    img.addEventListener("click", () => window.open(src, "_blank"));
+    img.src = src;
+    img.className = "evidence-thumb";
+    img.alt = `Evidence ${i+1}`;
+    img.title = "Click to enlarge";
+    img.addEventListener("click", () => openImagePreview(src));
     ev.preview.appendChild(img);
   });
   const has = evidenceData.length > 0;
@@ -123,27 +121,14 @@ function initEvidenceUploader() {
 }
 initEvidenceUploader();
 
-/* ================= Past Offense temporary data (mock) =================
-   - Persists in localStorage for demo
-   - Swap to backend by setting USE_API = true and wiring endpoints
-======================================================================= */
-const USE_API  = false;
-const API_BASE = '/api';
+/* ================= Mock Past Offense Store ================= */
 const STORAGE_KEY = 'sdms_mock_past_offenses_v1';
-
 const MockPastOffenseStore = {
   _data: null,
   _load() {
     if (this._data) return this._data;
     try {
-      this._data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
-        'Juan Dela Cruz': [
-          'Tardiness — 2025-08-01',
-          'Improper Uniform — 2025-09-10',
-        ],
-        'Maria Santos': [],
-        'Hee, Wael N': ['Not Wearing Uniform — 2025-09-20'],
-      };
+      this._data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
     } catch { this._data = {}; }
     return this._data;
   },
@@ -160,37 +145,17 @@ const MockPastOffenseStore = {
     data[key].push(label);
     this._save();
     return data[key].slice();
-  }
-};
-
-const ApiPastOffenseStore = {
-  async getByName(name) {
-    const res = await fetch(`${API_BASE}/past-offenses?name=${encodeURIComponent(name)}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
   },
-  async addOffense(name, label, dateISO) {
-    const res = await fetch(`${API_BASE}/past-offenses`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name, label, date: dateISO })
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+  async updateLastOffense(name, newLabel) {
+    const data = this._load();
+    const key = Object.keys(data).find(k => k.toLowerCase() === String(name).trim().toLowerCase());
+    if (!key) return [];
+    if (data[key].length > 0) data[key][data[key].length - 1] = newLabel;
+    this._save();
+    return data[key].slice();
   }
 };
-
-const PastOffenseService = USE_API ? ApiPastOffenseStore : MockPastOffenseStore;
-
-function levelFromCount(n) {
-  if (n <= 0) return 'None';
-  if (n === 1) return '1st Offense';
-  if (n === 2) return '2nd Offense';
-  if (n === 3) return '3rd Offense';
-  return 'Repeat/Chronic';
-}
+const PastOffenseService = MockPastOffenseStore;
 
 const debounce = (fn, ms = 300) => {
   let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
@@ -199,10 +164,7 @@ const debounce = (fn, ms = 300) => {
 /* ================= Refresh Past Offense UI ================= */
 async function refreshPastOffenseUI() {
   if (!pastOffenseWrap || !pastOffenseList || !pastOffenseEmpty) return;
-
   const name = (studentNameInput && studentNameInput.value || '').trim();
-
-  // Hide until there's a name
   if (!name) {
     pastOffenseWrap.classList.add('is-hidden');
     pastOffenseList.innerHTML = '';
@@ -211,11 +173,7 @@ async function refreshPastOffenseUI() {
   }
 
   pastOffenseWrap.classList.remove('is-hidden');
-
-  // Get history (mock/localStorage for now)
   const offenses = await PastOffenseService.getByName(name);
-
-  // Render list
   pastOffenseList.innerHTML = '';
   if (!offenses.length) {
     pastOffenseEmpty.classList.remove('is-hidden');
@@ -230,19 +188,15 @@ async function refreshPastOffenseUI() {
   }
 }
 
-
 /* ================= Open/Close Modals ================= */
 addViolationBtn.addEventListener("click", () => {
   violationForm.reset();
   editIndexInput.value = "";
   modalTitle.textContent = "Add Violation";
-  window._evidence?.clear();             // reset images
-
-  // Ensure Past Offense is hidden on open
-  if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
-  if (pastOffenseList) pastOffenseList.innerHTML = '';
-  if (pastOffenseEmpty) pastOffenseEmpty.textContent = 'No past offenses.';
-
+  window._evidence?.clear();
+  pastOffenseWrap.classList.add('is-hidden');
+  pastOffenseList.innerHTML = '';
+  pastOffenseEmpty.textContent = 'No past offenses.';
   violationModal.style.display = "flex";
 });
 
@@ -250,6 +204,7 @@ closeBtns.forEach(btn => {
   btn.addEventListener("click", () => {
     violationModal.style.display = "none";
     viewModal.style.display = "none";
+    imagePreviewModal?.classList.remove("is-open");
   });
 });
 
@@ -262,12 +217,24 @@ violationForm.addEventListener("submit", async (e) => {
   const violationType = (violationTypeInput?.value || "").trim();
   const sanction      = (sanctionInput.value || "").trim();
   const description   = (descriptionInput.value || "").trim();
-  /* use Incident + automatic Added date */
   const incidentDate  = incidentDateInput.value || "";
   const addedDate     = new Date(Date.now() - (new Date()).getTimezoneOffset()*60000).toISOString().slice(0,10);
-
-  // Keep legacy field if present (not shown in table)
   const violation     = violationInput ? (violationInput.value || "").trim() : "";
+
+  const parts = [];
+  if (description) parts.push(description);
+  if (violationType) parts.push(violationType);
+  if (sanction) parts.push(`Sanction: ${sanction}`);
+  const label = parts.join(" | ") + (incidentDate ? ` — ${incidentDate}` : "");
+
+  let offensesAfter = [];
+  if (studentName) {
+    if (editIndexInput.value === "") {
+      offensesAfter = await PastOffenseService.addOffense(studentName, label, incidentDate);
+    } else {
+      offensesAfter = await PastOffenseService.updateLastOffense(studentName, label);
+    }
+  }
 
   const violationData = {
     studentName,
@@ -278,7 +245,6 @@ violationForm.addEventListener("submit", async (e) => {
     description,
     violationType,
     sanction,
-    // keep the older 'violation' in case you still use it somewhere else
     violation,
     evidence: window._evidence?.get ? window._evidence.get() : []
   };
@@ -289,43 +255,23 @@ violationForm.addEventListener("submit", async (e) => {
     violations[editIndexInput.value] = violationData;
   }
 
-  // Update mock store so history appears next time
-  // Build a readable label for history, e.g., "Improper Uniform | Minor | Sanction: Verbal Warning — 2025-09-20"
-  const parts = [];
-  if (description) parts.push(description);
-  if (violationType) parts.push(violationType);
-  if (sanction) parts.push(`Sanction: ${sanction}`);
-  const label = parts.join(" | ") + (incidentDate ? ` — ${incidentDate}` : "");
-  let offensesAfter = [];
-  if (studentName) {
-    offensesAfter = await PastOffenseService.addOffense(studentName, label, incidentDate);
-  }
-
   renderTable();
   violationModal.style.display = "none";
-
-  // optional: refresh dashboard
   window.dispatchEvent(new Event('sdms:data-changed'));
 });
 
-/* ================= Render table =================
-   Columns:
-   Student Name | Grade & Section | Past Offense | Incident Date | Violation's Description | Violation Type | Sanction | Added Date | Actions
-================================================= */
+/* ================= Render table ================= */
 function renderTable() {
   violationTable.innerHTML = "";
-
   violations.forEach((item, index) => {
     const hasAttach = item.evidence && item.evidence.length > 0;
     const paperclip = hasAttach ? `<span class="has-attachment" title="Has evidence"><i class="fa fa-paperclip"></i></span>` : "";
-
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${item.studentName} ${paperclip}</td>
       <td>${item.gradeSection || '-'}</td>
       <td>${item.pastOffense || 'None'}</td>
       <td>${item.incidentDate || '-'}</td>
-      <td>${item.description || '—'}</td>
       <td>${item.violationType || '-'}</td>
       <td>${item.sanction || '-'}</td>
       <td>${item.addedDate || '-'}</td>
@@ -342,62 +288,49 @@ function renderTable() {
 /* ================= View details ================= */
 window.viewViolationDetails = function (index) {
   const item = violations[index];
-
-  if (viewStudent)      viewStudent.textContent = item.studentName || '-';
-  if (viewGradeSection) viewGradeSection.textContent = item.gradeSection || '-';
-
+  viewStudent.textContent = item.studentName || '-';
+  viewGradeSection.textContent = item.gradeSection || '-';
   const offenseText = item.pastOffense || 'None';
-  if (viewPastOffense)  viewPastOffense.textContent = offenseText;
-  if (viewPastOffenseRow) viewPastOffenseRow.classList.toggle('is-hidden', !offenseText || offenseText === 'None');
+  viewPastOffense.textContent = offenseText;
+  viewPastOffenseRow.classList.toggle('is-hidden', !offenseText || offenseText === 'None');
+  viewViolationType.textContent = item.violationType || '-';
+  viewSanction.textContent = item.sanction || '-';
+  viewDescription.textContent = item.description || "No description provided.";
+  viewIncidentDate.textContent = item.incidentDate || '-';
+  viewAddedDate.textContent = item.addedDate || '-';
 
-  if (viewViolationType) viewViolationType.textContent = item.violationType || '-';
-  if (viewSanction)     viewSanction.textContent = item.sanction || '-';
-  if (viewDescription)  viewDescription.textContent = item.description || "No description provided.";
-  /* show both dates */
-  if (viewIncidentDate) viewIncidentDate.textContent = item.incidentDate || '-';
-  if (viewAddedDate)    viewAddedDate.textContent = item.addedDate || '-';
-
-  // render evidence thumbs
-  if (viewEvidenceBox && viewEvidenceWrap) {
-    viewEvidenceBox.innerHTML = "";
-    if (item.evidence && item.evidence.length) {
-      item.evidence.forEach((src, i) => {
-        const img = document.createElement("img");
-        img.src = src; img.className = "evidence-thumb"; img.alt = `Evidence ${i+1}`;
-        img.title = "Click to open";
-        img.addEventListener("click", () => window.open(src, "_blank"));
-        viewEvidenceBox.appendChild(img);
-      });
-      viewEvidenceWrap.classList.remove("is-hidden");
-    } else {
-      viewEvidenceWrap.classList.add("is-hidden");
-    }
+  viewEvidenceBox.innerHTML = "";
+  if (item.evidence && item.evidence.length) {
+    item.evidence.forEach((src, i) => {
+      const img = document.createElement("img");
+      img.src = src;
+      img.className = "evidence-thumb";
+      img.alt = `Evidence ${i+1}`;
+      img.title = "Click to enlarge";
+      img.addEventListener("click", () => openImagePreview(src));
+      viewEvidenceBox.appendChild(img);
+    });
+    viewEvidenceWrap.classList.remove("is-hidden");
+  } else {
+    viewEvidenceWrap.classList.add("is-hidden");
   }
-
   viewModal.style.display = "block";
 };
 
 /* ================= Edit violation ================= */
 window.editViolation = function (index) {
   const item = violations[index];
-
   studentNameInput.value    = item.studentName || '';
-  gradeSectionInput && (gradeSectionInput.value = item.gradeSection || '');
-  violationTypeInput && (violationTypeInput.value = item.violationType || '');
+  gradeSectionInput.value   = item.gradeSection || '';
+  violationTypeInput.value  = item.violationType || '';
   sanctionInput.value       = item.sanction || '';
   descriptionInput.value    = item.description || '';
-  /* set incident date; added date is automatic (no input to set) */
   incidentDateInput.value   = item.incidentDate || '';
   editIndexInput.value      = index;
-
-  // Update Past Offense UI for this student (and show the block)
   refreshPastOffenseUI();
-
-  // preload evidence
   window._evidence?.set(item.evidence || []);
-
   modalTitle.textContent = "Edit Violation";
-  violationModal.style.display = "block";
+  violationModal.style.display = "flex";
 };
 
 /* ================= Delete violation ================= */
@@ -419,20 +352,36 @@ window.searchViolation = function () {
   });
 };
 
-/* ================= Init ================= */
-renderTable();
+/* ================= Image Preview Feature ================= */
+const imagePreviewModal = document.getElementById("imagePreviewModal");
+const imagePreviewFull  = document.getElementById("imagePreviewFull");
+const imagePreviewClose = document.getElementById("imagePreviewClose");
 
-// Hide Past Offense on load
-if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
-if (pastOffenseSelect) pastOffenseSelect.value = 'None';
-if (pastOffenseStatus) pastOffenseStatus.textContent = 'No past offenses.';
+window.openImagePreview = function (src) {
+  if (!imagePreviewModal || !imagePreviewFull) return;
+  imagePreviewFull.src = src;
+  imagePreviewModal.classList.add("is-open");
+};
 
-// Show/refresh past offense after typing student name
-if (studentNameInput) {
-  studentNameInput.addEventListener("input", debounce(refreshPastOffenseUI, 250));
+if (imagePreviewClose) {
+  imagePreviewClose.addEventListener("click", () => {
+    imagePreviewModal.classList.remove("is-open");
+  });
 }
 
-// Allow other parts (like autocomplete) to set the student programmatically:
+if (imagePreviewModal) {
+  imagePreviewModal.addEventListener("click", (e) => {
+    if (e.target === imagePreviewModal) {
+      imagePreviewModal.classList.remove("is-open");
+    }
+  });
+}
+
+/* ================= Init ================= */
+renderTable();
+if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
+if (studentNameInput) studentNameInput.addEventListener("input", debounce(refreshPastOffenseUI, 250));
+
 document.addEventListener('studentSelected', (e) => {
   const name = e?.detail?.name || '';
   if (name && studentNameInput) {
@@ -441,7 +390,6 @@ document.addEventListener('studentSelected', (e) => {
   refreshPastOffenseUI();
 });
 
-// Logout
 document.getElementById("logoutBtn")?.addEventListener("click", () => {
   window.location.href = "index.html";
 });
