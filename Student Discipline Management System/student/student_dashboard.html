@@ -7,22 +7,31 @@
   <link rel="stylesheet" href="css/student.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Keep existing backend glue so API and auth remain connected -->
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
   <script src="js/student_auth_guard.js"></script>
 </head>
 <body>
-  <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
+
+  <!-- Toggle button for mobile -->
+  <button class="sidebar-toggle" id="sidebarToggle">
+    <i class="fa fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
   <aside class="sidebar">
     <img src="../images/mpnag_logo.png" alt="School Logo" class="logo"/>
     <a href="student_dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
-    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
-    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+  <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
     <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
-    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
     <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
+
+  <!-- Backdrop for mobile -->
   <div class="backdrop" id="sidebarBackdrop"></div>
+
+  <!-- Main -->
   <main class="main">
     <header class="topbar">
       <div class="title">
@@ -31,32 +40,65 @@
       </div>
       <div class="profile">
         <div class="name-grade">
-          <strong>Juan Dela Cruz</strong>
-          <small>Grade 9 • Section Emerald</small>
+          <strong id="studentName">Juan Dela Cruz</strong>
+          <small id="studentSection">Grade 9 • Emerald</small>
         </div>
-  <img src="../images/mpnag_logo.png" alt="Avatar" class="avatar"/>
+        <img src="../images/mpnag_logo.png"
+             onerror="this.onerror=null;this.src='../images/mpnag_logo.png';"
+             alt="Avatar" class="avatar"/>
       </div>
     </header>
+
+    <!-- Welcome Banner -->
+    <section class="welcome-banner">
+      <div class="welcome-text">
+        <h2>Welcome back, <span id="studentNameBanner">Juan!</span></h2>
+        <p>Keep track of your conduct and stay informed about your student discipline records.</p>
+      </div>
+      <div class="welcome-illustration">
+        <i class="fa-solid fa-user-graduate"></i>
+      </div>
+    </section>
+
+    <!-- Cards (kept because dashboard scripts update these) -->
     <section class="cards">
-      <div class="card"><i class="fa fa-exclamation-circle"></i><h2 id="totalViolations">0</h2><p>Total Violations</p></div>
-      <div class="card"><i class="fa fa-folder-open"></i><h2 id="openCases">0</h2><p>Open Cases</p></div>
-      <div class="card"><i class="fa fa-calendar"></i><h2 id="lastViolation">—</h2><p>Last Violation</p></div>
-      <div class="card"><i class="fa fa-user-check"></i><span class="status" id="studentStatus">Good Standing</span><p>Status</p></div>
+      <div class="card"><div class="icon"><i class="fa fa-exclamation-circle"></i></div><div class="data"><div class="value" id="totalViolations">0</div><div class="label">Total Violations</div></div></div>
+      <div class="card"><div class="icon"><i class="fa fa-folder-open"></i></div><div class="data"><div class="value" id="openCases">0</div><div class="label">Open Cases</div></div></div>
+      <div class="card"><div class="icon"><i class="fa fa-calendar"></i></div><div class="data"><div class="value" id="lastViolation">—</div><div class="label">Last Violation</div></div></div>
+      <div class="card"><div class="icon"><i class="fa fa-user-check"></i></div><div class="data"><div class="badge" id="studentStatus">Good Standing</div><div class="label">Status</div></div></div>
     </section>
+
+    <!-- Charts -->
     <section class="grid-2">
-      <div class="panel"><div class="panel-header"><h3>My Violations Over Time</h3></div><canvas id="lineChart" height="140"></canvas></div>
-      <div class="panel"><div class="panel-header"><h3>Violation Breakdown</h3></div><canvas id="barChart" height="140"></canvas></div>
+      <div class="panel">
+        <div class="panel-header"><h3>My Violations Over Time</h3></div>
+        <canvas id="lineChart" height="140"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Violation Breakdown</h3></div>
+        <canvas id="barChart" height="140"></canvas>
+      </div>
     </section>
+
+    <!-- Violation History -->
     <section class="panel">
       <div class="panel-header"><h3>Violation History</h3></div>
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th>Date</th><th>Type</th><th>Remarks</th><th>Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Remarks</th>
+              <th>Status</th>
+            </tr>
+          </thead>
           <tbody id="violationRows"></tbody>
         </table>
       </div>
     </section>
   </main>
+
   <script type="module">
     import { api, getStudentId } from './js/api.js';
     let violations = [];
@@ -67,7 +109,8 @@
       document.getElementById('totalViolations').textContent = violations.length;
       document.getElementById('openCases').textContent = open;
       document.getElementById('lastViolation').textContent = violations.length ? violations[violations.length-1].date : '—';
-      document.getElementById('studentStatus').textContent = open>=3 ? 'On Probation' : 'Good Standing';
+      const statusEl = document.getElementById('studentStatus');
+      statusEl.textContent = open>=3 ? 'On Probation' : 'Good Standing';
     }
     function renderTable(){
       const tbody = document.getElementById('violationRows');
@@ -93,12 +136,13 @@
     async function loadData(){
       const studentId = getStudentId();
       try {
-        const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
+        const path = studentId ? `/violations?studentId=${encodeURIComponent(studentId)}` : '/violations/me';
+        const data = await api(path);
         violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({
-          date: (v.date || v.created_at || '').slice(0,10),
-            type: v.type || v.violation_type || v.offense || 'Unknown',
-            remarks: v.remarks || v.description || '',
-            status: v.status || 'Pending'
+          date: (v.date || v.incident_date || v.created_at || '').toString().slice(0,10),
+          type: v.type || v.offense_type || v.violation_type || 'Unknown',
+          remarks: v.remarks || v.description || '',
+          status: v.status || 'Pending'
         }));
       } catch (e){
         console.error('Failed to load violations for dashboard', e);
@@ -110,6 +154,7 @@
     }
     loadData();
   </script>
+
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>
