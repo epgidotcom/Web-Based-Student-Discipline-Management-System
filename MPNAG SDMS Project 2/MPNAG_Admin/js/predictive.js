@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const strands = ["STEM", "ABM", "GAS", "HUMSS", "TVL"];
   const violations = ["Tardiness", "Cheating", "Dress Code", "Disrespect"];
 
-  // 🎯 Simulated 7-day forecast data for each strand & violation
+  // Simulated 7-day forecast data for each strand & violation
   const simulated = {};
   strands.forEach((s) => {
     simulated[s] = {};
@@ -93,4 +93,5 @@ document.addEventListener("DOMContentLoaded", () => {
   // Update on dropdown change
   document.getElementById("filterStrand").addEventListener("change", updateChart);
   document.getElementById("filterViolation").addEventListener("change", updateChart);
+
 });
