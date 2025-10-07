@@ -1,0 +1,398 @@
+:root {
+  --bg: #f5f6fa;
+  --panel: #ffffff;
+  --panel-2: #f9f9f9;
+  --muted: #6c757d;
+  --text: #2c3e50;
+  --ring: rgba(59, 130, 246, 0.2);
+  --outline: #dee2e6;
+  --accent: #3b82f6;
+  --ok: #28a745;
+  --warn: #ffc107;
+  --danger: #dc3545;
+}
+
+/* Narrow box-sizing to just the UI pieces that need it */
+input, select, textarea, button, .panel, .form-grid > * {
+  box-sizing: border-box;
+}
+
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 20px;
+  padding: 20px;
+}
+
+
+/* Panels */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.panel-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--outline);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #f8f9fa;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.body {
+  padding: 16px;
+}
+
+.subtle {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+/* Form */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: #495057;
+  margin: 0 0 6px 2px;
+}
+
+input, select, textarea, button {
+  font: inherit;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 12px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 4px var(--ring);
+  border-color: var(--accent);
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.hstack {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #e9ecef;
+  border: 1px solid var(--outline);
+  color: #212529;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.btn:hover {
+  background: #dee2e6;
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: var(--ok);
+  color: white;
+  border-color: transparent;
+}
+
+.btn.primary:hover {
+  background: #218838;
+}
+
+.btn.outline {
+  background: white;
+  border: 1px solid var(--outline);
+  color: var(--text);
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.btn-icon:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+/* Chat preview */
+.chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--outline);
+  background: #f1f3f5;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ok);
+}
+
+.chat-title {
+  font-weight: 700;
+}
+
+.chat-body {
+  flex: 1;
+  padding: 16px;
+  background: #f8f9fa;
+  overflow: auto;
+}
+
+.msg {
+  max-width: 80%;
+  background: #e0f0ff;
+  border: 1px solid #d0e3f3;
+  padding: 12px 14px;
+  border-radius: 14px;
+  margin: 8px 0;
+  color: #212529;
+}
+
+.msg.right {
+  align-self: flex-end;
+  background: #d1ecf1;
+}
+
+.msg small {
+  display: block;
+  opacity: 0.6;
+  margin-top: 6px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.counter {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.help {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Enhanced Button Styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn.primary {
+  background-color: #28a745;
+  color: #fff;
+  border-color: #28a745;
+}
+
+.btn.primary:hover {
+  background-color: #218838;
+}
+
+.btn.secondary {
+  background-color: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+.btn.secondary:hover {
+  background-color: #0069d9;
+}
+
+.btn.outline {
+  background-color: #fff;
+  color: #495057;
+  border: 1px solid #ccc;
+}
+
+.btn.outline:hover {
+  background-color: #f1f1f1;
+}
+
+.btn.danger {
+  background-color: #dc3545;
+  color: #fff;
+  border-color: #dc3545;
+}
+
+.btn.danger:hover {
+  background-color: #c82333;
+}
+
+
+
+/* Responsive */
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr; }
+}
+
+.sidebar img {
+  display: block;
+  width: 160px;        /* or 100% if it’s in a constrained container */
+  height: auto;
+  max-width: 100%;
+  box-sizing: content-box; /* explicitly opt out */
+}
+
+
+
+
+/* === SMS Page Layout (Form left • Preview right) === */
+.sms-container{
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;   /* form | preview */
+  gap: 20px;
+  align-items: start;
+}
+
+/* Form card look (optional, matches your .panel style) */
+.sms-form{
+  background: var(--panel);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+/* Preview column acts like a panel and stays visible */
+.sms-preview{
+  background: var(--panel);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 96px;             /* adjust if your topbar height differs */
+}
+
+/* Header inside the preview */
+.sms-preview .chat-header{
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--outline);
+  background: #f1f3f5;
+  font-weight: 600;
+}
+
+/* Body/scroll area for the preview bubbles */
+.sms-preview #chat{
+  padding: 16px;
+  background: #f8f9fa;
+  max-height: calc(100vh - 180px);   /* keeps it inside the viewport */
+  overflow: auto;
+}
+
+/* Tidy the first system bubble */
+.sms-preview #chat .msg:first-child{
+  background: #fff;
+  border: 1px solid var(--outline);
+}
+
+/* Buttons inside form rows */
+.button-row{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Counter & meta text */
+.sms-counter{ color: var(--muted); font-size: 12px; margin: 8px 0; }
+.meta-info .help{ margin-top: 6px; }
+
+/* Responsive: stack on small screens */
+@media (max-width: 1100px){
+  .sms-container{ grid-template-columns: 1fr; }
+  .sms-preview{ position: static; max-height: none; }
+}
+
+
