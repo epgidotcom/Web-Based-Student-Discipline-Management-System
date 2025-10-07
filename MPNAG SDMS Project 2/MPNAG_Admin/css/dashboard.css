@@ -371,3 +371,147 @@ th {
   .topbar h1 { font-size: 16px; }
   .logout-btn { padding: 6px 10px; font-size: 12px; }
 }
+
+
+/* === Predictive Analytics Section (Full Width Aligned) === */
+.predictive-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 25px;
+}
+
+.predictive-section {
+  background: linear-gradient(180deg, #ffffff, #f9fbff);
+  border: 1px solid #e6ebf2;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  padding: 20px 24px 22px;
+  width: 100%;
+  max-width: 100%;                 
+  box-sizing: border-box;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* === Header === */
+.predictive-section .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eef1f6;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.predictive-section h3 {
+  color: #2f4e92;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* === Filters === */
+.predictive-filters {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.predictive-filters label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.predictive-filters select {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #f8fafc;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.predictive-filters select:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.predictive-filters select:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+/* === Chart Container === */
+.predictive-section .chart-wrap {
+  margin-top: 10px;
+  height: 380px;                     /* slightly taller for balance */
+  background: #f9fbff;
+  border-radius: 12px;
+  padding: 16px 18px;
+  overflow: hidden;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ✅ Slight horizontal stretch but with safe max width */
+.predictive-section canvas {
+  width: 100%;             /* fills most of card */
+  max-width: 1250px;                 /* prevents over-stretching */
+  height: 100%;
+  display: block;
+  transition: all 0.2s ease;
+}
+
+/* === Chart Description === */
+.predictive-section .chart-note {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  text-align: left;
+}
+
+/* === Responsive Adjustments === */
+@media (max-width: 1024px) {
+  .predictive-section {
+    max-width: 100%;
+    padding: 18px;
+  }
+
+  .predictive-section .chart-wrap {
+    height: 320px;
+  }
+
+  .predictive-section canvas {
+    width: 100%;
+    max-width: 1000px;
+  }
+}
+
+@media (max-width: 768px) {
+  .predictive-section .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .predictive-section .chart-wrap {
+    height: 260px;
+  }
+
+  .predictive-section canvas {
+    width: 100% !important;
+  }
+}

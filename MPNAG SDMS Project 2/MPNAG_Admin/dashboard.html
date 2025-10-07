@@ -8,9 +8,10 @@
   <!-- Global Styles -->
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet"
+  <link rel="stylesheet" 
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -152,114 +153,51 @@
       <div class="empty hidden" id="emptyByGrade">No data available.</div>
     </div>
   </div>
+
+  <!-- Predictive Analytics Wrapper -->
+  <div class="predictive-wrapper">
+    <div class="predictive-section card">
+      <div class="card-header">
+        <h3>Predictive Analytics – Estimated Repeat Offenders (7-Day Forecast)</h3>
+        <div class="predictive-filters">
+          <label>
+            Strand:
+            <select id="filterStrand">
+              <option value="All">All</option>
+              <option value="STEM">STEM</option>
+              <option value="ABM">ABM</option>
+              <option value="GAS">GAS</option>
+              <option value="HUMSS">HUMSS</option>
+              <option value="TVL">TVL</option>
+            </select>
+          </label>
+          <label>
+            Violation:
+            <select id="filterViolation">
+              <option value="All">All</option>
+              <option value="Tardiness">Tardiness</option>
+              <option value="Cheating">Cheating</option>
+              <option value="Dress Code">Dress Code</option>
+              <option value="Disrespect">Disrespect</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="chartPredictive"></canvas>
+      </div>
+
+      <p class="chart-note">
+        Forecasted number of students likely to commit repeat offenses every 7 days, grouped by strand (STEM, ABM, GAS, HUMSS, TVL).
+      </p>
+    </div>
+  </div>
 </div>
 
 <!-- JS -->
 <script src="js/app.js" defer></script>
 <script src="js/dashboard.js" defer></script>
-
-<script>
-document.addEventListener('DOMContentLoaded', async () => {
-  const sidebar  = document.getElementById('sidebar');
-  const menuBtn  = document.querySelector('.menu-btn');
-  const backdrop = document.getElementById('backdrop');
-  const logoutBtn = document.getElementById('logoutBtn');
-
-  const setOpen = (open) => {
-    sidebar.classList.toggle('open', open);
-    backdrop.classList.toggle('show', open);
-    document.body.style.overflow = open ? 'hidden' : '';
-    menuBtn?.setAttribute('aria-expanded', String(open));
-  };
-
-  menuBtn?.addEventListener('click', () => setOpen(!sidebar.classList.contains('open')));
-  backdrop?.addEventListener('click', () => setOpen(false));
-  window.addEventListener('resize', () => { if (innerWidth >= 769) setOpen(false); });
-
-  logoutBtn?.addEventListener('click', () => {
-    // Clear local session or token before redirecting
-    localStorage.removeItem('sdms_token');
-    localStorage.removeItem('sdms_user');
-    window.location.href = 'index.html';
-  });
-
-  // === Fetch user info from backend ===
-  try {
-    const res = await fetch('/api/user/profile', { headers: { 'Authorization': `Bearer ${localStorage.getItem('sdms_token')}` }});
-    if (res.ok) {
-      const user = await res.json();
-      document.getElementById('userName').textContent = user.name || 'User';
-      document.getElementById('userAvatar').textContent = (user.name?.[0] || 'U').toUpperCase();
-    }
-  } catch (err) {
-    console.error('Failed to load user info', err);
-  }
-
-  // === Fetch KPI Metrics ===
-  try {
-    const res = await fetch('/api/dashboard/metrics');
-    if (res.ok) {
-      const data = await res.json();
-      document.getElementById('totalStudents').textContent = data.totalStudents ?? '—';
-      document.getElementById('violations30').textContent = data.violationsLast30 ?? '—';
-      document.getElementById('openCases').textContent = data.openCases ?? '—';
-      document.getElementById('repeatOffenders').textContent = data.repeatOffenders ?? '—';
-    }
-  } catch (err) {
-    console.error('Failed to load metrics', err);
-  }
-
-  // === Fetch Chart Data ===
-  try {
-    const res = await fetch('/api/dashboard/charts');
-    if (res.ok) {
-      const chartData = await res.json();
-      renderCharts(chartData);
-    }
-  } catch (err) {
-    console.error('Failed to load chart data', err);
-  }
-});
-
-// ===== Chart.js setup (backend data injected) =====
-function renderCharts(data) {
-  const trendCtx = document.getElementById('chartTrend').getContext('2d');
-  const typesCtx = document.getElementById('chartTopTypes').getContext('2d');
-  const gradeCtx = document.getElementById('chartByGrade').getContext('2d');
-
-  new Chart(trendCtx, {
-    type: 'line',
-    data: {
-      labels: data.trend?.labels || [],
-      datasets: [{
-        label: 'Violations',
-        data: data.trend?.values || []
-      }]
-    }
-  });
-
-  new Chart(typesCtx, {
-    type: 'bar',
-    data: {
-      labels: data.topTypes?.labels || [],
-      datasets: [{
-        label: 'Count',
-        data: data.topTypes?.values || []
-      }]
-    }
-  });
-
-  new Chart(gradeCtx, {
-    type: 'bar',
-    data: {
-      labels: data.byGrade?.labels || [],
-      datasets: [{
-        label: 'Violations',
-        data: data.byGrade?.values || []
-      }]
-    }
-  });
-}
-</script>
+<script src="js/predictive.js" defer></script>
 </body>
 </html>
