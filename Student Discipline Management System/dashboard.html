@@ -12,19 +12,6 @@
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script>
-    // Early role guard to avoid loading admin dashboard for students
-    (function(){
-      try {
-        var raw = localStorage.getItem('sdms_auth_v1');
-        var auth = raw ? JSON.parse(raw) : null;
-        var role = (auth && auth.account && auth.account.role) ? String(auth.account.role).toLowerCase() : '';
-        if (role === 'student') {
-          window.location.replace('/student/student_dashboard.html?v=2');
-        }
-      } catch(_) { /* noop */ }
-    })();
-  </script>
 </head>
 <body>
 
@@ -37,7 +24,7 @@
   <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
   <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
   <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
-  <a href="create_account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
 
   <div class="sidebar-footer">
     <button id="logoutBtn" class="logout-side" type="button">
@@ -67,38 +54,38 @@
 
   <!-- KPI Section -->
   <div class="kpi-grid">
-    <div class="kpi card" id="kpiTotalStudents">
+    <div class="kpi card">
       <div class="kpi-icon"><i class="fa fa-users"></i></div>
       <div class="kpi-body">
         <div class="kpi-label">Students</div>
-        <div class="kpi-value">—</div>
+        <div class="kpi-value" id="totalStudents">—</div>
         <div class="kpi-sub">Registered</div>
       </div>
     </div>
 
-    <div class="kpi card" id="kpiViolations30">
+    <div class="kpi card">
       <div class="kpi-icon warn"><i class="fa fa-exclamation-triangle"></i></div>
       <div class="kpi-body">
         <div class="kpi-label">Violations</div>
-        <div class="kpi-value">—</div>
+        <div class="kpi-value" id="violations30">—</div>
         <div class="kpi-sub">Last 30 days</div>
       </div>
     </div>
 
-    <div class="kpi card" id="kpiOpenCases">
+    <div class="kpi card">
       <div class="kpi-icon info"><i class="fa fa-clipboard-list"></i></div>
       <div class="kpi-body">
         <div class="kpi-label">Open Cases</div>
-        <div class="kpi-value">—</div>
+        <div class="kpi-value" id="openCases">—</div>
         <div class="kpi-sub">Needing follow-up</div>
       </div>
     </div>
 
-    <div class="kpi card" id="kpiRepeatOffenders">
+    <div class="kpi card">
       <div class="kpi-icon danger"><i class="fa fa-user-times"></i></div>
       <div class="kpi-body">
         <div class="kpi-label">Repeat Offenders</div>
-        <div class="kpi-value">—</div>
+        <div class="kpi-value" id="repeatOffenders">—</div>
         <div class="kpi-sub">≥ 3 violations (90d)</div>
       </div>
     </div>
@@ -167,11 +154,111 @@
   </div>
 </div>
 
-<!-- JS: config first for API base, then auth helpers, then main + dashboard -->
-<script src="js/config.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/main.js" defer></script>
+<!-- JS -->
 <script src="js/dashboard.js" defer></script>
-<!-- Dashboard JS renders charts and KPIs; inline legacy block removed in favor of js/dashboard.js -->
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const sidebar  = document.getElementById('sidebar');
+  const menuBtn  = document.querySelector('.menu-btn');
+  const backdrop = document.getElementById('backdrop');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  const setOpen = (open) => {
+    sidebar.classList.toggle('open', open);
+    backdrop.classList.toggle('show', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+    menuBtn?.setAttribute('aria-expanded', String(open));
+  };
+
+  menuBtn?.addEventListener('click', () => setOpen(!sidebar.classList.contains('open')));
+  backdrop?.addEventListener('click', () => setOpen(false));
+  window.addEventListener('resize', () => { if (innerWidth >= 769) setOpen(false); });
+
+  logoutBtn?.addEventListener('click', () => {
+    // Clear local session or token before redirecting
+    localStorage.removeItem('sdms_token');
+    localStorage.removeItem('sdms_user');
+    window.location.href = 'index.html';
+  });
+
+  // === Fetch user info from backend ===
+  try {
+    const res = await fetch('/api/user/profile', { headers: { 'Authorization': `Bearer ${localStorage.getItem('sdms_token')}` }});
+    if (res.ok) {
+      const user = await res.json();
+      document.getElementById('userName').textContent = user.name || 'User';
+      document.getElementById('userAvatar').textContent = (user.name?.[0] || 'U').toUpperCase();
+    }
+  } catch (err) {
+    console.error('Failed to load user info', err);
+  }
+
+  // === Fetch KPI Metrics ===
+  try {
+    const res = await fetch('/api/dashboard/metrics');
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('totalStudents').textContent = data.totalStudents ?? '—';
+      document.getElementById('violations30').textContent = data.violationsLast30 ?? '—';
+      document.getElementById('openCases').textContent = data.openCases ?? '—';
+      document.getElementById('repeatOffenders').textContent = data.repeatOffenders ?? '—';
+    }
+  } catch (err) {
+    console.error('Failed to load metrics', err);
+  }
+
+  // === Fetch Chart Data ===
+  try {
+    const res = await fetch('/api/dashboard/charts');
+    if (res.ok) {
+      const chartData = await res.json();
+      renderCharts(chartData);
+    }
+  } catch (err) {
+    console.error('Failed to load chart data', err);
+  }
+});
+
+// ===== Chart.js setup (backend data injected) =====
+function renderCharts(data) {
+  const trendCtx = document.getElementById('chartTrend').getContext('2d');
+  const typesCtx = document.getElementById('chartTopTypes').getContext('2d');
+  const gradeCtx = document.getElementById('chartByGrade').getContext('2d');
+
+  new Chart(trendCtx, {
+    type: 'line',
+    data: {
+      labels: data.trend?.labels || [],
+      datasets: [{
+        label: 'Violations',
+        data: data.trend?.values || []
+      }]
+    }
+  });
+
+  new Chart(typesCtx, {
+    type: 'bar',
+    data: {
+      labels: data.topTypes?.labels || [],
+      datasets: [{
+        label: 'Count',
+        data: data.topTypes?.values || []
+      }]
+    }
+  });
+
+  new Chart(gradeCtx, {
+    type: 'bar',
+    data: {
+      labels: data.byGrade?.labels || [],
+      datasets: [{
+        label: 'Violations',
+        data: data.byGrade?.values || []
+      }]
+    }
+  });
+}
+</script>
 </body>
 </html>

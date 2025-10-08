@@ -1,329 +1,301 @@
 document.addEventListener("DOMContentLoaded", () => {
 const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
-const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
-async function apiJSON(path){
-  const res = await fetch(API_BASE+path,{headers:{'Content-Type':'application/json'}});
-  if(!res.ok) throw new Error(path+': '+res.status);
-  return res.json();
-}
+  // Fallback parsers from tables (optional)
+  function parseStudentsFromTable() {
+    const rows = Array.from(document.querySelectorAll("#studentTable tr")).slice(1);
+    return rows.map((r, i) => {
+      const tds = r.querySelectorAll("td");
+      return {
+        id: i + 1,
+        firstName: (tds[0]?.textContent || "").trim(),
+        grade: Number((tds[1]?.textContent || "").trim()),
+        section: (tds[2]?.textContent || "").trim(),
+      };
+    });
+  }
+  function parseViolationsFromTable() {
+    const rows = Array.from(document.querySelectorAll("#violationTable tr")).slice(1);
+    return rows.map((r, i) => {
+      const tds = r.querySelectorAll("td");
+      const date = (tds[2]?.textContent || "").trim();
+      return {
+        id: i + 1,
+        studentName: (tds[0]?.textContent || "").trim(),
+        type: (tds[1]?.textContent || "").trim(),
+        status: "Open",
+        date: date || new Date().toISOString().slice(0,10),
+        grade: undefined,
+        section: undefined,
+      };
+    });
+  }
 
-let students = []; // will be populated from API
-let violations = []; // populated from API
-let violationStats = null; // stats from /api/violations/stats
+  // Prefer global arrays if present
+  let students = Array.isArray(window.studentsData) ? window.studentsData : parseStudentsFromTable();
+  let violations = Array.isArray(window.violationsData) ? window.violationsData : parseViolationsFromTable();
 
-async function loadData(){
-  const cacheBust = `?_=${Date.now()}`; // avoid any stale CDN caching
-  const [stu, vio, stats] = await Promise.all([
-    apiJSON('/api/students'+cacheBust).catch(err=>{ console.warn('[Dashboard] students fetch failed', err); return []; }),
-    apiJSON('/api/violations'+cacheBust).catch(err=>{ console.warn('[Dashboard] violations fetch failed', err); return []; }),
-    apiJSON('/api/violations/stats'+cacheBust).catch(err=>{ console.warn('[Dashboard] stats fetch failed', err); return null; })
-  ]);
-  students = Array.isArray(stu)? stu : [];
-  // Normalize violations: align field names used in charts (type, date, grade, section)
-  violations = (Array.isArray(vio)? vio: []).map(v=>{
-    const incident_date = v.incident_date || v.date || v.created_at;
-    const normalized = {
-      id: v.id,
-      studentId: v.student_id,
-      studentName: v.student_name,
-      type: v.offense_type || v.violation_type || '',
-      status: v.status || 'Pending',
-      date: incident_date,
-      grade: (v.grade_section && v.grade_section.split('-')[0]) || v.grade || null,
-      section: (v.grade_section && v.grade_section.split('-')[1]) || v.section || null
-    };
-    // Add debug info for date parsing
-    if (incident_date) {
-      const parsedDate = toDate(incident_date);
-      if (isNaN(parsedDate.getTime())) {
-        console.warn('[Dashboard] Invalid date for violation', v.id, ':', incident_date);
-      }
+  // If absolutely empty, fake a tiny dataset so the dashboard shows structure
+  if (students.length === 0 && violations.length === 0) {
+    const sections = ["A","B","C","D"];
+    for (let i=0;i<18;i++) {
+      const grade = 7 + (i % 6);
+      const section = sections[i % sections.length];
+      students.push({ id: i+1, grade, section, firstName: "Student "+(i+1) });
     }
-    return normalized;
-  });
-  violationStats = stats;
-  console.info('[Dashboard] Data loaded',{ studentCount: students.length, violationCount: violations.length, hasStats: !!violationStats });
-}
-
-function showLoading(on){
-  const el = document.getElementById('loadingOverlay');
-  if(on){
-    if(!el){
-      const d=document.createElement('div');
-      d.id='loadingOverlay';
-      d.textContent='Loading data...';
-      d.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.8);font:600 1.1rem system-ui;z-index:999';
-      document.body.appendChild(d);
+    const types = ["Tardiness","Dress Code","Disrespect","Cheating"];
+    const today = new Date();
+    for (let i=0;i<48;i++) {
+      const s = students[Math.floor(Math.random()*students.length)];
+      const d = new Date(today); d.setDate(today.getDate()-Math.floor(Math.random()*80));
+      violations.push({
+        id:i+1, studentId:s.id, type: types[Math.floor(Math.random()*types.length)],
+        status: Math.random()<0.7 ? "Resolved":"Open",
+        date: d.toISOString().slice(0,10), grade: s.grade, section: s.section
+      });
     }
-  } else {
-    el && el.remove();
   }
-}
 
-/* ===== Helpers (fixed date parsing) ===== */
-const toDate = (s) => {
-  if (s instanceof Date) return s;
-  if (!s) return new Date();
-  // Handle both date-only strings (2025-10-02) and datetime strings (2025-10-02T10:30:00Z)
-  const str = String(s);
-  if (str.includes('T') || str.includes(' ')) {
-    // Already has time component, parse as-is
-    return new Date(str);
-  } else {
-    // Date-only string, add T00:00:00 for local midnight
-    return new Date(str + "T00:00:00");
+  /* ===== Helpers ===== */
+  const toDate = (s) => (s instanceof Date ? s : new Date(s + "T00:00:00"));
+  const fmt = (d) => DATE_FMT.format(d);
+  const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+  const startOfDay = (d)=>new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const endOfDay = (d)=>new Date(d.getFullYear(), d.getMonth(), d.getDate(),23,59,59);
+
+  function animateCount(el, value) {
+    const start = Number(el.dataset.count || 0);
+    const end = Number(value || 0);
+    const duration = 600;
+    const t0 = performance.now();
+    function step(t) {
+      const p = Math.min(1, (t - t0) / duration);
+      const now = Math.round(start + (end - start) * p);
+      el.textContent = now.toLocaleString();
+      if (p < 1) requestAnimationFrame(step);
+      else el.dataset.count = String(end);
+    }
+    requestAnimationFrame(step);
   }
-};
-const fmt = (d) => DATE_FMT.format(d);
-const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
-const startOfDay = (d)=>new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const endOfDay = (d)=>new Date(d.getFullYear(), d.getMonth(), d.getDate(),23,59,59);
-function animateCount(el, value) {
-  if(!el) return;
-  const start = Number(el.dataset.count || 0);
-  const end = Number(value || 0);
-  const duration = 600;
-  const t0 = performance.now();
-  function step(t) {
-    const p = Math.min(1, (t - t0) / duration);
-    const now = Math.round(start + (end - start) * p);
-    el.textContent = now.toLocaleString();
-    if (p < 1) requestAnimationFrame(step);
-    else el.dataset.count = String(end);
+
+  function violationsInRange(list, from, to) {
+    const f = startOfDay(from), t = endOfDay(to);
+    return list.filter(v => {
+      const d = toDate(v.date);
+      return d >= f && d <= t;
+    });
   }
-  requestAnimationFrame(step);
-}
-function violationsInRange(list, from, to) {
-  const f = startOfDay(from), t = endOfDay(to);
-  const filtered = list.filter(v => {
-    if (!v.date) return false;
-    const d = toDate(v.date);
-    if (isNaN(d.getTime())) return false;
-    return d >= f && d <= t;
-  });
-  console.log('[Dashboard] violationsInRange:', {
-    from: fmt(from), to: fmt(to), 
-    totalViolations: list.length,
-    validDates: list.filter(v => v.date && !isNaN(toDate(v.date).getTime())).length,
-    inRange: filtered.length,
-    sampleDates: list.slice(0,3).map(v => ({ id: v.id, rawDate: v.date, parsedDate: v.date ? toDate(v.date) : null }))
-  });
-  return filtered;
-}
-function unique(arr) { return [...new Set(arr)]; }
-function weeksBetween(from, to) {
-  const out = []; let cur = startOfDay(from);
-  while (cur <= to) { out.push(new Date(cur)); cur = addDays(cur, 7); }
-  return out;
-}
-function countByType(list) {
-  const map = new Map();
-  for (const v of list) {
-    const type = v.type?.trim() || 'Unknown';
-    map.set(type, (map.get(type)||0)+1);
+  function unique(arr) { return [...new Set(arr)]; }
+  function weeksBetween(from, to) {
+    const out = []; let cur = startOfDay(from);
+    while (cur <= to) { out.push(new Date(cur)); cur = addDays(cur, 7); }
+    return out;
   }
-  return [...map].map(([type,count])=>({type,count})).sort((a,b)=>b.count-a.count);
-}
-function countByGrade(list) {
-  const map = new Map();
-  for (const v of list) {
-    const grade = v.grade?.trim() || 'Unknown';
-    map.set(grade, (map.get(grade)||0)+1);
+  function countByType(list) {
+    const map = new Map();
+    for (const v of list) map.set(v.type, (map.get(v.type)||0)+1);
+    return [...map].map(([type,count])=>({type,count})).sort((a,b)=>b.count-a.count);
   }
-  return [...map].map(([grade,count])=>({grade,count})).sort((a,b)=>{
-    // Sort numerically if both are numbers, otherwise alphabetically
-    const aNum = parseInt(a.grade, 10);
-    const bNum = parseInt(b.grade, 10);
-    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-    return String(a.grade).localeCompare(String(b.grade));
-  });
-}
+  function countByGrade(list) {
+    const map = new Map();
+    for (const v of list) map.set(v.grade, (map.get(v.grade)||0)+1);
+    return [...map].map(([grade,count])=>({grade,count})).sort((a,b)=>a.grade-b.grade);
+  }
 
-/* ===== Elements ===== */
-const els = {
-  kpiStudents: document.querySelector("#kpiTotalStudents .kpi-value"),
-  kpiViolations30: document.querySelector("#kpiViolations30 .kpi-value"),
-  kpiOpenCases: document.querySelector("#kpiOpenCases .kpi-value"),
-  kpiRepeat: document.querySelector("#kpiRepeatOffenders .kpi-value"),
-  dateFrom: document.getElementById("dateFrom"),
-  dateTo: document.getElementById("dateTo"),
-  filterGrade: document.getElementById("filterGrade"),
-  filterSection: document.getElementById("filterSection"),
-  filterType: document.getElementById("filterType"),
-  btnQuick7: document.getElementById("btnQuick7"),
-  btnQuick30: document.getElementById("btnQuick30"),
-  btnReset: document.getElementById("btnReset"),
-  btnApply: document.getElementById("btnApply"),
-  rangeHint: document.getElementById("rangeHint"),
-  typesHint: document.getElementById("typesHint"),
-  emptyTrend: document.getElementById("emptyTrend"),
-  emptyTypes: document.getElementById("emptyTypes"),
-  emptyByGrade: document.getElementById("emptyByGrade"),
-};
+  /* ===== Elements ===== */
+  const els = {
+    kpiStudents: document.querySelector("#kpiTotalStudents .kpi-value"),
+    kpiViolations30: document.querySelector("#kpiViolations30 .kpi-value"),
+    kpiOpenCases: document.querySelector("#kpiOpenCases .kpi-value"),
+    kpiRepeat: document.querySelector("#kpiRepeatOffenders .kpi-value"),
+    dateFrom: document.getElementById("dateFrom"),
+    dateTo: document.getElementById("dateTo"),
+    filterGrade: document.getElementById("filterGrade"),
+    filterSection: document.getElementById("filterSection"),
+    filterType: document.getElementById("filterType"),
+    btnQuick7: document.getElementById("btnQuick7"),
+    btnQuick30: document.getElementById("btnQuick30"),
+    btnReset: document.getElementById("btnReset"),
+    btnApply: document.getElementById("btnApply"),
+    rangeHint: document.getElementById("rangeHint"),
+    typesHint: document.getElementById("typesHint"),
+    emptyTrend: document.getElementById("emptyTrend"),
+    emptyTypes: document.getElementById("emptyTypes"),
+    emptyByGrade: document.getElementById("emptyByGrade"),
+  };
 
-/* ===== Filters init ===== */
-function initFilters(){
-  const grades = unique(students.map(s=>s.grade).filter(Boolean)).sort((a,b)=>a-b);
-  grades.forEach(g => { const o=document.createElement("option"); o.value=g; o.textContent=g; els.filterGrade.appendChild(o); });
-  const sections = unique(students.map(s=>s.section).filter(Boolean)).sort();
-  sections.forEach(s => { const o=document.createElement("option"); o.value=s; o.textContent=s; els.filterSection.appendChild(o); });
-  const types = unique(violations.map(v=>v.type).filter(Boolean)).sort();
-  types.forEach(t => { const o=document.createElement("option"); o.value=t; o.textContent=t; els.filterType.appendChild(o); });
-  const to = new Date(); const from = addDays(to, -89);
-  els.dateFrom.value = from.toISOString().slice(0,10);
-  els.dateTo.value = to.toISOString().slice(0,10);
-  els.btnQuick7.addEventListener("click", () => { const to=new Date(); const from=addDays(to,-6); els.dateFrom.value=from.toISOString().slice(0,10); els.dateTo.value=to.toISOString().slice(0,10); applyFilters(); });
-  els.btnQuick30.addEventListener("click", () => { const to=new Date(); const from=addDays(to,-29); els.dateFrom.value=from.toISOString().slice(0,10); els.dateTo.value=to.toISOString().slice(0,10); applyFilters(); });
-  els.btnReset.addEventListener("click", () => { els.filterGrade.value=""; els.filterSection.value=""; els.filterType.value=""; const to=new Date(); const from=addDays(to,-89); els.dateFrom.value=from.toISOString().slice(0,10); els.dateTo.value=to.toISOString().slice(0,10); applyFilters(); });
-  els.btnApply.addEventListener("click", applyFilters);
-}
+  /* ===== Filters init ===== */
+  (function initFilters(){
+    // populate grade/section/type
+    const grades = unique(students.map(s=>s.grade).filter(Boolean)).sort((a,b)=>a-b);
+    grades.forEach(g => {
+      const o=document.createElement("option"); o.value=g; o.textContent=g;
+      els.filterGrade.appendChild(o);
+    });
+    const sections = unique(students.map(s=>s.section).filter(Boolean)).sort();
+    sections.forEach(s => {
+      const o=document.createElement("option"); o.value=s; o.textContent=s;
+      els.filterSection.appendChild(o);
+    });
+    const types = unique(violations.map(v=>v.type).filter(Boolean)).sort();
+    types.forEach(t => {
+      const o=document.createElement("option"); o.value=t; o.textContent=t;
+      els.filterType.appendChild(o);
+    });
 
-/* ===== Charts ===== */
-let chartTrend, chartTopTypes, chartByGrade;
-function ensureChart(ctx, cfg, existing) { if (existing) existing.destroy(); return new Chart(ctx, cfg); }
+    // default date: last 90 days
+    const to = new Date();
+    const from = addDays(to, -89);
+    els.dateFrom.value = from.toISOString().slice(0,10);
+    els.dateTo.value = to.toISOString().slice(0,10);
 
-/* ===== Render ===== */
-function applyFilters() {
-  const from = toDate(els.dateFrom.value);
-  const to = toDate(els.dateTo.value);
-  const g = els.filterGrade.value; const s = els.filterSection.value; const t = els.filterType.value;
-  let filtered = violationsInRange(violations, from, to);
-  if (g) filtered = filtered.filter(v => String(v.grade) === String(g));
-  if (s) filtered = filtered.filter(v => v.section === s);
-  if (t) filtered = filtered.filter(v => v.type === t);
-  els.rangeHint.textContent = `${fmt(from)} – ${fmt(to)}`;
-  els.typesHint.textContent = t ? `Type: ${t}` : "All types";
-  renderKPIs(from, to);
-  renderTrend(filtered, from, to);
-  renderTopTypes(filtered);
-  renderByGrade(filtered);
-}
+    // quick buttons
+    els.btnQuick7.addEventListener("click", () => {
+      const to=new Date(); const from=addDays(to,-6);
+      els.dateFrom.value = from.toISOString().slice(0,10);
+      els.dateTo.value = to.toISOString().slice(0,10);
+      applyFilters();
+    });
+    els.btnQuick30.addEventListener("click", () => {
+      const to=new Date(); const from=addDays(to,-29);
+      els.dateFrom.value = from.toISOString().slice(0,10);
+      els.dateTo.value = to.toISOString().slice(0,10);
+      applyFilters();
+    });
+    els.btnReset.addEventListener("click", () => {
+      els.filterGrade.value=""; els.filterSection.value=""; els.filterType.value="";
+      const to=new Date(); const from=addDays(to,-89);
+      els.dateFrom.value = from.toISOString().slice(0,10);
+      els.dateTo.value = to.toISOString().slice(0,10);
+      applyFilters();
+    });
+    els.btnApply.addEventListener("click", applyFilters);
+  })();
 
-function renderKPIs(from, to) {
-  animateCount(els.kpiStudents, students.length);
-  if(violationStats){
-    animateCount(els.kpiViolations30, violationStats.last30);
-    animateCount(els.kpiOpenCases, violationStats.open_cases);
-    animateCount(els.kpiRepeat, violationStats.repeat_offenders_90);
-  } else {
+  /* ===== Charts ===== */
+  let chartTrend, chartTopTypes, chartByGrade;
+  function ensureChart(ctx, cfg, existing) { if (existing) existing.destroy(); return new Chart(ctx, cfg); }
+
+  /* ===== Render ===== */
+  function applyFilters() {
+    const from = toDate(els.dateFrom.value);
+    const to = toDate(els.dateTo.value);
+    const g = els.filterGrade.value;
+    const s = els.filterSection.value;
+    const t = els.filterType.value;
+
+    let filtered = violationsInRange(violations, from, to);
+    if (g) filtered = filtered.filter(v => String(v.grade) === String(g));
+    if (s) filtered = filtered.filter(v => v.section === s);
+    if (t) filtered = filtered.filter(v => v.type === t);
+
+    els.rangeHint.textContent = `${fmt(from)} – ${fmt(to)}`;
+    els.typesHint.textContent = t ? `Type: ${t}` : "All types";
+
+    renderKPIs(from, to);
+    renderTrend(filtered, from, to);
+    renderTopTypes(filtered);
+    renderByGrade(filtered);
+  }
+
+  function renderKPIs(from, to) {
+    animateCount(els.kpiStudents, students.length);
+
     const last30 = violationsInRange(violations, addDays(to, -29), to).length;
     animateCount(els.kpiViolations30, last30);
-    const open = violations.filter(v => (v.status || '').toLowerCase() === 'pending' || (v.status||'').toLowerCase()==='ongoing').length;
+
+    const open = violations.filter(v => (v.status || "").toLowerCase() === "open").length;
     animateCount(els.kpiOpenCases, open);
+
+    // repeat offenders: >=3 in last 90 days
     const v90 = violationsInRange(violations, addDays(to, -89), to);
-    const byStu = new Map(); v90.forEach(v => byStu.set(v.studentId || v.studentName, (byStu.get(v.studentId || v.studentName) || 0) + 1));
-    const repeat = [...byStu.values()].filter(n => n >= 3).length; animateCount(els.kpiRepeat, repeat);
+    const byStu = new Map();
+    v90.forEach(v => byStu.set(v.studentId || v.studentName, (byStu.get(v.studentId || v.studentName) || 0) + 1));
+    const repeat = [...byStu.values()].filter(n => n >= 3).length;
+    animateCount(els.kpiRepeat, repeat);
   }
-}
-function renderTrend(list, from, to) {
-  const weeks = weeksBetween(from, to);
-  const labels = weeks.map(d => fmt(d));
-  const counts = weeks.map((start, i) => { 
-    const end = i < weeks.length - 1 ? addDays(weeks[i+1], -1) : to; 
-    const weekViolations = list.filter(v => { 
-      const vd = toDate(v.date); 
-      return vd >= start && vd <= end; 
+
+
+  function renderTrend(list, from, to) {
+
+    const weeks = weeksBetween(from, to);
+    const labels = weeks.map(d => fmt(d));
+    const counts = weeks.map((start, i) => {
+      const end = i < weeks.length - 1 ? addDays(weeks[i+1], -1) : to;
+      return list.filter(v => {
+        const vd = toDate(v.date);
+        return vd >= start && vd <= end;
+      }).length;
     });
-    return weekViolations.length;
-  });
-  const hasData = counts.some(c => c > 0); 
-  console.log('[Dashboard] renderTrend:', { 
-    weeks: weeks.length, 
-    labels: labels.slice(0,3), 
-    counts: counts.slice(0,3), 
-    hasData, 
-    totalFiltered: list.length 
-  });
-  els.emptyTrend.classList.toggle("hidden", hasData);
-  chartTrend = ensureChart(document.getElementById("chartTrend").getContext("2d"), { 
-    type: "line", 
-    data: { labels, datasets: [{ label: "Violations / week", data: counts, tension: 0.35, fill: true, borderWidth: 2 }]}, 
-    options: { responsive:true, maintainAspectRatio:false, plugins: { legend:{ display:false }, tooltip:{ intersect:false } }, scales: { y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } 
-  }, chartTrend);
-}
-function renderTopTypes(list) {
-  const agg = countByType(list).slice(0, 5); 
-  const labels = agg.map(a => a.type); 
-  const values = agg.map(a => a.count); 
-  const hasData = values.some(v => v > 0); 
-  console.log('[Dashboard] renderTopTypes:', { 
-    totalViolations: list.length, 
-    aggregated: agg, 
-    hasData 
-  });
-  els.emptyTypes.classList.toggle("hidden", hasData);
-  chartTopTypes = ensureChart(document.getElementById("chartTopTypes").getContext("2d"), { 
-    type: "bar", 
-    data: { labels, datasets: [{ label:"Count", data: values, borderWidth:1 }] }, 
-    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } 
-  }, chartTopTypes);
-}
-function renderByGrade(list) {
-  const agg = countByGrade(list); 
-  const labels = agg.map(a => a.grade); 
-  const values = agg.map(a => a.count); 
-  const hasData = values.some(v => v > 0); 
-  console.log('[Dashboard] renderByGrade:', { 
-    totalViolations: list.length, 
-    aggregated: agg, 
-    hasData 
-  });
-  els.emptyByGrade.classList.toggle("hidden", hasData);
-  chartByGrade = ensureChart(document.getElementById("chartByGrade").getContext("2d"), { 
-    type: "bar", 
-    data: { labels, datasets: [{ label:"Violations", data: values, borderWidth:1 }] }, 
-    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } 
-  }, chartByGrade);
-}
+    const hasData = counts.some(c => c > 0);
+    document.getElementById("emptyTrend").classList.toggle("hidden", hasData);
 
-async function init(){
-  showLoading(true);
-  try { await loadData(); } catch(e){ console.error('Dashboard data load failed', e); }
-  showLoading(false);
-  initFilters();
+    chartTrend = ensureChart(
+      document.getElementById("chartTrend").getContext("2d"),
+      {
+        type: "line",
+        data: { labels, datasets: [{ label: "Violations / week", data: counts, tension: 0.35, fill: true, borderWidth: 2 }]},
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins: { legend:{ display:false }, tooltip:{ intersect:false } },
+          scales: { y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } }
+        }
+      },
+      chartTrend
+    );
+  }
+
+  function renderTopTypes(list) {
+    const agg = countByType(list).slice(0, 5);
+    const labels = agg.map(a => a.type);
+    const values = agg.map(a => a.count);
+    const hasData = values.some(v => v > 0);
+    document.getElementById("emptyTypes").classList.toggle("hidden", hasData);
+
+    chartTopTypes = ensureChart(
+      document.getElementById("chartTopTypes").getContext("2d"),
+      {
+        type: "bar",
+        data: { labels, datasets: [{ label:"Count", data: values, borderWidth:1 }] },
+        options: {
+          responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+          scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } }
+        }
+      },
+      chartTopTypes
+    );
+  }
+
+  function renderByGrade(list) {
+    const agg = countByGrade(list);
+    const labels = agg.map(a => a.grade);
+    const values = agg.map(a => a.count);
+    const hasData = values.some(v => v > 0);
+    document.getElementById("emptyByGrade").classList.toggle("hidden", hasData);
+
+    chartByGrade = ensureChart(
+      document.getElementById("chartByGrade").getContext("2d"),
+      {
+        type: "bar",
+        data: { labels, datasets: [{ label:"Violations", data: values, borderWidth:1 }] },
+        options: {
+          responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+          scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } }
+        }
+      },
+      chartByGrade
+    );
+  }
+
+
+
+  // Initial render
   applyFilters();
-}
 
-init();
-
-// === Auto-refresh when violations change elsewhere ===
-let refreshTimer = null; let lastReload = 0;
-async function scheduleReload(){
-  const now = Date.now();
-  if(now - lastReload < 1000) return; // guard: don't reload more than once per second
-  clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(async ()=>{
-    lastReload = Date.now();
-    try {
-      await loadData();
-      // Rebuild filters (add any new grades/sections/types if they appeared)
-      // Simple approach: clear existing dynamic <option>s except the first blank.
-      ['filterGrade','filterSection','filterType'].forEach(id=>{
-        const sel = document.getElementById(id); if(!sel) return;
-        for(let i=sel.options.length-1;i>0;i--) sel.remove(i);
-      });
-      initFilters();
-      applyFilters();
-      console.info('[Dashboard] Auto-refreshed due to violations change');
-    } catch(e){ console.warn('[Dashboard] Auto-refresh failed', e); }
-  }, 250); // slight debounce for burst events
-}
-
-// Listen for localStorage flag changes (cross-tab)
-window.addEventListener('storage', (e)=>{
-  if(e.key === 'sdms_violations_dirty' || e.key === 'sdms_students_dirty' || e.key === 'sdms_data_dirty'){ scheduleReload(); }
-});
-
-// Also listen to custom event dispatched within same tab
-window.addEventListener('sdms:data-changed', scheduleReload);
-
-// Refresh when tab becomes visible again (in case user left it open)
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') scheduleReload(); });
-window.addEventListener('focus', scheduleReload);
-
-// Logout (retained)
-document.getElementById("logoutBtn")?.addEventListener("click", () => { window.location.href = "index.html"; });
+  // Logout 
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
 });
 
 

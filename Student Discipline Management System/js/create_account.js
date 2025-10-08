@@ -1,6 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Require admin/teacher role
-  if(!window.SDMSAuth?.requireRole(['Admin','Teacher'])) return;
   const roleSelect = document.getElementById("role");
   const gradeGroup = document.getElementById("gradeGroup");
   const form = document.getElementById("accountForm");
@@ -8,21 +6,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const msg = document.getElementById('accountMsg');
   const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
-  // Logout
-  document.getElementById("logoutBtn").addEventListener("click", () => {
-    window.location.href = "index.html";
-  });
-
-  // Toggle grade field based on role
-  roleSelect.addEventListener("change", () => {
-    if (roleSelect.value === "Student") {
+  const gradeField = document.getElementById("grade");
+  const updateGradeVisibility = (value) => {
+    if (!gradeGroup) return;
+    if (value === "Student") {
       gradeGroup.style.display = "block";
-      document.getElementById("grade").setAttribute("required", "true");
+      gradeField?.setAttribute("required", "true");
     } else {
       gradeGroup.style.display = "none";
-      document.getElementById("grade").removeAttribute("required");
+      gradeField?.removeAttribute("required");
     }
-  });
+  };
+
+  updateGradeVisibility(roleSelect?.value || "");
+  roleSelect?.addEventListener("change", () => updateGradeVisibility(roleSelect.value));
+
+  const authUser = window.SDMSAuth?.getUser?.();
+  const role = (authUser?.role || '').toLowerCase();
+  const allowedRoles = ['admin', 'teacher'];
+  const hasAccess = allowedRoles.includes(role);
+
+  if (!hasAccess) {
+    console.warn('[Accounts] Restricted area — no authenticated admin/teacher detected. Showing read-only view.');
+    if (msg) {
+      msg.textContent = 'Please log in as an Administrator or Teacher to manage accounts.';
+      msg.classList.add('warn');
+    }
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      alert('Please log in as an Administrator or Teacher to submit changes.');
+    });
+    return;
+  }
+
 
   async function loadAccounts(){
     try{
@@ -128,8 +144,3 @@ document.addEventListener("DOMContentLoaded", () => {
   // initial load (may fail if unauthorized)
   loadAccounts();
 });
-
-  // Logout 
-  document.getElementById("logoutBtn")?.addEventListener("click", () => {
-    window.location.href = "index.html";
-  });

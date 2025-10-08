@@ -12,6 +12,10 @@ function getUser(){ return getAuth()?.account || null; }
 function logout(){ localStorage.removeItem(AUTH_KEY); window.location.href='index.html'; }
 
 function requireRole(roles){
+  if (window.SDMS_CONFIG?.DEV_PREVIEW) {
+    console.info('[auth] DEV_PREVIEW enabled — skipping role check');
+    return true;
+  }
   const user = getUser();
   if(!user){ window.location.href = 'index.html'; return false; }
   const role = (user.role||'').toLowerCase();

@@ -17,8 +17,6 @@
     <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
     <a href="messages.html" class="active"><i class="fa fa-envelope"></i> Messages</a>
-    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
-    <a href="about.html"><i class="fa fa-circle-info"></i> About & Concept</a>
     <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
   <div class="backdrop" id="sidebarBackdrop"></div>
@@ -82,7 +80,7 @@
       status.textContent='Sending...';
       try {
         const studentId = getStudentId();
-        await api('/sms/send', { method:'POST', body: JSON.stringify({ message: body, studentId }) });
+  await api('/sms/send', { method:'POST', body: { message: body, studentId } });
         status.textContent='Message sent successfully.';
         e.target.reset();
       } catch(err){

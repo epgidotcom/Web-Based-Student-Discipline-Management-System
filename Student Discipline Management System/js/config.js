@@ -4,9 +4,16 @@
   const RAW = window.SDMS_API_BASE || 'https://web-based-student-discipline-management.onrender.com';
   const API_BASE = String(RAW || '').replace(/\/+$/, ''); // remove trailing slashes
 
+  const hostname = (window.location && window.location.hostname) || '';
+  const protocol = (window.location && window.location.protocol) || '';
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isFile = protocol === 'file:';
+  const devPreview = Boolean(isFile || isLocalHost);
+
   const cfg = Object.freeze({
     API_BASE,
-    USE_API: true
+    USE_API: true,
+    DEV_PREVIEW: devPreview
   });
   window.SDMS_CONFIG = cfg;
   // Provide legacy/global shortcut expected by new student integration code.

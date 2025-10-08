@@ -48,6 +48,44 @@ console.log("Main JS loaded");
       close: () => setOpen(false),
       toggle
     };
+    
+      /* ===== Shared user chip + logout ===== */
+      const userChipName   = document.getElementById("userName");
+      const userChipAvatar = document.getElementById("userAvatar");
+      const logoutBtn      = document.getElementById("logoutBtn");
+    
+      if (logoutBtn && !logoutBtn.dataset.bound) {
+        logoutBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          if (window.SDMSAuth?.logout) {
+            window.SDMSAuth.logout();
+          } else {
+            try { localStorage.removeItem("sdms_auth_v1"); } catch (_) {}
+            window.location.href = "index.html";
+          }
+        });
+        logoutBtn.dataset.bound = "1";
+      }
+    
+      const authUser = window.SDMSAuth?.getUser?.();
+      const nameCandidates = [
+        authUser?.fullName,
+        authUser?.name,
+        [authUser?.firstName, authUser?.lastName].filter(Boolean).join(" "),
+        authUser?.username,
+        (function(){
+          try { return localStorage.getItem("sdms_user"); } catch (_) { return null; }
+        })()
+      ].map(v => (v || "").trim()).filter(Boolean);
+    
+      if (nameCandidates.length && userChipName) {
+        userChipName.textContent = nameCandidates[0];
+      }
+    
+      const initial = (nameCandidates[0] || "A").trim().charAt(0).toUpperCase() || "A";
+      if (userChipAvatar) {
+        userChipAvatar.textContent = initial;
+      }
   });
 })();
 
