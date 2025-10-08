@@ -22,9 +22,13 @@
   function computeBase(raw){
     const cleaned = normalize(raw);
     if (cleaned) return cleaned;
-    if (isFile) return FALLBACK_LOCAL;
-  if (origin) return origin.replace(/\/+$/, '');
-    return FALLBACK_REMOTE;
+
+    const isLocalOrigin = isLocalHost || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(origin || '');
+
+    if (isLocalOrigin && origin) return origin.replace(/\/+$/, '');
+    if (isFile) return FALLBACK_REMOTE;
+    if (origin && !isLocalOrigin) return FALLBACK_REMOTE;
+    return FALLBACK_LOCAL;
   }
 
   function deriveConfig(raw){

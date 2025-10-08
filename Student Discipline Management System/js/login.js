@@ -179,7 +179,10 @@ form.addEventListener("submit", async function (event) {
 
   try {
     const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
+    if (!API_ROOT) throw new Error('API base URL is not configured');
+
+    const res = await fetch(`${API_ROOT}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: usernameInput, password: passwordInput })
@@ -199,7 +202,11 @@ form.addEventListener("submit", async function (event) {
       window.location.assign('dashboard.html');
     }
   } catch(err){
-    errorMessage.textContent = err.message || 'Login failed';
+    let message = err?.message || 'Login failed';
+    if ((err instanceof TypeError) || /failed to fetch/i.test(message)) {
+      message = 'Unable to reach the server. Please verify your internet connection or API base URL.';
+    }
+    errorMessage.textContent = message;
     resetCaptcha();
   }
 });
