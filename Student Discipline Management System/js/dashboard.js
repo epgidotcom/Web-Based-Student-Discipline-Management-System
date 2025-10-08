@@ -180,8 +180,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error('[dashboard] hydrate failed', err);
     }
 
-    if (!students.length || !violations.length) {
-      console.info('[dashboard] using fallback data');
+    const allowFallback = Boolean(window.SDMS_CONFIG?.DEV_PREVIEW);
+    if (allowFallback && (!students.length || !violations.length)) {
+      console.info('[dashboard] using fallback data (DEV_PREVIEW)');
       const fallback = generateFallbackData();
       if (!students.length) students = fallback.students;
       if (!violations.length) violations = fallback.violations;

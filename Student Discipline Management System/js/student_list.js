@@ -209,7 +209,8 @@
       students = Array.isArray(list) ? list.map(normalizeStudent) : [];
     } catch (err) {
       console.error('[students] failed to load', err);
-      alert('Failed to load students. Please refresh or try again.');
+      const detail = err?.message ? `\n\nDetails: ${err.message}` : '';
+      alert(`Failed to load students. Please refresh or try again.${detail}`);
       students = [];
     }
     renderTable();
