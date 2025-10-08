@@ -93,5 +93,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Update on dropdown change
   document.getElementById("filterStrand").addEventListener("change", updateChart);
   document.getElementById("filterViolation").addEventListener("change", updateChart);
+});
 
+
+  // nag add ako logout here kasi hindi ma-logout from dashboard.js -gem
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
+    window.location.href = "index.html";
 });

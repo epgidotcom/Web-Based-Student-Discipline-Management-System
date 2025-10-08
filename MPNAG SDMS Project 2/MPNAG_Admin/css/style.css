@@ -94,17 +94,6 @@ body {
   color: #43699c;
 }
 
-/* Calendar */
-#calendar {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  min-height: 600px;
-}
-
-
-
 
 /* === Mobile adjustments === */
 .menu-btn {

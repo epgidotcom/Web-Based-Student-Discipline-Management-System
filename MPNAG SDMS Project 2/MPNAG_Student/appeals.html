@@ -50,17 +50,16 @@
       <div class="panel-header"><h3>Submit an Appeal</h3></div>
       <form id="appealForm" class="appeal-form">
         <div class="field">
-          <label for="violationSelect">Violation</label>
-          <select id="violationSelect">
-            <option value="">Select a violation...</option>
-            <!-- backend options will populate here -->
-          </select>
+          <label for="violationText">Violation</label>
+          <input type="text" id="violationText" placeholder="Enter violation type..." />
         </div>
         <div class="field">
           <label for="appealReason">Reason / Explanation</label>
           <textarea id="appealReason" rows="4" placeholder="Explain why you are appealing…"></textarea>
         </div>
-        <button class="btn primary" type="submit"><i class="fa fa-file-circle-check"></i> Submit Appeal</button>
+        <button class="btn primary" type="submit">
+          <i class="fa fa-file-circle-check"></i> Submit Appeal
+        </button>
       </form>
     </section>
 
@@ -78,7 +77,6 @@
             </tr>
           </thead>
           <tbody id="appealRows">
-            <!-- backend data will populate here -->
             <tr>
               <td colspan="4" style="text-align:center; color:#888;">No appeals found.</td>
             </tr>
@@ -89,112 +87,7 @@
   </main>
 
   <!-- JS -->
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      loadStudentProfile();
-      loadPendingViolations();
-      loadAppeals();
-    });
-
-    // Load student info from backend
-    function loadStudentProfile() {
-      // Placeholder — backend will provide actual data
-      document.getElementById("studentName").textContent = "Juan Dela Cruz";
-      document.getElementById("studentSection").textContent = "Grade 9 • Emerald";
-      document.getElementById("studentAvatar").src = "images/mpnag_logo.png";
-    }
-
-    // Load pending violations (for appeal selection)
-    function loadPendingViolations() {
-      const select = document.getElementById("violationSelect");
-      select.innerHTML = '<option value="">Select a violation...</option>';
-      // ✅ Backend integration sample:
-      // fetch("/api/violations/pending")
-      //   .then(res => res.json())
-      //   .then(data => {
-      //     data.forEach(v => {
-      //       const opt = document.createElement("option");
-      //       opt.value = v.id;
-      //       opt.textContent = `${v.date} — ${v.type}`;
-      //       select.appendChild(opt);
-      //     });
-      //   })
-      //   .catch(err => console.error("Failed to load violations", err));
-    }
-
-    // Load existing appeals
-    function loadAppeals() {
-      const tbody = document.getElementById("appealRows");
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">Loading...</td></tr>`;
-
-      // ✅ Backend integration sample:
-      // fetch("/api/appeals")
-      //   .then(res => res.json())
-      //   .then(data => {
-      //     renderAppeals(data);
-      //   })
-      //   .catch(err => {
-      //     console.error("Failed to load appeals", err);
-      //     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">Error loading data.</td></tr>`;
-      //   });
-
-      // Placeholder (empty) — will be filled by backend
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No appeals found.</td></tr>`;
-    }
-
-    // Render appeal table rows
-    function renderAppeals(appeals) {
-      const tbody = document.getElementById("appealRows");
-      tbody.innerHTML = "";
-      if (!appeals || appeals.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No appeals found.</td></tr>`;
-        return;
-      }
-      appeals.forEach(a => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${a.date}</td>
-          <td>${a.violation}</td>
-          <td>${a.reason}</td>
-          <td><span class="status ${a.status.toLowerCase()}">${a.status}</span></td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // Submit new appeal
-    document.getElementById("appealForm").addEventListener("submit", e => {
-      e.preventDefault();
-
-      const vId = document.getElementById("violationSelect").value;
-      const reason = document.getElementById("appealReason").value.trim();
-
-      if (!vId || !reason) return alert("Please select a violation and add your explanation.");
-
-      // ✅ Backend integration sample:
-      // fetch("/api/appeals", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ violationId: vId, reason })
-      // })
-      //   .then(res => res.json())
-      //   .then(() => {
-      //     alert("Appeal submitted successfully!");
-      //     document.getElementById("appealReason").value = "";
-      //     loadAppeals(); // refresh table
-      //   })
-      //   .catch(err => {
-      //     console.error("Failed to submit appeal", err);
-      //     alert("There was an error submitting your appeal.");
-      //   });
-    });
-
-    // Sidebar toggle
-    const sidebar = document.querySelector(".sidebar");
-    const toggleBtn = document.getElementById("sidebarToggle");
-    toggleBtn.addEventListener("click", () => sidebar.classList.toggle("closed"));
-  </script>
-
+  <script src="js/student_appeals.js"></script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>

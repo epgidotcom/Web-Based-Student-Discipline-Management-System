@@ -406,3 +406,37 @@ select option {
   cursor: pointer;
 }
 .image-preview-modal .close-btn:hover { color: #ff5757; }
+
+
+/* ============================= */
+/* Horizontal Scroll for Table   */
+/* ============================= */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;           /* 👈 enables left-right scrolling */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* smooth on mobile */
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  margin-top: 8px;
+}
+
+/* Keep table style consistent */
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px; /* 👈 ensures scroll activates if table is too wide */
+}
+
+/* Optional – style scrollbar */
+.table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

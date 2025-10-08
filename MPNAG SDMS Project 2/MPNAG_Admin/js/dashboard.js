@@ -36,24 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let students = Array.isArray(window.studentsData) ? window.studentsData : parseStudentsFromTable();
   let violations = Array.isArray(window.violationsData) ? window.violationsData : parseViolationsFromTable();
 
+  // Removed sample data generation
+  // If no real data is available, the dashboard will remain empty
   if (students.length === 0 && violations.length === 0) {
-    const sections = ["A","B","C","D"];
-    for (let i=0;i<18;i++) {
-      const grade = 7 + (i % 6);
-      const section = sections[i % sections.length];
-      students.push({ id: i+1, grade, section, firstName: "Student "+(i+1) });
-    }
-    const types = ["Tardiness","Dress Code","Disrespect","Cheating"];
-    const today = new Date();
-    for (let i=0;i<48;i++) {
-      const s = students[Math.floor(Math.random()*students.length)];
-      const d = new Date(today); d.setDate(today.getDate()-Math.floor(Math.random()*80));
-      violations.push({
-        id:i+1, studentId:s.id, type: types[Math.floor(Math.random()*types.length)],
-        status: Math.random()<0.7 ? "Resolved":"Open",
-        date: d.toISOString().slice(0,10), grade: s.grade, section: s.section
-      });
-    }
+    console.warn("No data found. Please ensure window.studentsData and window.violationsData are populated before loading this script.");
   }
 
   /* ===== Utilities ===== */
@@ -188,7 +174,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTrend(filtered, from, to);
     renderTopTypes(filtered);
     renderByGrade(filtered);
-    renderPredictive(); // 👈 NEW predictive analytics chart
   }
 
   function renderTrend(list, from, to) {

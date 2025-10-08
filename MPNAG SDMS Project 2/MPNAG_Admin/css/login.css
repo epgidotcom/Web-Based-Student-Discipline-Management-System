@@ -1,3 +1,14 @@
+/* Captcha and Button Alignment */
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1em;
+}
+
+.g-recaptcha {
+  margin: 0 auto;
+}
 /* Login Page Styles */
 body {
   display: flex;
@@ -233,3 +244,4 @@ h2 {
   outline: 2px solid #27ae60;
   outline-offset: 2px;
 }
+

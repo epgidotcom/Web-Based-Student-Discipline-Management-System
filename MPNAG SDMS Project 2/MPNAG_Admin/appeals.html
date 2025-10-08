@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - Appeals</title>
+
+  <!-- Global + Page CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/appeals_admin.css"> <!-- reuse layout & table design -->
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="appeals.html" class="active"><i class="fa fa-file-circle-question"></i> Appeals</a>
+  <a href="create_account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+
+  <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt"></i> <span>Logout</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Backdrop -->
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-head">
+      <h3>Appeals</h3>
+    </div>
+
+    <!-- Search -->
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search appeals..." onkeyup="searchAppeal()">
+      <button type="button" class="search-btn">
+        <i class="fa fa-search"></i><span> Search</span>
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table id="appealsTable">
+        <thead>
+          <tr>
+            <th>LRN</th>
+            <th>Date Submitted</th>
+            <th>Student Name</th>
+            <th>Section</th>
+            <th>Violation</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="8" style="text-align:center;color:#6b7280;">No appeals found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- View Appeal Modal -->
+<div id="appealModal" class="modal">
+  <div class="modal-content student-modal">
+    <div class="modal-header">
+      <h2>Appeal Details</h2>
+      <span class="close-btn" id="closeAppealModal">&times;</span>
+    </div>
+
+    <div class="student-info">
+      <div class="student-avatar">
+        <div id="appealAvatar" class="avatar--fallback">S</div>
+      </div>
+
+      <div class="student-details">
+        <div class="detail-row">
+          <span class="label">Student Name</span>
+          <span class="value" id="viewStudentName"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Section</span>
+          <span class="value" id="viewSection"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Violation</span>
+          <span class="value" id="viewViolation"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Reason</span>
+          <span class="value" id="viewReason"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Status</span>
+          <span class="value" id="viewStatus"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Date Submitted</span>
+          <span class="value" id="viewDate"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" id="approveAppeal"><i class="fa fa-check"></i> Approve</button>
+      <button class="btn danger" id="rejectAppeal"><i class="fa fa-times"></i> Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="js/main.js" defer></script>
+<script src="js/appeals.js" defer></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const sidebar  = document.getElementById('sidebar');
+  const menuBtn  = document.querySelector('.menu-btn');
+  const backdrop = document.getElementById('backdrop');
+
+  if (menuBtn && sidebar && !menuBtn.dataset.bound) {
+    function setOpen(open){
+      sidebar.classList.toggle('open', open);
+      if (backdrop) backdrop.classList.toggle('show', open);
+      document.body.style.overflow = open ? 'hidden' : '';
+      menuBtn.setAttribute('aria-expanded', String(open));
+    }
+    function toggle(){ setOpen(!sidebar.classList.contains('open')); }
+    menuBtn.addEventListener('click', toggle);
+    if (backdrop) backdrop.addEventListener('click', () => setOpen(false));
+    window.addEventListener('keydown', e => { if(e.key === 'Escape') setOpen(false); });
+    window.addEventListener('resize', () => { if (window.innerWidth >= 769) setOpen(false); });
+    menuBtn.dataset.bound = '1';
+  }
+});
+</script>
+
+</body>
+</html>

@@ -25,6 +25,7 @@
   <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
   <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
   <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
   <a href="create_account.html"><i class="fa fa-user-plus"></i> Accounts</a>
 
   <div class="sidebar-footer">
@@ -162,24 +163,11 @@
         <div class="predictive-filters">
           <label>
             Strand:
-            <select id="filterStrand">
-              <option value="All">All</option>
-              <option value="STEM">STEM</option>
-              <option value="ABM">ABM</option>
-              <option value="GAS">GAS</option>
-              <option value="HUMSS">HUMSS</option>
-              <option value="TVL">TVL</option>
-            </select>
+            <select id="filterStrand"><option value="">All</option></select>
           </label>
           <label>
             Violation:
-            <select id="filterViolation">
-              <option value="All">All</option>
-              <option value="Tardiness">Tardiness</option>
-              <option value="Cheating">Cheating</option>
-              <option value="Dress Code">Dress Code</option>
-              <option value="Disrespect">Disrespect</option>
-            </select>
+            <select id="filterViolation"><option value="">All</option></select>
           </label>
         </div>
       </div>
@@ -189,15 +177,15 @@
       </div>
 
       <p class="chart-note">
-        Forecasted number of students likely to commit repeat offenses every 7 days, grouped by strand (STEM, ABM, GAS, HUMSS, TVL).
+        Forecasted number of students likely to commit repeat offenses every 7 days, grouped by strand.
       </p>
     </div>
   </div>
 </div>
 
 <!-- JS -->
-<script src="js/app.js" defer></script>
-<script src="js/dashboard.js" defer></script>
+<script src="js/main.js" defer></script>
 <script src="js/predictive.js" defer></script>
+<script src="js/dashboard.js" defer></script>
 </body>
 </html>

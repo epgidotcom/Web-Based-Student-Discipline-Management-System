@@ -327,8 +327,6 @@ textarea {
 }
 
 
-
-
 /* === SMS Page Layout (Form left • Preview right) === */
 .sms-container{
   display: grid;
@@ -336,6 +334,21 @@ textarea {
   gap: 20px;
   align-items: start;
 }
+
+/* Header layout tweaks: place return button on left, then title+recipient beside it */
+.sms-header{ display:flex; align-items:center; gap:12px; }
+.btn-icon#returnBtn{ order: 0; margin-right:8px; }
+.sms-header-row{ order: 1; display:flex; align-items:center; gap:12px; }
+
+.sms-header h2{ margin:0; font-size:18px; }
+
+.recipient-control{ display:inline-flex; align-items:center; }
+.recipient-control select{ min-width:78px; padding:6px 10px; height:32px; font-size:13px; }
+
+/* Grade & Strand pair - compact and side-by-side */
+.grade-strand{ display:flex; gap:8px; align-items:center; }
+.grade-strand select{ min-width:110px; padding:6px 8px; height:45px; font-size:15px; border-radius:12px; }
+@media (max-width:600px){ .grade-strand{ flex-wrap:wrap; } .grade-strand select{ min-width:100%; } }
 
 /* Form card look (optional, matches your .panel style) */
 .sms-form{
@@ -394,5 +407,3 @@ textarea {
   .sms-container{ grid-template-columns: 1fr; }
   .sms-preview{ position: static; max-height: none; }
 }
-
-
