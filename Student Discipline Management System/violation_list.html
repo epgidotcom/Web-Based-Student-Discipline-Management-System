@@ -29,7 +29,7 @@
   <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
   <a href="violation_list.html" class="active"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
   <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
-  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+  <a href="create_account.html"><i class="fa fa-user-plus"></i> Accounts</a>
   <div class="sidebar-footer">
     <button id="logoutBtn" class="logout-side" type="button">
       <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
@@ -60,7 +60,7 @@
     <button id="addViolationBtn" class="add-btn"><i class="fa fa-plus"></i> Add Violation</button>
 
     <div class="search-container">
-      <input type="text" id="searchInput" placeholder="Search violation..." onkeyup="searchViolation()">
+      <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchViolation()">
       <button type="button" class="search-btn"><i class="fa fa-search"></i> <span>Search</span></button>
     </div>
 
@@ -72,10 +72,11 @@
             <th>Student Name</th>
             <th>Grade &amp; Section</th>
             <th>Past Offense</th>
-            <th>Date</th>
+            <th>Incident Date</th>
             <!-- Description intentionally hidden from the table -->
             <th>Violation Type</th>
             <th>Sanction</th>
+            <th>Added Date</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -94,20 +95,15 @@
     <form id="violationForm">
       <input type="hidden" id="editIndex">
 
-  <!-- 0) LRN (optional fast lookup) -->
-  <label>LRN (Lookup):</label>
-  <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" pattern="[0-9A-Za-z\- ]+" title="Alphanumeric LRN" />
-  <!-- Status message injected dynamically -->
+      <label>LRN (Lookup):</label>
+      <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" pattern="[0-9A-Za-z\- ]+" title="Alphanumeric LRN" />
 
-      <!-- 1) Student Name -->
       <label>Student Name:</label>
       <input type="text" id="studentName" autocomplete="off" required>
 
-      <!-- 2) Grade & Section -->
       <label>Grade &amp; Section:</label>
       <input type="text" id="gradeSection" placeholder="e.g., Grade 10 - St. Matthew" required>
 
-      <!-- 3) Past Offense (hidden until a student name is entered/selected) -->
       <div id="pastOffenseWrap" class="is-hidden">
         <label>Past Offense:</label>
         <div id="pastOffenseBox" class="past-offense-box">
@@ -116,45 +112,36 @@
         </div>
       </div>
 
-      <!-- 4) Date -->
-      <label>Date:</label>
-      <input type="date" id="date" required>
+      <label>Incident Date:</label>
+      <input type="date" id="incidentDate" required>
 
-      <!-- 5) Violation's Description (stored, not in table) -->
       <label>Violation's Description:</label>
       <textarea id="description" rows="3" placeholder="Describe the violation..." required></textarea>
 
-      <!-- 6) Violation Type -->
       <label>Violation Type:</label>
       <select id="violationType" required>
         <option value="" disabled selected>Select type</option>
-        <option value="Bullying">Bullying</option>
-        <option value="Cheating">Cheating</option>
-        <option value="Vandalism">Vandalism</option>
-        <option value="Tardiness">Tardiness</option>
-        <option value="Improper Uniform">Improper Uniform</option>
-        <option value="Others">Others</option>
+        <option value="First Offense">First Offense</option>
+        <option value="Second Offense">Second Offense</option>
+        <option value="Third Offense">Third Offense</option>
       </select>
 
-      <!-- 7) Sanction -->
       <label>Sanction:</label>
       <select id="sanction" required>
         <option value="" disabled selected>Select sanction</option>
         <option value="Verbal Warning">Verbal Warning</option>
-        <option value="Written Reprimand">Written Reprimand</option>
-        <option value="Detention">Detention</option>
-        <option value="Community Service">Community Service</option>
+        <option value="Counseling">Counseling</option>
         <option value="Parent Conference">Parent Conference</option>
         <option value="Suspension">Suspension</option>
+        <option value="Expulsion">Expulsion</option>
       </select>
 
-      <!-- (Optional) Evidence -->
       <div class="evidence-uploader" id="evidenceUploader">
         <div class="head"><strong>Evidence (optional)</strong></div>
         <div class="evidence-preview is-hidden" id="evidencePreview"></div>
         <div class="drop" id="evidenceDrop">
           <i class="fa fa-paperclip"></i>
-          <p>Drag & drop or choose 1–3 images (JPG/PNG, ~2MB each). We’ll auto-resize.</p>
+          <p>Drag & drop or choose 1–3 images.</p>
           <button type="button" class="btn" id="evidenceChoose">Choose file(s)</button>
           <input type="file" id="evidenceInput" accept="image/*" multiple class="is-hidden">
           <div class="evidence-actions is-hidden" id="evidenceActions">
@@ -171,36 +158,71 @@
 
 <!-- View Violation Modal -->
 <div id="viewModal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn">&times;</span>
-    <h2>Violation Details</h2>
-
-    <p><strong>Student:</strong> <span id="viewStudent"></span></p>
-    <p><strong>Grade &amp; Section:</strong> <span id="viewGradeSection"></span></p>
-
-    <div id="viewPastOffenseRow" class="is-hidden">
-      <p><strong>Past Offense:</strong> <span id="viewPastOffense"></span></p>
+  <div class="modal-content violation-modal">
+    <div class="modal-header">
+      <h2>Violation Details</h2>
+      <span class="close-btn">&times;</span>
     </div>
 
-    <p><strong>Date:</strong> <span id="viewDate"></span></p>
-    <p><strong>Violation's Description:</strong> <span id="viewDescription"></span></p>
-    <p><strong>Violation Type:</strong> <span id="viewViolationType"></span></p>
-    <p><strong>Sanction:</strong> <span id="viewSanction"></span></p>
+    <div class="violation-body">
+      <div class="detail-row">
+        <span class="label">Student</span>
+        <span class="value" id="viewStudent"></span>
+      </div>
 
-    <div id="viewEvidenceWrap" class="is-hidden" style="margin-top:10px;">
-      <strong>Evidence:</strong>
-      <div id="viewEvidence" class="evidence-preview" style="margin-top:6px;"></div>
+      <div class="detail-row">
+        <span class="label">Grade & Section</span>
+        <span class="value" id="viewGradeSection"></span>
+      </div>
+
+      <div id="viewPastOffenseRow" class="detail-row is-hidden">
+        <span class="label">Past Offense</span>
+        <span class="value" id="viewPastOffense"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Incident Date</span>
+        <span class="value" id="viewIncidentDate"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Added Date</span>
+        <span class="value" id="viewAddedDate"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Violation Description</span>
+        <span class="value multiline" id="viewDescription"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Violation Type</span>
+        <span class="value" id="viewViolationType"></span>
+      </div>
+
+      <div class="detail-row">
+        <span class="label">Sanction</span>
+        <span class="value" id="viewSanction"></span>
+      </div>
+
+      <div id="viewEvidenceWrap" class="is-hidden evidence-section">
+        <strong>Evidence:</strong>
+        <div id="viewEvidence" class="evidence-preview"></div>
+      </div>
     </div>
   </div>
 </div>
+
+<!-- ===== Image Preview Modal ===== -->
+<div id="imagePreviewModal" class="modal image-preview-modal">
+  <span class="close-btn" id="imagePreviewClose">&times;</span>
+  <img id="imagePreviewFull" class="image-preview-full" alt="Preview">
+</div>
+
 
 <!-- Scripts -->
 <script src="js/config.js"></script>
 <script src="js/main.js" defer></script>
 <script src="js/violation_list.js" defer></script>
-
-<!-- Removed large duplicate inline script block that previously handled violations entirely on the client.
-     The external file js/violation_list.js now provides the API-driven implementation (CRUD, repeat count, LRN lookup, evidence upload).
-     Keeping this comment for clarity and future maintenance. -->
 </body>
 </html>

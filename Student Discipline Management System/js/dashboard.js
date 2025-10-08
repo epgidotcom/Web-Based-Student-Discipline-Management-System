@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+  const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
-  // Fallback parsers from tables (optional)
+  /* ===== Parse fallback data ===== */
   function parseStudentsFromTable() {
     const rows = Array.from(document.querySelectorAll("#studentTable tr")).slice(1);
     return rows.map((r, i) => {
@@ -14,6 +14,7 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
       };
     });
   }
+
   function parseViolationsFromTable() {
     const rows = Array.from(document.querySelectorAll("#violationTable tr")).slice(1);
     return rows.map((r, i) => {
@@ -31,11 +32,10 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
     });
   }
 
-  // Prefer global arrays if present
+  /* ===== Data sources ===== */
   let students = Array.isArray(window.studentsData) ? window.studentsData : parseStudentsFromTable();
   let violations = Array.isArray(window.violationsData) ? window.violationsData : parseViolationsFromTable();
 
-  // If absolutely empty, fake a tiny dataset so the dashboard shows structure
   if (students.length === 0 && violations.length === 0) {
     const sections = ["A","B","C","D"];
     for (let i=0;i<18;i++) {
@@ -56,7 +56,7 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
     }
   }
 
-  /* ===== Helpers ===== */
+  /* ===== Utilities ===== */
   const toDate = (s) => (s instanceof Date ? s : new Date(s + "T00:00:00"));
   const fmt = (d) => DATE_FMT.format(d);
   const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
@@ -85,7 +85,7 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
       return d >= f && d <= t;
     });
   }
-  function unique(arr) { return [...new Set(arr)]; }
+  const unique = arr => [...new Set(arr)];
   function weeksBetween(from, to) {
     const out = []; let cur = startOfDay(from);
     while (cur <= to) { out.push(new Date(cur)); cur = addDays(cur, 7); }
@@ -104,10 +104,6 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
   /* ===== Elements ===== */
   const els = {
-    kpiStudents: document.querySelector("#kpiTotalStudents .kpi-value"),
-    kpiViolations30: document.querySelector("#kpiViolations30 .kpi-value"),
-    kpiOpenCases: document.querySelector("#kpiOpenCases .kpi-value"),
-    kpiRepeat: document.querySelector("#kpiRepeatOffenders .kpi-value"),
     dateFrom: document.getElementById("dateFrom"),
     dateTo: document.getElementById("dateTo"),
     filterGrade: document.getElementById("filterGrade"),
@@ -126,7 +122,6 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
   /* ===== Filters init ===== */
   (function initFilters(){
-    // populate grade/section/type
     const grades = unique(students.map(s=>s.grade).filter(Boolean)).sort((a,b)=>a-b);
     grades.forEach(g => {
       const o=document.createElement("option"); o.value=g; o.textContent=g;
@@ -143,13 +138,11 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
       els.filterType.appendChild(o);
     });
 
-    // default date: last 90 days
     const to = new Date();
     const from = addDays(to, -89);
     els.dateFrom.value = from.toISOString().slice(0,10);
     els.dateTo.value = to.toISOString().slice(0,10);
 
-    // quick buttons
     els.btnQuick7.addEventListener("click", () => {
       const to=new Date(); const from=addDays(to,-6);
       els.dateFrom.value = from.toISOString().slice(0,10);
@@ -173,7 +166,7 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
   })();
 
   /* ===== Charts ===== */
-  let chartTrend, chartTopTypes, chartByGrade;
+  let chartTrend, chartTopTypes, chartByGrade, chartPredictive;
   function ensureChart(ctx, cfg, existing) { if (existing) existing.destroy(); return new Chart(ctx, cfg); }
 
   /* ===== Render ===== */
@@ -192,32 +185,13 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
     els.rangeHint.textContent = `${fmt(from)} – ${fmt(to)}`;
     els.typesHint.textContent = t ? `Type: ${t}` : "All types";
 
-    renderKPIs(from, to);
     renderTrend(filtered, from, to);
     renderTopTypes(filtered);
     renderByGrade(filtered);
+    renderPredictive(); // 👈 NEW predictive analytics chart
   }
-
-  function renderKPIs(from, to) {
-    animateCount(els.kpiStudents, students.length);
-
-    const last30 = violationsInRange(violations, addDays(to, -29), to).length;
-    animateCount(els.kpiViolations30, last30);
-
-    const open = violations.filter(v => (v.status || "").toLowerCase() === "open").length;
-    animateCount(els.kpiOpenCases, open);
-
-    // repeat offenders: >=3 in last 90 days
-    const v90 = violationsInRange(violations, addDays(to, -89), to);
-    const byStu = new Map();
-    v90.forEach(v => byStu.set(v.studentId || v.studentName, (byStu.get(v.studentId || v.studentName) || 0) + 1));
-    const repeat = [...byStu.values()].filter(n => n >= 3).length;
-    animateCount(els.kpiRepeat, repeat);
-  }
-
 
   function renderTrend(list, from, to) {
-
     const weeks = weeksBetween(from, to);
     const labels = weeks.map(d => fmt(d));
     const counts = weeks.map((start, i) => {
@@ -287,12 +261,10 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
     );
   }
 
-
-
   // Initial render
   applyFilters();
 
-  // Logout 
+  // Logout
   document.getElementById("logoutBtn")?.addEventListener("click", () => {
     window.location.href = "index.html";
   });

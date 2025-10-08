@@ -1,51 +1,4 @@
-// In-memory cache loaded from the API
 let students = [];
-
-// Helpers to talk to backend API
-const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
-console.log('[StudentList] API_BASE =', API_BASE || '(empty - using relative)');
-async function apiFetch(path, init) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(()=> '');
-    throw new Error(`HTTP ${res.status} ${res.statusText}: ${text}`);
-  }
-  // 204 no content
-  if (res.status === 204) return null;
-  return res.json();
-}
-
-// Map between UI shape (camelCase) and API shape (snake_case)
-function toServer(body) {
-  return {
-    lrn: body.lrn || null,
-    first_name: body.firstName || null,
-    middle_name: body.middleName || null,
-    last_name: body.lastName || null,
-    birthdate: body.birthdate || null,
-    address: body.address || null,
-    grade: body.grade || null,
-    section: body.section || null,
-    parent_contact: body.parentContact || null
-  };
-}
-function fromServer(row) {
-  return {
-    id: row.id,
-    lrn: row.lrn || '',
-    firstName: row.first_name || '',
-    middleName: row.middle_name || '',
-    lastName: row.last_name || '',
-    birthdate: row.birthdate || '',
-    address: row.address || '',
-    grade: row.grade || '',
-    section: row.section || '',
-    parentContact: row.parent_contact || ''
-  };
-}
 
 const studentTable = document.querySelector("#studentTable tbody");
 const addStudentBtn = document.getElementById("addStudentBtn");
@@ -59,8 +12,7 @@ const editIndex = document.getElementById("editIndex");
 
 const viewLRN = document.getElementById("viewLRN");
 const viewName = document.getElementById("viewName");
-const viewBirthdate = document.getElementById("viewBirthdate");
-const viewAddress = document.getElementById("viewAddress");
+const viewAge = document.getElementById("viewAge");
 const viewGrade = document.getElementById("viewGrade");
 const viewSection = document.getElementById("viewSection");
 const viewParent = document.getElementById("viewParent");
@@ -153,58 +105,52 @@ closeBtns.forEach(btn => btn.onclick = () => {
   viewModal.style.display = "none";
 });
 
+/* =================== Helpers =================== */
+function todayISO() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
 /* =================== Save Student =================== */
-studentForm.onsubmit = async (e) => {
+studentForm.onsubmit = (e) => {
   e.preventDefault();
 
-  const idx = editIndex.value === '' ? null : Number(editIndex.value);
-  const prevLRN = idx === null ? null : students[idx]?.lrn;
+  const prevLRN = editIndex.value === "" ? null : students[editIndex.value]?.lrn;
 
+  // if editing, keep existing addedDate; if new, set to today
+  const existingAdded = editIndex.value === "" ? null : (students[editIndex.value]?.addedDate || null);
+  const computedAddedDate = existingAdded || todayISO();
+
+  const ageRaw = document.getElementById("age").value;
   const student = {
-    lrn: document.getElementById('lrn').value.trim(),
-    firstName: document.getElementById('firstName').value.trim(),
-    middleName: document.getElementById('middleName').value.trim(),
-    lastName: document.getElementById('lastName').value.trim(),
-    birthdate: document.getElementById('birthdate').value,
-    address: document.getElementById('address').value.trim(),
-    grade: document.getElementById('grade').value,
-    section: document.getElementById('section').value.trim(),
-    parentContact: document.getElementById('parentContact').value.trim()
+    lrn: document.getElementById("lrn").value.trim(),
+    firstName: document.getElementById("firstName").value.trim(),
+    middleName: document.getElementById("middleName").value.trim(),
+    lastName: document.getElementById("lastName").value.trim(),
+    age: ageRaw === "" ? "" : parseInt(ageRaw, 10),
+    grade: document.getElementById("grade").value,
+    section: document.getElementById("section").value.trim(),
+    parentContact: document.getElementById("parentContact").value.trim(),
+    addedDate: computedAddedDate  // NEW
   };
 
-  try {
-    if (idx === null) {
-      // Create
-      const created = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(toServer(student)) });
-      const createdUi = fromServer(created);
-      // Save photo by LRN
-      const uploadedDataUrl = photoPreview?.dataset?.dataurl;
-      if (uploadedDataUrl) StudentPhotos.save(createdUi.lrn, uploadedDataUrl);
-      students.push(createdUi);
-    } else {
-      // Update
-      const id = students[idx]?.id;
-      const updated = await apiFetch(`/api/students/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(toServer(student)) });
-      const updatedUi = fromServer(updated);
-      // Move/save photo by LRN if changed
-      if (prevLRN && prevLRN !== updatedUi.lrn) {
-        StudentPhotos.move(prevLRN, updatedUi.lrn);
-      }
-      const uploadedDataUrl = photoPreview?.dataset?.dataurl;
-      if (uploadedDataUrl) StudentPhotos.save(updatedUi.lrn, uploadedDataUrl);
-      students[idx] = updatedUi;
+  // Save/move photo in storage by LRN
+  const uploadedDataUrl = photoPreview?.dataset?.dataurl;
+  if (editIndex.value === "") {
+    if (uploadedDataUrl) StudentPhotos.save(student.lrn, uploadedDataUrl);
+    students.push(student);
+  } else {
+    if (prevLRN && prevLRN !== student.lrn) {
+      StudentPhotos.move(prevLRN, student.lrn);
     }
-
-    renderTable();
-    studentModal.style.display = 'none';
-    window.dispatchEvent(new Event('sdms:data-changed'));
-    // Mark students data as dirty for dashboard auto-refresh
-    try { localStorage.setItem('sdms_students_dirty', String(Date.now())); } catch(_) {}
-    try { localStorage.setItem('sdms_data_dirty', String(Date.now())); } catch(_) {}
-  } catch (err) {
-    console.error(err);
-    alert('Failed to save student. Please try again.');
+    if (uploadedDataUrl) StudentPhotos.save(student.lrn, uploadedDataUrl);
+    students[editIndex.value] = student;
   }
+
+  renderTable();
+  studentModal.style.display = "none";
+  window.dispatchEvent(new Event('sdms:data-changed'));
 };
 
 /* =================== Render Table =================== */
@@ -214,6 +160,13 @@ function initialsFromName(name) {
 
 function renderTable() {
   studentTable.innerHTML = "";
+  if (!students.length) {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td colspan="7" style="text-align:center;color:#6b7280;">No data</td>`;
+    studentTable.appendChild(row);
+    return;
+  }
+
   students.forEach((s, i) => {
     const row = document.createElement("tr");
     const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, " ").trim();
@@ -230,9 +183,10 @@ function renderTable() {
           <span class="student-name">${fullName}</span>
         </div>
       </td>
-      <td>${s.birthdate}</td>
+      <td>${s.age ?? ""}</td>
       <td>${s.grade}</td>
       <td>${s.section}</td>
+      <td>${s.addedDate || ""}</td> <!-- NEW -->
       <td>
         <button class="action-btn" onclick="viewStudent(${i})" title="View"><i class="fa fa-eye"></i></button>
         <button class="action-btn edit-btn" onclick="editStudent(${i})" title="Edit"><i class="fa fa-edit"></i></button>
@@ -250,8 +204,7 @@ function viewStudent(i) {
 
   viewLRN.textContent = s.lrn;
   viewName.textContent = fullName;
-  viewBirthdate.textContent = s.birthdate;
-  viewAddress.textContent = s.address;
+  viewAge.textContent = s.age === "" || s.age == null ? "" : `${s.age} yrs`;
   viewGrade.textContent = s.grade;
   viewSection.textContent = s.section;
   viewParent.textContent = s.parentContact;
@@ -277,15 +230,13 @@ function editStudent(i) {
   document.getElementById("firstName").value = s.firstName;
   document.getElementById("middleName").value = s.middleName;
   document.getElementById("lastName").value = s.lastName;
-  document.getElementById("birthdate").value = s.birthdate;
-  document.getElementById("address").value = s.address;
+  document.getElementById("age").value = s.age ?? "";
   document.getElementById("grade").value = s.grade;
   document.getElementById("section").value = s.section;
   document.getElementById("parentContact").value = s.parentContact;
   editIndex.value = i;
   modalTitle.textContent = "Edit Student";
 
-  // preload existing photo for this LRN
   const photo = StudentPhotos.get(s.lrn);
   if (photo) {
     photoPreview.src = photo;
@@ -301,20 +252,13 @@ function editStudent(i) {
 }
 
 /* =================== Delete Student =================== */
-async function deleteStudent(i) {
-  if (!confirm('Are you sure you want to delete this student?')) return;
-  const s = students[i];
-  try {
-    await apiFetch(`/api/students/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
+function deleteStudent(i) {
+  if (confirm("Are you sure you want to delete this student?")) {
+    const s = students[i];
     StudentPhotos.remove(s.lrn);
     students.splice(i, 1);
     renderTable();
     window.dispatchEvent(new Event('sdms:data-changed'));
-    try { localStorage.setItem('sdms_students_dirty', String(Date.now())); } catch(_) {}
-    try { localStorage.setItem('sdms_data_dirty', String(Date.now())); } catch(_) {}
-  } catch (err) {
-    console.error(err);
-    alert('Failed to delete student.');
   }
 }
 
@@ -330,23 +274,9 @@ function searchStudent() {
 }
 
 /* =================== Init =================== */
-async function loadStudents() {
-  console.log('[StudentList] loadStudents() start');
-  try {
-    const list = await apiFetch('/api/students');
-    students = Array.isArray(list) ? list.map(fromServer) : [];
-    console.log('[StudentList] loadStudents() success, count =', students.length);
-  } catch (err) {
-    console.error('Failed to load students:', err);
-    students = [];
-    console.log('[StudentList] loadStudents() failed');
-  }
-  renderTable();
-}
+renderTable();
 
-loadStudents();
-
-// expose functions to window (since you call via onclick in HTML)
+// expose functions to window
 window.viewStudent = viewStudent;
 window.editStudent = editStudent;
 window.deleteStudent = deleteStudent;

@@ -1,91 +1,5 @@
-/* ================= Persistence via API (replaces previous in-memory only list) ================= */
+/* ================= In-memory list for current page ================= */
 let violations = [];
-let studentsIndex = []; // array of student objects from /api/students
-let studentNameMap = new Map(); // lower(full name) -> student
-let studentLrnMap = new Map(); // lrn -> student
-const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
-
-async function apiFetch(path, init) {
-  const url = `${API_BASE}${path}`;
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
-  if (!res.ok) {
-    let txt = '';
-    try { txt = await res.text(); } catch {}
-    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt}`.trim());
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
-
-// ================= Student resolution & repeat logic =================
-function buildStudentDisplay(s){
-  return [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
-}
-
-function rebuildStudentMap(){
-  studentNameMap.clear();
-  studentLrnMap.clear();
-  studentsIndex.forEach(s=> {
-    const name = buildStudentDisplay(s);
-    if(name) studentNameMap.set(name.toLowerCase(), {...s, _display: name});
-    if(s.lrn){
-      studentLrnMap.set(String(s.lrn).trim(), {...s, _display: name});
-    }
-  });
-}
-
-function resolveStudent(name){
-  if(!name) return null;
-  return studentNameMap.get(name.toLowerCase()) || null;
-}
-
-async function loadStudents(){
-  try {
-    const list = await apiFetch('/api/students');
-    studentsIndex = Array.isArray(list)? list : [];
-  } catch(e){
-    console.error('[Violations] Failed to load students', e);
-    studentsIndex = [];
-  }
-  rebuildStudentMap();
-}
-
-async function fetchRepeatCount(studentId, violationType){
-  if(!studentId || !violationType) return 0;
-  try {
-    const data = await apiFetch(`/api/violations/repeat/check?student_id=${encodeURIComponent(studentId)}&offense_type=${encodeURIComponent(violationType)}`);
-    return data?.count || 0;
-  } catch(e){
-    console.warn('[Violations] repeat check failed', e);
-    return 0;
-  }
-}
-
-function fromServerViolation(row){
-  // Accept legacy or new field names, normalizing to frontend shape
-  const evidenceRaw = row.evidence || null; // new: server stores JSON object {files: [...], notes: ...}
-  let evidenceArr = [];
-  if (evidenceRaw) {
-    if (Array.isArray(evidenceRaw)) {
-      evidenceArr = evidenceRaw; // legacy array form
-    } else if (typeof evidenceRaw === 'object') {
-      if (Array.isArray(evidenceRaw.files)) evidenceArr = evidenceRaw.files;
-    }
-  }
-  return {
-    id: row.id,
-    studentId: row.student_id || null,
-    studentName: row.student_name || '',
-    gradeSection: row.grade_section || '',
-    violationType: row.offense_type || row.violation_type || '',
-    description: row.description || '',
-    sanction: row.sanction || '',
-    violation: row.violation || '', // legacy optional
-    date: row.incident_date || row.date || '',
-    evidence: evidenceArr,
-    repeatCount: row.repeat_count != null ? row.repeat_count : (row.repeat_count_at_insert != null ? row.repeat_count_at_insert : 0)
-  };
-}
 
 /* ================= Elements ================= */
 const violationForm  = document.getElementById("violationForm");
@@ -96,51 +10,22 @@ const viewModal      = document.getElementById("viewModal");
 const modalTitle     = document.getElementById("modalTitle");
 const closeBtns      = document.querySelectorAll(".close-btn");
 
-/* ---- Inputs (core) ---- */
+/* ---- Inputs ---- */
 const studentNameInput = document.getElementById("studentName");
-const gradeSectionInput= document.getElementById("gradeSection");     // NEW
-const violationTypeInput = document.getElementById("violationType");  // NEW
+const gradeSectionInput= document.getElementById("gradeSection");
+const violationTypeInput = document.getElementById("violationType");
 const sanctionInput    = document.getElementById("sanction");
 const descriptionInput = document.getElementById("description");
-const dateInput        = document.getElementById("date");
+const incidentDateInput = document.getElementById("incidentDate");
 const editIndexInput   = document.getElementById("editIndex");
-const saveBtn = violationForm?.querySelector('button[type="submit"]') || violationForm?.querySelector('button');
-// dynamic info elements (create if missing)
-let studentLookupStatus = document.getElementById('studentLookupStatus');
-if(!studentLookupStatus && studentNameInput){
-  studentLookupStatus = document.createElement('div');
-  studentLookupStatus.id = 'studentLookupStatus';
-  studentLookupStatus.className = 'field-hint';
-  studentNameInput.parentElement.appendChild(studentLookupStatus);
-}
-let repeatInfoEl = document.getElementById('violationRepeatInfo');
-if(!repeatInfoEl && violationTypeInput){
-  repeatInfoEl = document.createElement('div');
-  repeatInfoEl.id = 'violationRepeatInfo';
-  repeatInfoEl.className = 'field-hint';
-  violationTypeInput.parentElement.appendChild(repeatInfoEl);
-}
-let resolvedStudent = null; // cache of currently matched student
-// LRN input + status (created if missing)
-const studentLrnInput = document.getElementById('studentLRN');
-let lrnLookupStatus = document.getElementById('lrnLookupStatus');
-if(!lrnLookupStatus && studentLrnInput){
-  lrnLookupStatus = document.createElement('div');
-  lrnLookupStatus.id = 'lrnLookupStatus';
-  lrnLookupStatus.className = 'field-hint';
-  studentLrnInput.parentElement.appendChild(lrnLookupStatus);
-}
 
-/* ---- Optional legacy input (if your form still has it) ---- */
-const violationInput   = document.getElementById("violation"); // kept for compatibility (not shown in table)
+/* Optional legacy input */
+const violationInput   = document.getElementById("violation");
 
 /* ---- Past Offense UI ---- */
 const pastOffenseWrap   = document.getElementById("pastOffenseWrap");
 const pastOffenseList   = document.getElementById("pastOffenseList");
 const pastOffenseEmpty  = document.getElementById("pastOffenseEmpty");
-// Optional legacy elements (may not exist in DOM)
-const pastOffenseSelect = document.getElementById("pastOffenseSelect");
-const pastOffenseStatus = document.getElementById("pastOffenseStatus");
 
 /* ---- View modal elements ---- */
 const viewStudent      = document.getElementById("viewStudent");
@@ -150,7 +35,8 @@ const viewPastOffense  = document.getElementById("viewPastOffense");
 const viewViolationType= document.getElementById("viewViolationType");
 const viewSanction     = document.getElementById("viewSanction");
 const viewDescription  = document.getElementById("viewDescription");
-const viewDate         = document.getElementById("viewDate");
+const viewIncidentDate = document.getElementById("viewIncidentDate");
+const viewAddedDate    = document.getElementById("viewAddedDate");
 const viewEvidenceWrap = document.getElementById("viewEvidenceWrap");
 const viewEvidenceBox  = document.getElementById("viewEvidence");
 
@@ -186,9 +72,11 @@ function renderEvidenceThumbs() {
   ev.preview.innerHTML = "";
   evidenceData.forEach((src, i) => {
     const img = document.createElement("img");
-    img.src = src; img.className = "evidence-thumb"; img.alt = `Evidence ${i+1}`;
-    img.title = "Click to open";
-    img.addEventListener("click", () => window.open(src, "_blank"));
+    img.src = src;
+    img.className = "evidence-thumb";
+    img.alt = `Evidence ${i+1}`;
+    img.title = "Click to enlarge";
+    img.addEventListener("click", () => openImagePreview(src));
     ev.preview.appendChild(img);
   });
   const has = evidenceData.length > 0;
@@ -233,37 +121,41 @@ function initEvidenceUploader() {
 }
 initEvidenceUploader();
 
-/* ================= Past Offense data via API only ================= */
-// Read API configuration (set in js/config.js). Fallbacks for safety.
-// (API_BASE now declared near top; keep legacy comment)
-
-const ApiPastOffenseStore = {
-  async getByName(name) {
-    const res = await fetch(`${API_BASE}/api/past-offenses?name=${encodeURIComponent(name)}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+/* ================= Mock Past Offense Store ================= */
+const STORAGE_KEY = 'sdms_mock_past_offenses_v1';
+const MockPastOffenseStore = {
+  _data: null,
+  _load() {
+    if (this._data) return this._data;
+    try {
+      this._data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch { this._data = {}; }
+    return this._data;
   },
-  async addOffense(name, label, dateISO) {
-    const res = await fetch(`${API_BASE}/api/past-offenses`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name, label, date: dateISO })
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+  _save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._data)); },
+  async getByName(name) {
+    const data = this._load();
+    const key = Object.keys(data).find(k => k.toLowerCase() === String(name).trim().toLowerCase());
+    return key ? data[key].slice() : [];
+  },
+  async addOffense(name, label) {
+    const data = this._load();
+    const key = Object.keys(data).find(k => k.toLowerCase() === String(name).trim().toLowerCase()) || name.trim();
+    data[key] = data[key] || [];
+    data[key].push(label);
+    this._save();
+    return data[key].slice();
+  },
+  async updateLastOffense(name, newLabel) {
+    const data = this._load();
+    const key = Object.keys(data).find(k => k.toLowerCase() === String(name).trim().toLowerCase());
+    if (!key) return [];
+    if (data[key].length > 0) data[key][data[key].length - 1] = newLabel;
+    this._save();
+    return data[key].slice();
   }
 };
-const PastOffenseService = ApiPastOffenseStore;
-
-function levelFromCount(n) {
-  if (n <= 0) return 'None';
-  if (n === 1) return '1st Offense';
-  if (n === 2) return '2nd Offense';
-  if (n === 3) return '3rd Offense';
-  return 'Repeat/Chronic';
-}
+const PastOffenseService = MockPastOffenseStore;
 
 const debounce = (fn, ms = 300) => {
   let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
@@ -272,10 +164,7 @@ const debounce = (fn, ms = 300) => {
 /* ================= Refresh Past Offense UI ================= */
 async function refreshPastOffenseUI() {
   if (!pastOffenseWrap || !pastOffenseList || !pastOffenseEmpty) return;
-
   const name = (studentNameInput && studentNameInput.value || '').trim();
-
-  // Hide until there's a name
   if (!name) {
     pastOffenseWrap.classList.add('is-hidden');
     pastOffenseList.innerHTML = '';
@@ -284,11 +173,7 @@ async function refreshPastOffenseUI() {
   }
 
   pastOffenseWrap.classList.remove('is-hidden');
-
-  // Get history from API
   const offenses = await PastOffenseService.getByName(name);
-
-  // Render list
   pastOffenseList.innerHTML = '';
   if (!offenses.length) {
     pastOffenseEmpty.classList.remove('is-hidden');
@@ -303,34 +188,27 @@ async function refreshPastOffenseUI() {
   }
 }
 
-
 /* ================= Open/Close Modals ================= */
 addViolationBtn.addEventListener("click", () => {
   violationForm.reset();
   editIndexInput.value = "";
   modalTitle.textContent = "Add Violation";
-  window._evidence?.clear();             // reset images
-
-  // Ensure Past Offense is hidden on open
-  if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
-  if (pastOffenseList) pastOffenseList.innerHTML = '';
-  if (pastOffenseEmpty) pastOffenseEmpty.textContent = 'No past offenses.';
-
-  violationModal.style.display = "block";
-  if(studentLookupStatus) studentLookupStatus.textContent = '';
-  if(repeatInfoEl) repeatInfoEl.textContent = '';
-  resolvedStudent = null;
-  if(saveBtn) saveBtn.disabled = true; // disable until student resolved
+  window._evidence?.clear();
+  pastOffenseWrap.classList.add('is-hidden');
+  pastOffenseList.innerHTML = '';
+  pastOffenseEmpty.textContent = 'No past offenses.';
+  violationModal.style.display = "flex";
 });
 
 closeBtns.forEach(btn => {
   btn.addEventListener("click", () => {
     violationModal.style.display = "none";
     viewModal.style.display = "none";
+    imagePreviewModal?.classList.remove("is-open");
   });
 });
 
-/* ================= Save form (create/update via API) ================= */
+/* ================= Save form ================= */
 violationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -339,108 +217,68 @@ violationForm.addEventListener("submit", async (e) => {
   const violationType = (violationTypeInput?.value || "").trim();
   const sanction      = (sanctionInput.value || "").trim();
   const description   = (descriptionInput.value || "").trim();
-  const date          = dateInput.value || "";
-
-  // Keep legacy field if present (not shown in table)
+  const incidentDate  = incidentDateInput.value || "";
+  const addedDate     = new Date(Date.now() - (new Date()).getTimezoneOffset()*60000).toISOString().slice(0,10);
   const violation     = violationInput ? (violationInput.value || "").trim() : "";
 
-  // Build a readable label for history, e.g., "Improper Uniform | Minor | Sanction: Verbal Warning — 2025-09-20"
   const parts = [];
   if (description) parts.push(description);
   if (violationType) parts.push(violationType);
   if (sanction) parts.push(`Sanction: ${sanction}`);
-  const label = parts.join(" | ") + (date ? ` — ${date}` : "");
+  const label = parts.join(" | ") + (incidentDate ? ` — ${incidentDate}` : "");
+
   let offensesAfter = [];
   if (studentName) {
-    offensesAfter = await PastOffenseService.addOffense(studentName, label, date);
+    if (editIndexInput.value === "") {
+      offensesAfter = await PastOffenseService.addOffense(studentName, label, incidentDate);
+    } else {
+      offensesAfter = await PastOffenseService.updateLastOffense(studentName, label);
+    }
   }
 
   const violationData = {
     studentName,
     gradeSection,
     pastOffense: offensesAfter.length ? offensesAfter.join(' • ') : 'No past offenses.',
-    date,
+    incidentDate,
+    addedDate,
     description,
     violationType,
     sanction,
-    // keep the older 'violation' in case you still use it somewhere else
     violation,
     evidence: window._evidence?.get ? window._evidence.get() : []
   };
 
-  // Ensure we have a resolved student
-  if(!resolvedStudent){
-    alert('Please select/enter a valid existing student from the Students list first.');
-    return;
+  if (editIndexInput.value === "") {
+    violations.push(violationData);
+  } else {
+    violations[editIndexInput.value] = violationData;
   }
-  // Prepare evidence as object {files: [...]} for new schema
-  const evidencePayload = (window._evidence?.get && window._evidence.get().length)
-    ? { files: window._evidence.get() }
-    : null;
-  try {
-    if (editIndexInput.value === "") {
-      // Create
-      const created = await apiFetch('/api/violations', { method: 'POST', body: JSON.stringify({
-        student_id: resolvedStudent.id,
-        grade_section: gradeSection,
-        offense_type: violationType,
-        sanction,
-        description,
-        incident_date: date,
-        evidence: evidencePayload
-      }) });
-      violations.unshift(fromServerViolation(created)); // newest first
-    } else {
-      // Update
-      const id = violations[editIndexInput.value].id;
-      const updated = await apiFetch(`/api/violations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({
-        student_id: resolvedStudent.id,
-        grade_section: gradeSection,
-        offense_type: violationType,
-        sanction,
-        description,
-        incident_date: date,
-        evidence: evidencePayload
-      }) });
-      violations[editIndexInput.value] = fromServerViolation(updated);
-    }
-    renderTable();
-    violationModal.style.display = "none";
-    window.dispatchEvent(new Event('sdms:data-changed'));
-    try { localStorage.setItem('sdms_violations_dirty', String(Date.now())); } catch(_) {}
-  } catch(err) {
-    console.error('Failed to save violation', err);
-    alert('Failed to save violation: ' + err.message);
-  }
+
+  renderTable();
+  violationModal.style.display = "none";
+  window.dispatchEvent(new Event('sdms:data-changed'));
 });
 
-/* ================= Render table =================
-   Columns:
-   Student Name | Grade & Section | Past Offense | Date | Violation's Description | Violation Type | Sanction | Actions
-================================================= */
+/* ================= Render table ================= */
 function renderTable() {
   violationTable.innerHTML = "";
-
   violations.forEach((item, index) => {
     const hasAttach = item.evidence && item.evidence.length > 0;
     const paperclip = hasAttach ? `<span class="has-attachment" title="Has evidence"><i class="fa fa-paperclip"></i></span>` : "";
-
     const row = document.createElement("tr");
-    row.className = 'violation-row';
     row.innerHTML = `
-      <td class="cell-student" data-label="Student">${paperclip} <span class="cell-text">${item.studentName}</span></td>
-      <td class="cell-grade" data-label="Grade & Section">${item.gradeSection || '-'}</td>
-      <td class="cell-past" data-label="Past Offense">${item.pastOffense || 'None'}</td>
-      <td class="cell-date" data-label="Date">${item.date || '-'}</td>
-      <td class="cell-description" data-label="Description">${item.description || '—'}</td>
-      <td class="cell-type" data-label="Violation Type">${item.violationType || '-'}</td>
-      <td class="cell-sanction" data-label="Sanction">${item.sanction || '-'}</td>
-      <td class="cell-actions" data-label="Actions">
-        <div class="actions-wrap">
-          <button class="tbl-btn view" onclick="viewViolationDetails(${index})" title="View" aria-label="View details for ${item.studentName}"><i class="fa fa-eye" aria-hidden="true"></i></button>
-          <button class="tbl-btn edit" onclick="editViolation(${index})" title="Edit" aria-label="Edit violation for ${item.studentName}"><i class="fa fa-edit" aria-hidden="true"></i></button>
-          <button class="tbl-btn delete" onclick="deleteViolation(${index})" title="Delete" aria-label="Delete violation for ${item.studentName}"><i class="fa fa-trash" aria-hidden="true"></i></button>
-        </div>
+      <td>${item.studentName} ${paperclip}</td>
+      <td>${item.gradeSection || '-'}</td>
+      <td>${item.pastOffense || 'None'}</td>
+      <td>${item.incidentDate || '-'}</td>
+      <td>${item.violationType || '-'}</td>
+      <td>${item.sanction || '-'}</td>
+      <td>${item.addedDate || '-'}</td>
+      <td>
+        <button onclick="viewViolationDetails(${index})" title="View"><i class="fa fa-eye"></i></button>
+        <button onclick="editViolation(${index})" title="Edit"><i class="fa fa-edit"></i></button>
+        <button onclick="deleteViolation(${index})" title="Delete"><i class="fa fa-trash"></i></button>
       </td>
     `;
     violationTable.appendChild(row);
@@ -450,101 +288,57 @@ function renderTable() {
 /* ================= View details ================= */
 window.viewViolationDetails = function (index) {
   const item = violations[index];
-
-  if (viewStudent)      viewStudent.textContent = item.studentName || '-';
-  if (viewGradeSection) viewGradeSection.textContent = item.gradeSection || '-';
-
+  viewStudent.textContent = item.studentName || '-';
+  viewGradeSection.textContent = item.gradeSection || '-';
   const offenseText = item.pastOffense || 'None';
-  if (viewPastOffense)  viewPastOffense.textContent = offenseText;
-  if (viewPastOffenseRow) viewPastOffenseRow.classList.toggle('is-hidden', !offenseText || offenseText === 'None');
+  viewPastOffense.textContent = offenseText;
+  viewPastOffenseRow.classList.toggle('is-hidden', !offenseText || offenseText === 'None');
+  viewViolationType.textContent = item.violationType || '-';
+  viewSanction.textContent = item.sanction || '-';
+  viewDescription.textContent = item.description || "No description provided.";
+  viewIncidentDate.textContent = item.incidentDate || '-';
+  viewAddedDate.textContent = item.addedDate || '-';
 
-  if (viewViolationType) viewViolationType.textContent = item.violationType || '-';
-  if (viewSanction)     viewSanction.textContent = item.sanction || '-';
-  if (viewDescription)  viewDescription.textContent = item.description || "No description provided.";
-  if (viewDate)         viewDate.textContent = item.date || '-';
-
-  // render evidence thumbs
-  if (viewEvidenceBox && viewEvidenceWrap) {
-    viewEvidenceBox.innerHTML = "";
-    if (item.evidence && item.evidence.length) {
-      item.evidence.forEach((src, i) => {
-        const img = document.createElement("img");
-        img.src = src; img.className = "evidence-thumb"; img.alt = `Evidence ${i+1}`;
-        img.title = "Click to open";
-        img.addEventListener("click", () => window.open(src, "_blank"));
-        viewEvidenceBox.appendChild(img);
-      });
-      viewEvidenceWrap.classList.remove("is-hidden");
-    } else {
-      viewEvidenceWrap.classList.add("is-hidden");
-    }
+  viewEvidenceBox.innerHTML = "";
+  if (item.evidence && item.evidence.length) {
+    item.evidence.forEach((src, i) => {
+      const img = document.createElement("img");
+      img.src = src;
+      img.className = "evidence-thumb";
+      img.alt = `Evidence ${i+1}`;
+      img.title = "Click to enlarge";
+      img.addEventListener("click", () => openImagePreview(src));
+      viewEvidenceBox.appendChild(img);
+    });
+    viewEvidenceWrap.classList.remove("is-hidden");
+  } else {
+    viewEvidenceWrap.classList.add("is-hidden");
   }
-
   viewModal.style.display = "block";
 };
 
 /* ================= Edit violation ================= */
 window.editViolation = function (index) {
   const item = violations[index];
-
   studentNameInput.value    = item.studentName || '';
-  gradeSectionInput && (gradeSectionInput.value = item.gradeSection || '');
-  violationTypeInput && (violationTypeInput.value = item.violationType || '');
+  gradeSectionInput.value   = item.gradeSection || '';
+  violationTypeInput.value  = item.violationType || '';
   sanctionInput.value       = item.sanction || '';
   descriptionInput.value    = item.description || '';
-  dateInput.value           = item.date || '';
+  incidentDateInput.value   = item.incidentDate || '';
   editIndexInput.value      = index;
-  // set resolvedStudent using current table data (will attempt by id or name)
-  resolvedStudent = item.studentId ? studentsIndex.find(s=> s.id === item.studentId) : resolveStudent(item.studentName);
-  if(studentLookupStatus){
-    if(resolvedStudent){
-      studentLookupStatus.textContent = 'Student resolved ✔';
-      studentLookupStatus.style.color = '#2e7d32';
-    } else {
-      studentLookupStatus.textContent = 'Unresolved student (cannot save until fixed)';
-      studentLookupStatus.style.color = '#c62828';
-    }
-  }
-  if(saveBtn) saveBtn.disabled = !resolvedStudent;
-  updateRepeatDisplay();
-
-  // Update Past Offense UI for this student (and show the block)
   refreshPastOffenseUI();
-
-  // preload evidence
   window._evidence?.set(item.evidence || []);
-
   modalTitle.textContent = "Edit Violation";
-  violationModal.style.display = "block";
+  violationModal.style.display = "flex";
 };
 
 /* ================= Delete violation ================= */
-window.deleteViolation = async function (index) {
-  if (!confirm("Delete this violation?")) return;
-  // Guard against stale index or race
-  if (index < 0 || index >= violations.length) {
-    alert('Item no longer exists in current view. Refreshing...');
-    await loadViolations();
-    return;
-  }
-  const v = violations[index];
-  const id = v.id;
-  // Optimistic removal
-  const snapshot = violations.slice();
-  violations.splice(index, 1);
-  renderTable();
-  try {
-    await apiFetch(`/api/violations/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    // After successful delete, refetch to stay in sync (in case server applies ordering / filters)
-    try { await loadViolations(); } catch(_) {}
-    window.dispatchEvent(new Event('sdms:data-changed'));
-    try { localStorage.setItem('sdms_violations_dirty', String(Date.now())); } catch(_) {}
-  } catch(err) {
-    console.error('Failed to delete violation', err);
-    // Rollback optimistic UI change
-    violations = snapshot;
+window.deleteViolation = function (index) {
+  if (confirm("Are you sure you want to delete this violation?")) {
+    violations.splice(index, 1);
     renderTable();
-    alert('Failed to delete violation: ' + err.message);
+    window.dispatchEvent(new Event('sdms:data-changed'));
   }
 };
 
@@ -558,105 +352,36 @@ window.searchViolation = function () {
   });
 };
 
-/* ================= Initial load from API ================= */
-async function loadViolations() {
-  try {
-    const list = await apiFetch('/api/violations');
-    violations = Array.isArray(list) ? list.map(fromServerViolation) : [];
-  } catch (err) {
-    console.error('Failed to load violations', err);
-    violations = [];
-  }
-  renderTable();
-}
-// Load students then violations
-loadStudents().then(()=> loadViolations());
+/* ================= Image Preview Feature ================= */
+const imagePreviewModal = document.getElementById("imagePreviewModal");
+const imagePreviewFull  = document.getElementById("imagePreviewFull");
+const imagePreviewClose = document.getElementById("imagePreviewClose");
 
-// Hide Past Offense on load
+window.openImagePreview = function (src) {
+  if (!imagePreviewModal || !imagePreviewFull) return;
+  imagePreviewFull.src = src;
+  imagePreviewModal.classList.add("is-open");
+};
+
+if (imagePreviewClose) {
+  imagePreviewClose.addEventListener("click", () => {
+    imagePreviewModal.classList.remove("is-open");
+  });
+}
+
+if (imagePreviewModal) {
+  imagePreviewModal.addEventListener("click", (e) => {
+    if (e.target === imagePreviewModal) {
+      imagePreviewModal.classList.remove("is-open");
+    }
+  });
+}
+
+/* ================= Init ================= */
+renderTable();
 if (pastOffenseWrap) pastOffenseWrap.classList.add('is-hidden');
-if (pastOffenseSelect) pastOffenseSelect.value = 'None';
-if (pastOffenseStatus) pastOffenseStatus.textContent = 'No past offenses.';
+if (studentNameInput) studentNameInput.addEventListener("input", debounce(refreshPastOffenseUI, 250));
 
-// Show/refresh past offense after typing student name
-function updateResolvedStudent(){
-  const name = (studentNameInput.value || '').trim();
-  resolvedStudent = resolveStudent(name);
-  if(studentLookupStatus){
-    if(!name){
-      studentLookupStatus.textContent='';
-    } else if(resolvedStudent){
-      studentLookupStatus.textContent = 'Student found ✔';
-      studentLookupStatus.style.color = '#2e7d32';
-    } else {
-      studentLookupStatus.textContent = 'Student not found. Add them in Students page first.';
-      studentLookupStatus.style.color = '#c62828';
-    }
-  }
-  if(saveBtn) saveBtn.disabled = !resolvedStudent;
-  updateRepeatDisplay();
-}
-
-// Attempt resolve by LRN first (non-destructive). If an exact LRN match is found,
-// we populate the name field (if empty or mismatched) and auto-fill grade/section when blank.
-async function updateResolvedStudentByLRN(){
-  if(!studentLrnInput) return;
-  const lrn = (studentLrnInput.value || '').trim();
-  if(!lrn){
-    if(lrnLookupStatus){ lrnLookupStatus.textContent=''; }
-    return;
-  }
-  const s = studentLrnMap.get(lrn);
-  if(s){
-    // Set resolvedStudent and sync name field if different
-    resolvedStudent = s;
-    const displayName = buildStudentDisplay(s);
-    if(studentNameInput && (!studentNameInput.value.trim() || studentNameInput.value.trim().toLowerCase() !== displayName.toLowerCase())){
-      studentNameInput.value = displayName;
-    }
-    if(gradeSectionInput && (!gradeSectionInput.value.trim())){
-      if(s.grade && s.section){ gradeSectionInput.value = `${s.grade}-${s.section}`; }
-      else if(s.grade){ gradeSectionInput.value = s.grade; }
-    }
-    if(lrnLookupStatus){ lrnLookupStatus.textContent = 'LRN found ✔'; lrnLookupStatus.style.color = '#2e7d32'; }
-    // refresh name-based status too
-    updateResolvedStudent();
-  } else {
-    if(lrnLookupStatus){ lrnLookupStatus.textContent = 'LRN not found in loaded students.'; lrnLookupStatus.style.color = '#c62828'; }
-  }
-  if(saveBtn) saveBtn.disabled = !resolvedStudent;
-  updateRepeatDisplay();
-}
-
-async function updateRepeatDisplay(){
-  if(!repeatInfoEl){ return; }
-  const violationType = (violationTypeInput?.value || '').trim();
-  if(resolvedStudent && violationType){
-    const count = await fetchRepeatCount(resolvedStudent.id, violationType);
-    if(count === 0) {
-      repeatInfoEl.textContent = 'First recorded occurrence of this violation.';
-      repeatInfoEl.style.color = '#2e7d32';
-    } else {
-      repeatInfoEl.textContent = `Previously recorded ${count} time${count>1?'s':''}.`;
-      repeatInfoEl.style.color = '#ef6c00';
-    }
-  } else {
-    repeatInfoEl.textContent = '';
-  }
-}
-
-if (studentNameInput) {
-  studentNameInput.addEventListener("input", debounce(()=>{ refreshPastOffenseUI(); updateResolvedStudent(); }, 250));
-}
-if (violationTypeInput){
-  violationTypeInput.addEventListener('change', ()=> updateRepeatDisplay());
-  violationTypeInput.addEventListener('input', debounce(updateRepeatDisplay, 250));
-}
-if(studentLrnInput){
-  studentLrnInput.addEventListener('input', debounce(updateResolvedStudentByLRN, 250));
-  studentLrnInput.addEventListener('change', updateResolvedStudentByLRN);
-}
-
-// Allow other parts (like autocomplete) to set the student programmatically:
 document.addEventListener('studentSelected', (e) => {
   const name = e?.detail?.name || '';
   if (name && studentNameInput) {
@@ -665,7 +390,6 @@ document.addEventListener('studentSelected', (e) => {
   refreshPastOffenseUI();
 });
 
-// Logout
 document.getElementById("logoutBtn")?.addEventListener("click", () => {
   window.location.href = "index.html";
 });
