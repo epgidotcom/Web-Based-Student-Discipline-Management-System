@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
   <title>MPNAG - Student Discipline Management System</title>
 
   <!-- Global and Page-Specific CSS -->
@@ -98,7 +99,11 @@
   <script src="js/main.js" defer></script>
   <script src="js/login.js" defer></script>
   <script>
-    window.SDMS_API_BASE = 'http://localhost:3000';
+    (function(){
+      const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
+      const fallback = isLocal ? 'http://localhost:3000' : 'https://web-based-student-discipline-management.onrender.com';
+      window.SDMS_API_BASE = fallback;
+    })();
   </script>
 </body>
 </html>
