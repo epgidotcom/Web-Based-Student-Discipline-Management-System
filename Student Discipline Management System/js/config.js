@@ -1,21 +1,65 @@
 (function(){
-  // Frontend config. Default base URL points to deployed backend.
-  // For local development set: window.SDMS_API_BASE = 'http://localhost:4000'; BEFORE including this script.
-  const RAW = window.SDMS_API_BASE || 'https://web-based-student-discipline-management.onrender.com';
-  const API_BASE = String(RAW || '').replace(/\/+$/, ''); // remove trailing slashes
-
-  const hostname = (window.location && window.location.hostname) || '';
-  const protocol = (window.location && window.location.protocol) || '';
-  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const { location } = window;
+  const hostname = location?.hostname || '';
+  const protocol = location?.protocol || '';
+  const origin = location?.origin && location.origin !== 'null' ? location.origin : '';
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(hostname);
   const isFile = protocol === 'file:';
-  const devPreview = Boolean(isFile || isLocalHost);
 
-  const cfg = Object.freeze({
-    API_BASE,
-    USE_API: true,
-    DEV_PREVIEW: devPreview
-  });
-  window.SDMS_CONFIG = cfg;
-  // Provide legacy/global shortcut expected by new student integration code.
-  window.API_BASE = cfg.API_BASE + '/api';
+  const FALLBACK_REMOTE = 'https://web-based-student-discipline-management.onrender.com';
+  const FALLBACK_LOCAL = 'http://localhost:3000';
+
+  const metaBase = document.querySelector('meta[name="sdms-api-base"]')?.content;
+  const storedBase = (() => {
+    try { return localStorage.getItem('sdms:api-base') || ''; }
+    catch (_) { return ''; }
+  })();
+
+  const normalize = (value) => String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
+
+  function computeBase(raw){
+    const cleaned = normalize(raw);
+    if (cleaned) return cleaned;
+    if (isFile) return FALLBACK_LOCAL;
+  if (origin) return origin.replace(/\/+$/, '');
+    return FALLBACK_REMOTE;
+  }
+
+  function deriveConfig(raw){
+    const base = computeBase(raw) || FALLBACK_REMOTE;
+    const devPreview = Boolean(isFile || isLocalHost);
+    const cfg = Object.freeze({
+      API_BASE: base,
+      USE_API: true,
+      DEV_PREVIEW: devPreview
+    });
+    window.SDMS_CONFIG = cfg;
+  const normalizedBase = base.replace(/\/+$/, '');
+  window.API_BASE = `${normalizedBase}/api`;
+    return cfg;
+  }
+
+  const initial = window.SDMS_API_BASE || metaBase || storedBase;
+  deriveConfig(initial);
+
+  function setApiBase(next){
+    const cfg = deriveConfig(next);
+    try { localStorage.setItem('sdms:api-base', cfg.API_BASE); }
+    catch(_){}
+    return cfg;
+  }
+
+  window.SDMS = window.SDMS || {};
+  window.SDMS.setApiBase = setApiBase;
+  window.setSDMSApiBase = setApiBase; // legacy helper if scripts expect global function
+
+  if (!Object.getOwnPropertyDescriptor(window, 'SDMS_API_BASE')?.set) {
+    Object.defineProperty(window, 'SDMS_API_BASE', {
+      configurable: true,
+      get(){ return window.SDMS_CONFIG?.API_BASE; },
+      set(value){ setApiBase(value); }
+    });
+  }
 })();
