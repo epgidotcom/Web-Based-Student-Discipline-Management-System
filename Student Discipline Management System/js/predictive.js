@@ -5,10 +5,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
   const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
+  const allowSimulated = Boolean(window.SDMS_CONFIG?.DEV_PREVIEW);
 
   const defaultWeeks = ['Jul 7', 'Jul 14', 'Jul 21', 'Jul 28', 'Aug 4', 'Aug 11'];
   const defaultStrands = ['STEM', 'ABM', 'GAS', 'HUMSS', 'TVL'];
   const defaultViolations = ['Tardiness', 'Cheating', 'Dress Code', 'Disrespect'];
+
+  const chartWrap = canvas.parentElement;
+  const noteEl = document.querySelector('.chart-note');
+  const defaultNote = noteEl?.textContent?.trim() || '';
+  const emptyEl = document.createElement('div');
+  emptyEl.id = 'predictiveEmpty';
+  emptyEl.className = 'empty hidden';
+  emptyEl.textContent = 'Forecast data will appear once the analytics service is connected.';
+  if (chartWrap?.parentElement) {
+    chartWrap.parentElement.insertBefore(emptyEl, chartWrap.nextSibling);
+  }
+
+  function setEmptyState(show) {
+    if (chartWrap) chartWrap.classList.toggle('hidden', show);
+    emptyEl?.classList.toggle('hidden', !show);
+  }
+
+  function setNote(source) {
+    if (!noteEl) return;
+    if (source === 'simulated') {
+      noteEl.textContent = `${defaultNote} (using sample data for preview)`;
+    } else if (source === 'none') {
+      noteEl.textContent = 'Forecast data will appear once the analytics service is connected.';
+    } else {
+      noteEl.textContent = defaultNote;
+    }
+  }
 
   function generateSimulatedMatrix(weeks, strands, violations) {
     const out = {};
@@ -26,10 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const forecastState = {
     weeks: defaultWeeks.slice(),
-    strands: defaultStrands.slice(),
-    violations: defaultViolations.slice(),
-    matrix: generateSimulatedMatrix(defaultWeeks, defaultStrands, defaultViolations),
+    strands: [],
+    violations: [],
+    matrix: {},
   };
+  let forecastSource = 'none';
 
   function authHeaders() {
     const token = window.SDMSAuth?.getToken?.();
@@ -146,9 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         option.textContent = strand;
         strandSelect.appendChild(option);
       });
-      if (forecastState.strands.includes(previous)) {
-        strandSelect.value = previous;
-      }
+      strandSelect.value = forecastState.strands.includes(previous) ? previous : 'All';
     }
     if (violationSelect) {
       const previous = violationSelect.value;
@@ -159,9 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
         option.textContent = violation;
         violationSelect.appendChild(option);
       });
-      if (forecastState.violations.includes(previous)) {
-        violationSelect.value = previous;
-      }
+      violationSelect.value = forecastState.violations.includes(previous) ? previous : 'All';
     }
   }
 
@@ -180,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const palette = ['#1e88e5', '#43a047', '#ffb300', '#8e24aa', '#e53935', '#00acc1', '#f4511e'];
 
+    let hasSeries = false;
     const datasets = visibleStrands.map((strand, index) => {
       const values = forecastState.weeks.map((_, weekIndex) => {
         let total = 0;
@@ -189,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (Array.isArray(series) && series.length > weekIndex) {
             total += Number(series[weekIndex]) || 0;
             count += 1;
+            hasSeries = true;
           }
         });
         return count ? Math.round(total / count) : 0;
@@ -207,6 +234,21 @@ document.addEventListener('DOMContentLoaded', () => {
         pointHoverRadius: 6,
       };
     });
+
+    const hasData = hasSeries && forecastState.weeks.length && datasets.length;
+
+    if (!hasData) {
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+      setEmptyState(true);
+      setNote(forecastSource);
+      return;
+    }
+
+    setEmptyState(false);
+    setNote(forecastSource);
 
     if (chartInstance) chartInstance.destroy();
 
@@ -236,7 +278,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function init() {
-    await loadBackendForecast();
+    const backendLoaded = await loadBackendForecast();
+
+    if (backendLoaded) {
+      forecastSource = 'backend';
+    } else if (allowSimulated) {
+      forecastState.weeks = defaultWeeks.slice();
+      forecastState.strands = defaultStrands.slice();
+      forecastState.violations = defaultViolations.slice();
+      forecastState.matrix = generateSimulatedMatrix(defaultWeeks, defaultStrands, defaultViolations);
+      forecastSource = 'simulated';
+      console.info('[predictive] using sample forecast data (DEV_PREVIEW)');
+    } else {
+      forecastState.weeks = defaultWeeks.slice();
+      forecastState.strands = [];
+      forecastState.violations = [];
+      forecastState.matrix = {};
+      forecastSource = 'none';
+    }
+
     syncFilterOptions();
     updateChart();
 
