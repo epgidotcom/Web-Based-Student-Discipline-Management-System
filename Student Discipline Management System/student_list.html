@@ -97,7 +97,7 @@
     </div>
 
     <form id="studentForm">
-      <input type="hidden" id="editIndex">
+  <input type="hidden" id="editIndex" name="editIndex">
 
       <div class="photo-uploader" id="photoUploader">
         <div class="head">
@@ -120,22 +120,22 @@
       </div>
 
       <label>LRN:</label>
-      <input type="text" id="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
+  <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
 
       <label>First Name:</label>
-      <input type="text" id="firstName" required>
+  <input type="text" id="firstName" name="firstName" required>
 
       <label>Middle Name:</label>
-      <input type="text" id="middleName">
+  <input type="text" id="middleName" name="middleName">
 
       <label>Last Name:</label>
-      <input type="text" id="lastName" required>
+  <input type="text" id="lastName" name="lastName" required>
+  <label>Age:</label>
+  <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
 
-     <label>Age:</label>
-    <input type="number" id="age" placeholder="Enter age" min="0" max="120" required>
 
       <label>Grade:</label>
-      <select id="grade" required>
+  <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
         <option value="7">Grade 7</option>
         <option value="8">Grade 8</option>
@@ -146,9 +146,10 @@
       </select>
 
       <label>Section:</label>
-      <input type="text" id="section" placeholder="e.g. A" required>
+  <input type="text" id="section" name="section" placeholder="e.g. A" required>
 
-      
+      <label>Parent's Contact Number:</label>
+  <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
 
       <button type="submit" class="save-btn">Save</button>
     </form>
@@ -196,7 +197,7 @@
         </div>
         <div class="detail-row">
           <span class="label">Parent’s Contact</span>
-          <span class="value" id="viewParent"></span>    
+          <span class="value" id="viewParent"></span>
         </div>
       </div>
     </div>
@@ -244,10 +245,3 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
