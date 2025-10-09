@@ -4,6 +4,7 @@
   const protocol = location?.protocol || '';
   const origin = location?.origin && location.origin !== 'null' ? location.origin : '';
   const isLocalHost = ['localhost', '127.0.0.1'].includes(hostname);
+  const LIVE_SERVER_PORTS = new Set(['5500', '5501', '5502']);
   const isFile = protocol === 'file:';
 
   const FALLBACK_REMOTE = 'https://web-based-student-discipline-management.onrender.com';
@@ -25,7 +26,12 @@
 
     const isLocalOrigin = isLocalHost || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(origin || '');
 
-    if (isLocalOrigin && origin) return origin.replace(/\/+$/, '');
+    if (isLocalOrigin && origin) {
+      if (LIVE_SERVER_PORTS.has(location?.port)) {
+        return FALLBACK_LOCAL;
+      }
+      return origin.replace(/\/+$/, '');
+    }
     if (isFile) return FALLBACK_REMOTE;
     if (origin && !isLocalOrigin) return FALLBACK_REMOTE;
     return FALLBACK_LOCAL;

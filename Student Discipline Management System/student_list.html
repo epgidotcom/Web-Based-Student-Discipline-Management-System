@@ -21,6 +21,7 @@
   <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
   <a href="student_list.html" class="active"><i class="fa fa-users"></i> Student List</a>
   <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
   <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
   <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
 
@@ -54,7 +55,6 @@
   <div class="widget">
     <div class="widget-head">
       <h3>Student List</h3>
-
       <button id="addStudentBtn" class="add-btn">
         <i class="fa fa-plus"></i> Add Student
       </button>
@@ -74,19 +74,31 @@
             <th>Full Name</th>
             <th>Age</th>
             <th>Grade</th>
-            <th>Section</th>
+            <th>Strand</th>
             <th>Added Date</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <!-- rows injected by JS -->
           <tr>
-            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td><!-- updated colspan -->
+            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td>
           </tr>
         </tbody>
       </table>
+
+      <!-- Pagination + info bar -->
+      <div class="table-utils">
+        <div id="studentInfo" class="table-info" aria-live="polite"></div>
+        <nav id="studentPagination" class="pagination" role="navigation" aria-label="Table pagination"></nav>
+      </div>
+
+      <!-- Spinner overlay -->
+      <div class="table-loading" id="tableLoading" aria-hidden="true">
+        <div class="spinner" role="status" aria-label="Loading"></div>
+      </div>
     </div>
+  </div>
+</div>
 
 <!-- Add/Edit Student Modal -->
 <div id="studentModal" class="modal">
@@ -97,7 +109,7 @@
     </div>
 
     <form id="studentForm">
-  <input type="hidden" id="editIndex" name="editIndex">
+      <input type="hidden" id="editIndex" name="editIndex">
 
       <div class="photo-uploader" id="photoUploader">
         <div class="head">
@@ -120,36 +132,32 @@
       </div>
 
       <label>LRN:</label>
-  <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
+      <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
 
       <label>First Name:</label>
-  <input type="text" id="firstName" name="firstName" required>
+      <input type="text" id="firstName" name="firstName" required>
 
       <label>Middle Name:</label>
-  <input type="text" id="middleName" name="middleName">
+      <input type="text" id="middleName" name="middleName">
 
       <label>Last Name:</label>
-  <input type="text" id="lastName" name="lastName" required>
-  <label>Age:</label>
-  <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
+      <input type="text" id="lastName" name="lastName" required>
 
+      <label>Age:</label>
+      <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
 
       <label>Grade:</label>
-  <select id="grade" name="grade" required>
+      <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
-        <option value="7">Grade 7</option>
-        <option value="8">Grade 8</option>
-        <option value="9">Grade 9</option>
-        <option value="10">Grade 10</option>
         <option value="11">Grade 11</option>
         <option value="12">Grade 12</option>
       </select>
 
-      <label>Section:</label>
-  <input type="text" id="section" name="section" placeholder="e.g. A" required>
+      <label>Strand:</label>
+      <input type="text" id="strand" name="strand" placeholder="e.g. STEM / HUMSS / ABM" required>
 
       <label>Parent's Contact Number:</label>
-  <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number">
+      <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
 
       <button type="submit" class="save-btn">Save</button>
     </form>
@@ -184,16 +192,12 @@
           <span class="value" id="viewAge"></span>
         </div>
         <div class="detail-row">
-          <span class="label">Birthdate</span>
-          <span class="value" id="viewBirthdate"></span>
-        </div>
-        <div class="detail-row">
           <span class="label">Grade</span>
           <span class="value" id="viewGrade"></span>
         </div>
         <div class="detail-row">
-          <span class="label">Section</span>
-          <span class="value" id="viewSection"></span>
+          <span class="label">Strand</span>
+          <span class="value" id="viewStrand"></span>
         </div>
         <div class="detail-row">
           <span class="label">Parent’s Contact</span>
@@ -204,8 +208,7 @@
   </div>
 </div>
 
-
-<!-- Page scripts -->
+<!-- Scripts -->
 <script src="js/config.js" defer></script>
 <script src="js/auth.js" defer></script>
 <script src="js/main.js" defer></script>
@@ -217,32 +220,28 @@
     const fallback = isLocal ? 'http://localhost:3000' : 'https://web-based-student-discipline-management.onrender.com';
     window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
   })();
-</script>
 
-<!-- Inline page logic (self-contained) -->
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  /* ===== Drawer fallback (guarded) ===== */
-  var sidebar  = document.getElementById('sidebar');
-  var menuBtn  = document.querySelector('.menu-btn');
-  var backdrop = document.getElementById('backdrop'); // may not exist
+  // Drawer control
+  document.addEventListener('DOMContentLoaded', function () {
+    var sidebar  = document.getElementById('sidebar');
+    var menuBtn  = document.querySelector('.menu-btn');
+    var backdrop = document.getElementById('backdrop');
 
-  if (menuBtn && sidebar && !menuBtn.dataset.bound) {
-    function setOpen(open){
-      sidebar.classList.toggle('open', open);
-      if (backdrop) backdrop.classList.toggle('show', open);
-      document.body.style.overflow = open ? 'hidden' : '';
-      menuBtn.setAttribute('aria-expanded', String(open));
+    if (menuBtn && sidebar && !menuBtn.dataset.bound) {
+      function setOpen(open){
+        sidebar.classList.toggle('open', open);
+        if (backdrop) backdrop.classList.toggle('show', open);
+        document.body.style.overflow = open ? 'hidden' : '';
+        menuBtn.setAttribute('aria-expanded', String(open));
+      }
+      function toggle(){ setOpen(!sidebar.classList.contains('open')); }
+      menuBtn.addEventListener('click', toggle);
+      if (backdrop) backdrop.addEventListener('click', function(){ setOpen(false); });
+      window.addEventListener('keydown', function(e){ if(e.key === 'Escape') setOpen(false); });
+      window.addEventListener('resize', function(){ if (window.innerWidth >= 769) setOpen(false); });
+      menuBtn.dataset.bound = '1';
     }
-    function toggle(){ setOpen(!sidebar.classList.contains('open')); }
-    menuBtn.addEventListener('click', toggle);
-    if (backdrop) backdrop.addEventListener('click', function(){ setOpen(false); });
-    window.addEventListener('keydown', function(e){ if(e.key === 'Escape') setOpen(false); });
-    window.addEventListener('resize', function(){ if (window.innerWidth >= 769) setOpen(false); });
-    menuBtn.dataset.bound = '1';
-  }
-});
+  });
 </script>
 </body>
 </html>
-

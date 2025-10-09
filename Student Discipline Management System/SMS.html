@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sanction Notice — Parent SMS (One-Way)</title>
+  <title>Internal Messaging — Student Inbox</title>
 
   <!-- Global + Page CSS -->
   <link rel="stylesheet" href="css/style.css">
@@ -18,6 +18,7 @@
     <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
     <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
     <a href="SMS.html" class="active"><i class="fa fa-message"></i> Message</a>
     <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
     <div class="sidebar-footer">
@@ -48,149 +49,139 @@
     </div>
   </div>
 
-    <section class="widget">
+    <section class="widget messaging-widget">
       <div class="sms-header">
-        <h3>Sanction Notice — Parent SMS (One-Way)</h3>
+        <h2>Internal Messaging</h2>
         <button class="btn-icon" id="returnBtn" title="Back to Dashboard" type="button">
           <i class="fa fa-arrow-left"></i>
         </button>
       </div>
 
-      <p class="sms-subtext">Use this module to text parents when a student receives a sanction. Replies are not monitored.</p>
+      <p class="sms-subtext">Compose direct messages to students. Messages stay inside the system—no SMS delivery.</p>
 
-      <div class="sms-container">
-        <!-- ================== Form ================== -->
-        <div class="sms-form">
+      <div class="messaging-layout">
+        <aside class="recipient-panel">
+          <div class="panel-block">
+            <label for="studentSearch">Search student</label>
+            <input id="studentSearch" type="search" placeholder="Search by name or username" autocomplete="off" />
+          </div>
 
-          <form id="formPanel" autocomplete="off" novalidate>
-            <div class="form-grid">
-              <div>
-                <label for="phone">Parent's Phone Number:</label>
-                <input
-                  id="phone"
-                  type="tel"
-                  inputmode="numeric"
-                  maxlength="11"
-                  pattern="\d{11}"
-                  placeholder="e.g., 09171234567"
-                  required
-                />
-                <small class="help">11 digits, numbers only.</small>
-              </div>
+          <div class="panel-block">
+            <label for="studentSelect">Students</label>
+            <select id="studentSelect" size="10" aria-label="Select student"></select>
+          </div>
 
-              <div>
-                <label for="student">Student Name:</label>
-                <input id="student" type="text" placeholder="e.g., Juan Dela Cruz" required />
-              </div>
+          <div class="panel-block recipient-summary" id="recipientSummary"></div>
 
-              <div>
-                <label for="grade">Grade &amp; Section:</label>
-                <select id="grade" required>
-                  <option value="">— Select Grade &amp; Section —</option>
-                  <option>Grade 7 - Section A</option>
-                  <option>Grade 8 - Section B</option>
-                  <option>Grade 9 - Section C</option>
-                  <option>Grade 10 - Section D</option>
-                  <option>Grade 11 - ABM</option>
-                  <option>Grade 12 - AB2</option>
-                </select>
-              </div>
+          <button class="btn outline" id="refreshStudents" type="button">
+            <i class="fa fa-rotate"></i> Refresh list
+          </button>
+        </aside>
 
-              <div>
-                <label for="violation">Violation / Incident:</label>
-                <select id="violation" required>
-                  <option value="">— Select Violation —</option>
-                  <option>Bullying</option>
-                  <option>Cheating</option>
-                  <option>Improper Uniform</option>
-                  <option>Tardiness</option>
-                  <option>Others</option>
-                </select>
-              </div>
+        <div class="conversation-panel">
+          <div class="conversation-placeholder" id="conversationPlaceholder">
+            <i class="fa fa-comments"></i>
+            <p>Select a student to review and send messages.</p>
+          </div>
 
-              <div>
-                <label for="sanction">Sanction:</label>
-                <select id="sanction" required>
-                  <option value="">— Select Sanction —</option>
-                  <option>Warning</option>
-                  <option>Written Reprimand</option>
-                  <option>Extra Homework</option>
-                  <option>Suspension</option>
-                  <option>Expulsion</option>
-                </select>
-              </div>
+          <div class="conversation-header" id="conversationHeader" hidden>
+            <div>
+              <h3 id="conversationTitle">Student Messages</h3>
+              <p id="conversationSubtitle" class="hint"></p>
+            </div>
+            <button class="btn outline" id="reloadMessages" type="button">
+              <i class="fa fa-rotate"></i> Reload
+            </button>
+          </div>
 
-              <div>
-                <label for="date">Date of Incident:</label>
-                <input id="date" type="date" required />
-              </div>
+          <div class="conversation-history" id="messageHistory"></div>
 
-              <div>
-                <label for="teacher">Teacher-in-Charge:</label>
-                <input id="teacher" type="text" placeholder="e.g., Ms. Santos" required />
-              </div>
+          <form id="messageForm" class="message-form" autocomplete="off">
+            <div class="form-field">
+              <label for="subjectInput">Subject <span class="hint">(optional)</span></label>
+              <input id="subjectInput" type="text" placeholder="Subject line" maxlength="120" />
+            </div>
 
-              <div>
-                <label for="template">Violation Type:</label>
-                <select id="template">
-                  <option value="">— Select Type —</option>
-                  <option value="warning">Warning Notice</option>
-                  <option value="minor">Minor Offense Notice</option>
-                  <option value="major">Major Offense Notice</option>
-                  <option value="suspension">Suspension Notice</option>
-                </select>
-              </div>
+            <div class="form-field">
+              <label for="messageInput">Message</label>
+              <textarea id="messageInput" rows="4" placeholder="Type your message to the student..." required></textarea>
+            </div>
 
-              <div class="full">
-                <div class="button-row">
-                  <button class="btn secondary" id="genBtn" type="button">
-                    <i class="fa fa-magic"></i> Generate Message
-                  </button>
-                  <button class="btn danger" id="resetBtn" type="button">
-                    <i class="fa fa-times-circle"></i> Reset
-                  </button>
-                </div>
-              </div>
-
-              <div class="full">
-                <label for="message">Message:</label>
-                <textarea id="message" rows="6" placeholder="Auto-generated or type custom…"></textarea>
-
-                <!-- live counter (JS updates this) -->
-                <div id="counter" class="sms-counter" aria-live="polite">
-                  0 characters • 0 SMS segments (160 chars per SMS)
-                </div>
-
-                <div class="button-row">
-                  <button class="btn primary" id="sendBtn" type="button">
-                    <i class="fa fa-paper-plane"></i> Send Sanction SMS
-                  </button>
-                  <button class="btn outline" id="previewBtn" type="button">
-                    <i class="fa fa-eye"></i> Preview Only
-                  </button>
-                </div>
-
-                <div class="meta-info">
-                  <div class="help">
-                    POST to <code>/api/sms/sanctions/send</code> with JSON payload (see console log on send).
-                  </div>
-                </div>
-              </div>
+            <div class="form-actions">
+              <span class="hint" id="messageStatus"></span>
+              <button class="btn primary" id="sendBtn" type="submit">
+                <i class="fa fa-paper-plane"></i> Send Message
+              </button>
             </div>
           </form>
         </div>
-        <!-- ================== /Form ================== -->
+      </div>
+    </section>
 
-        <!-- ================== Preview ================== -->
-        <aside class="sms-preview">
-          <div class="chat-header">SMS — School Discipline</div>
-          <div class="sms-bubble" id="chat">
-            Hello Parent/Guardian, you will receive important discipline updates here. Replies are not monitored.
-            <br>
-            <small id="welcomeClock">Today – 04:04 PM</small>
+    <section class="widget sms-sandbox" id="parentSmsWidget">
+      <div class="sms-header">
+        <h2>Sanction Notice — Parent SMS (One-Way)</h2>
+        <button class="btn-icon" id="backToMessaging" type="button" title="Scroll to top">
+          <i class="fa fa-arrow-up"></i>
+        </button>
+      </div>
+      <p class="sms-subtext">Use this module to text parents when a student receives a sanction. Replies are not monitored.</p>
+
+      <form class="sms-form" id="parentSmsForm" novalidate>
+        <div class="sms-grid">
+          <div class="form-field">
+            <label for="smsPhone">Parent's Phone Number <span class="hint">11 digits</span></label>
+            <input type="tel" id="smsPhone" name="phone" placeholder="e.g., 09171234567" maxlength="11" required />
           </div>
-        </aside>
-      </div> 
+          <div class="form-field">
+            <label for="smsStudent">Student Name</label>
+            <input type="text" id="smsStudent" name="studentName" placeholder="e.g., Juan Dela Cruz" />
+          </div>
+          <div class="form-field">
+            <label for="smsGrade">Grade &amp; Strand</label>
+            <input type="text" id="smsGrade" name="gradeSection" placeholder="e.g., Grade 11 - STEM" />
+          </div>
+          <div class="form-field">
+            <label for="smsViolation">Violation / Incident</label>
+            <input type="text" id="smsViolation" name="violation" placeholder="Select or type violation" />
+          </div>
+          <div class="form-field">
+            <label for="smsDate">Date of Incident</label>
+            <input type="date" id="smsDate" name="incidentDate" />
+          </div>
+          <div class="form-field">
+            <label for="smsType">Violation Type</label>
+            <input type="text" id="smsType" name="violationType" placeholder="e.g., Major Offense" />
+          </div>
+          <div class="form-field">
+            <label for="smsSanction">Sanction</label>
+            <input type="text" id="smsSanction" name="sanction" placeholder="Select sanction" />
+          </div>
+          <div class="form-field">
+            <label for="smsTeacher">Teacher-in-Charge</label>
+            <input type="text" id="smsTeacher" name="teacher" placeholder="e.g., Ms. Santos" />
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="smsMessage">Message</label>
+          <textarea id="smsMessage" name="message" rows="4" placeholder="Auto-generated or type custom..." required></textarea>
+          <div class="hint" id="smsCharCount">0 characters · 0 SMS segments (160 chars per SMS)</div>
+        </div>
+
+        <div class="sms-actions">
+          <div class="left-group">
+            <button class="btn outline" id="smsGenerate" type="button"><i class="fa fa-magic"></i> Generate Message</button>
+            <button class="btn danger" id="smsReset" type="button"><i class="fa fa-rotate-left"></i> Reset</button>
+          </div>
+          <div class="right-group">
+            <button class="btn outline" id="smsPreview" type="button"><i class="fa fa-eye"></i> Preview Only</button>
+            <button class="btn primary" id="smsSend" type="submit"><i class="fa fa-paper-plane"></i> Send Sanction SMS</button>
+          </div>
+        </div>
+        <p class="hint">POST to <code>/api/sms/sanctions/send</code> with JSON payload (see console log on send).</p>
+        <p class="sms-status" id="smsStatus"></p>
+      </form>
     </section>
   </div>
 

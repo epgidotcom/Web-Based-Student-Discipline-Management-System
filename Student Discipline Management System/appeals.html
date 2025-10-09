@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
+  <title>SDMS - Appeals</title>
+
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/appeals.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar" aria-hidden="true">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo" class="sidebar-logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="appeals.html" class="active"><i class="fa fa-file-circle-question"></i> Appeals</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+  <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
+  </div>
+</nav>
+
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">?</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-head">
+      <h3>Appeals</h3>
+    </div>
+
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search appeals..." />
+      <button type="button" id="searchButton"><i class="fa fa-search"></i><span> Search</span></button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="appealsTable">
+        <thead>
+          <tr>
+            <th>LRN</th>
+            <th>Date Submitted</th>
+            <th>Student Name</th>
+            <th>Section</th>
+            <th>Violation</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-placeholder="empty">
+            <td colspan="8">No appeals found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="appealModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="appealModalTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="appealModalTitle">Appeal Details</h2>
+      <span class="close-btn" id="appealModalClose" aria-label="Close">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="detail-row">
+        <span class="label">Student Name</span>
+        <span class="value" id="modalStudentName"></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">LRN</span>
+        <span class="value" id="modalLRN"></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Section</span>
+        <span class="value" id="modalSection"></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Violation</span>
+        <span class="value" id="modalViolation"></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Reason</span>
+        <span class="value" id="modalReason"></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Status</span>
+        <span class="value" id="modalStatus"></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Submitted</span>
+        <span class="value" id="modalSubmitted"></span>
+      </div>
+      <div class="detail-row" id="decisionRow" style="display:none;">
+        <span class="label">Decision Notes</span>
+        <span class="value" id="modalDecision"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn neutral" id="modalBackToPending"><i class="fa fa-rotate-left"></i> Mark Pending</button>
+      <button type="button" class="btn primary" id="modalApprove"><i class="fa fa-check"></i> Approve</button>
+      <button type="button" class="btn danger" id="modalReject"><i class="fa fa-times"></i> Reject</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js" defer></script>
+<script src="js/auth.js" defer></script>
+<script src="js/main.js" defer></script>
+<script src="js/appeals.js" defer></script>
+
+</body>
+</html>

@@ -15,83 +15,69 @@
   <aside class="sidebar">
     <img src="../images/mpnag_logo.png" alt="School Logo" class="logo"/>
     <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
-    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
-    <a href="messages.html" class="active"><i class="fa fa-envelope"></i> Messages</a>
+  <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+  <a href="messages.html" class="active"><i class="fa fa-envelope"></i> Messages</a>
     <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
   <div class="backdrop" id="sidebarBackdrop"></div>
   <main class="main">
     <header class="topbar">
       <div class="title">
-        <h1>Messages & Announcements</h1>
-        <span class="subtitle">Guidance / School Notices and Direct Messages</span>
+        <h1>Messages</h1>
+        <span class="subtitle">View and reply to guidance notifications</span>
+      </div>
+      <div class="profile" id="studentProfile">
+        <div class="name-grade">
+          <strong id="studentName">Student</strong>
+          <small id="studentSection"></small>
+        </div>
+        <img id="studentAvatar" src="images/mpnag_logo.png" alt="Student avatar" class="avatar" />
       </div>
     </header>
 
-    <section class="panel">
-      <div class="panel-header"><h3>Announcements</h3></div>
-      <ul class="notices" id="noticeList"></ul>
-    </section>
-
-    <section class="panel">
-      <div class="panel-header"><h3>Send a Message to Guidance</h3></div>
-      <form id="messageForm" class="msg-compose">
-        <textarea id="messageBody" placeholder="Write your question or concern..." required></textarea>
+    <section class="panel conversation" id="messagesPanel">
+      <div class="panel-header">
         <div>
-          <button type="submit" class="btn primary"><i class="fa fa-paper-plane"></i> Send</button>
+          <h3>Guidance Inbox</h3>
+          <span class="hint" id="inboxHint">Messages will appear here once sent by the guidance team.</span>
+        </div>
+        <button class="btn" type="button" id="reloadMessages">
+          <i class="fa fa-rotate"></i> Refresh
+        </button>
+      </div>
+      <div class="message-list" id="messageList">
+        <p class="hint">Loading messages…</p>
+      </div>
+      <form class="conversation-form" id="messageForm" novalidate>
+        <div class="field">
+          <label for="messageSubject">Subject <span class="hint">(optional)</span></label>
+          <input type="text" id="messageSubject" placeholder="Enter a short subject" />
+        </div>
+        <div class="field">
+          <label for="messageBody">Message</label>
+          <textarea id="messageBody" rows="3" placeholder="Type your reply here" required></textarea>
+        </div>
+        <div class="actions">
+          <span class="message-status" id="messageStatus"></span>
+          <button class="btn primary" type="submit" id="sendMessageBtn">
+            <i class="fa fa-paper-plane"></i> Send Message
+          </button>
         </div>
       </form>
-      <p class="hint" id="messageStatus" style="display:none"></p>
+    </section>
+
+    <section class="panel" id="announcementsPanel">
+      <div class="panel-header">
+        <h3>Announcements</h3>
+        <span class="hint">Administrative notices and reminders</span>
+      </div>
+      <ul class="notices" id="noticeList">
+        <li class="notice">Loading announcements…</li>
+      </ul>
     </section>
   </main>
-
-  <script type="module">
-    import { api, getStudentId } from './js/api.js';
-
-    async function loadAnnouncements(){
-      const list = document.getElementById('noticeList');
-      list.innerHTML = '<li class="notice">Loading...</li>';
-      try {
-        const data = await api('/sms/announcements');
-        const rows = Array.isArray(data) ? data : (data.rows||[]);
-        if(!rows.length){
-          list.innerHTML = '<li class="notice">No announcements at this time.</li>';
-          return;
-        }
-        list.innerHTML = '';
-        rows.forEach(n => {
-          const li = document.createElement('li');
-          li.className = 'notice';
-          li.innerHTML = `<strong>${n.title || 'Announcement'}</strong><span>${n.message || n.body || ''}</span><small>${(n.created_at||'').slice(0,10)}</small>`;
-          list.appendChild(li);
-        });
-      } catch(err){
-        console.error(err);
-        list.innerHTML = '<li class="notice" style="color:#e74c3c;">Failed to load announcements.</li>';
-      }
-    }
-
-    document.getElementById('messageForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const body = document.getElementById('messageBody').value.trim();
-      if(!body) return;
-      const status = document.getElementById('messageStatus');
-      status.style.display='block';
-      status.textContent='Sending...';
-      try {
-        const studentId = getStudentId();
-  await api('/sms/send', { method:'POST', body: { message: body, studentId } });
-        status.textContent='Message sent successfully.';
-        e.target.reset();
-      } catch(err){
-        console.error(err);
-        status.textContent='Failed to send message.';
-      }
-      setTimeout(()=>{status.style.display='none';},4000);
-    });
-
-    loadAnnouncements();
-  </script>
+  <script type="module" src="js/messages.js"></script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>

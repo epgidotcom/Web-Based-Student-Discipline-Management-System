@@ -112,43 +112,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  function generateFallbackData() {
-    const fallbackStudents = [];
-    const fallbackViolations = [];
-    const sections = ['Alpha', 'Bravo', 'Charlie', 'Delta'];
-    for (let i = 0; i < 18; i++) {
-      const grade = 7 + (i % 6);
-      const section = sections[i % sections.length];
-      fallbackStudents.push({
-        id: i + 1,
-        firstName: `Student ${i + 1}`,
-        middleName: '',
-        lastName: 'Sample',
-        grade,
-        section,
-      });
-    }
-    const types = ['Tardiness', 'Dress Code', 'Disrespect', 'Cheating'];
-    const today = new Date();
-    for (let i = 0; i < 48; i++) {
-      const student = fallbackStudents[Math.floor(Math.random() * fallbackStudents.length)];
-      const d = new Date(today);
-      d.setDate(today.getDate() - Math.floor(Math.random() * 80));
-      fallbackViolations.push({
-        id: i + 1,
-        studentId: student.id,
-        studentName: buildStudentName(student) || student.firstName,
-        type: types[Math.floor(Math.random() * types.length)],
-        status: Math.random() < 0.7 ? 'Resolved' : 'Pending',
-        date: d.toISOString().slice(0, 10),
-        grade: student.grade,
-        section: student.section,
-        createdAt: d.toISOString(),
-      });
-    }
-    return { students: fallbackStudents, violations: fallbackViolations };
-  }
-
   async function hydrateData() {
     try {
       const [studentsRes, violationsRes, statsRes] = await Promise.all([
@@ -166,26 +129,22 @@ document.addEventListener("DOMContentLoaded", () => {
         }),
       ]);
 
-      if (Array.isArray(studentsRes) && studentsRes.length) {
+      if (Array.isArray(studentsRes)) {
         students = studentsRes.map(normalizeStudent);
+      } else {
+        students = [];
       }
-      if (Array.isArray(violationsRes) && violationsRes.length) {
+      if (Array.isArray(violationsRes)) {
         const studentIndex = new Map(students.map((s) => [s.id, s]));
         violations = violationsRes.map((row) => normalizeViolation(row, studentIndex));
+      } else {
+        violations = [];
       }
       if (statsRes && !statsRes.error) {
         violationStats = statsRes;
       }
     } catch (err) {
       console.error('[dashboard] hydrate failed', err);
-    }
-
-    const allowFallback = Boolean(window.SDMS_CONFIG?.DEV_PREVIEW);
-    if (allowFallback && (!students.length || !violations.length)) {
-      console.info('[dashboard] using fallback data (DEV_PREVIEW)');
-      const fallback = generateFallbackData();
-      if (!students.length) students = fallback.students;
-      if (!violations.length) violations = fallback.violations;
     }
   }
 

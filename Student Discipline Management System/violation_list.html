@@ -29,6 +29,7 @@
   <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
   <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
   <a href="violation_list.html" class="active"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
   <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
   <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
   <div class="sidebar-footer">
@@ -83,6 +84,15 @@
         </thead>
         <tbody></tbody>
       </table>
+
+      <div class="table-utils">
+        <div id="violationInfo" class="table-info" aria-live="polite"></div>
+        <nav id="violationPagination" class="pagination" role="navigation" aria-label="Violation table pagination"></nav>
+      </div>
+
+      <div class="table-loading" id="violationLoading" aria-hidden="true">
+        <div class="spinner" role="status" aria-label="Loading"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -237,4 +247,3 @@
 </script>
 </body>
 </html>
-
