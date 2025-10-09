@@ -25,6 +25,25 @@ router.get('/', requireAuth, requireAdmin, async (_req, res) => {
   }
 });
 
+router.get('/students', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT id,
+              full_name AS "fullName",
+              username,
+              grade,
+              created_at AS "createdAt"
+         FROM accounts
+        WHERE role = 'Student'
+        ORDER BY full_name ASC`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch student accounts' });
+  }
+});
+
 // Create account. If there are zero accounts, allow bootstrap without auth.
 router.post('/', async (req, res) => {
   try {

@@ -131,13 +131,76 @@ FROM violations
 WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
 GROUP BY student_id, offense_type;
 
--- SMS logs
+-- Appeals feature (status enum + table)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'appeal_status_type') THEN
+    CREATE TYPE appeal_status_type AS ENUM ('Pending','Approved','Rejected');
+  END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS appeals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+  violation_id UUID REFERENCES violations(id) ON DELETE SET NULL,
+  lrn TEXT,
+  student_name TEXT NOT NULL,
+  section TEXT,
+  violation_title TEXT,
+  reason TEXT NOT NULL,
+  status appeal_status_type DEFAULT 'Pending',
+  decision_notes TEXT,
+  decided_by UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  decided_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_appeals_account ON appeals(account_id);
+CREATE INDEX IF NOT EXISTS idx_appeals_student ON appeals(student_id);
+CREATE INDEX IF NOT EXISTS idx_appeals_status ON appeals(status);
+
+CREATE TABLE IF NOT EXISTS appeal_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  appeal_id UUID NOT NULL REFERENCES appeals(id) ON DELETE CASCADE,
+  sender_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  sender_role TEXT NOT NULL CHECK (sender_role IN ('Admin','Teacher','Student')),
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_appeal_messages_appeal ON appeal_messages(appeal_id);
+CREATE INDEX IF NOT EXISTS idx_appeal_messages_created ON appeal_messages(created_at);
+
 CREATE TABLE IF NOT EXISTS sms_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone TEXT NOT NULL,
   message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS sms_announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT,
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_sms_announcements_created ON sms_announcements(created_at DESC);
+
+-- Internal student messaging (admin <-> student)
+CREATE TYPE IF NOT EXISTS student_message_sender_role AS ENUM ('Admin','Teacher','Student');
+
+CREATE TABLE IF NOT EXISTS student_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  sender_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  sender_role student_message_sender_role NOT NULL,
+  subject TEXT,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_student_messages_student ON student_messages(student_account_id);
+CREATE INDEX IF NOT EXISTS idx_student_messages_created ON student_messages(created_at DESC);
 
 -- Students (idempotent evolution)
 CREATE TABLE IF NOT EXISTS students (

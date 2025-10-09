@@ -8,6 +8,8 @@ import smsRoute from './routes/sms.js';
 import studentsRoute from './routes/students.js';
 import violationsRoute from './routes/violations.js';
 import authRoute from './routes/auth.js';
+import appealsRoute from './routes/appeals.js';
+import messagesRoute from './routes/messages.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +56,8 @@ app.use('/api/past-offenses', offensesRoute);
 app.use('/api/sms', smsRoute);
 app.use('/api/students', studentsRoute);
 app.use('/api/violations', violationsRoute);
+app.use('/api/appeals', appealsRoute);
+app.use('/api/messages', messagesRoute);
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
