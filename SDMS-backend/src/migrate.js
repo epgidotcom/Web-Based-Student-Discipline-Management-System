@@ -184,7 +184,16 @@ CREATE TABLE IF NOT EXISTS sms_announcements (
   message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_sms_announcements_created ON sms_announcements(created_at DESC);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+     WHERE schemaname = current_schema()
+       AND indexname = 'idx_sms_announcements_created'
+  ) THEN
+    EXECUTE 'CREATE INDEX idx_sms_announcements_created ON sms_announcements (created_at DESC)';
+  END IF;
+END$$;
 
 -- Internal student messaging (admin <-> student)
 CREATE TYPE IF NOT EXISTS student_message_sender_role AS ENUM ('Admin','Teacher','Student');
