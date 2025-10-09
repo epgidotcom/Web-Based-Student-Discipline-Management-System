@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS students (
   middle_name TEXT,
   last_name TEXT NOT NULL,
   birthdate DATE,
+  age INTEGER,
   address TEXT,
   grade TEXT,
   section TEXT,
@@ -160,6 +161,7 @@ ALTER TABLE students ADD COLUMN IF NOT EXISTS first_name TEXT;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS middle_name TEXT;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS last_name TEXT;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS birthdate DATE;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS age INTEGER;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS grade TEXT;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_contact TEXT;
