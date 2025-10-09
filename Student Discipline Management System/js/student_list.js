@@ -25,6 +25,7 @@
   const viewInitials = document.getElementById('viewInitials');
 
   const birthdateInput = document.getElementById('birthdate');
+  const ageInput = document.getElementById('age');
   if (birthdateInput) {
     birthdateInput.max = new Date().toISOString().slice(0, 10);
   }
@@ -146,6 +147,11 @@
       middleName: row.middle_name || '',
       lastName: row.last_name || '',
       birthdate: row.birthdate ? String(row.birthdate).slice(0,10) : '',
+      age: (() => {
+        if (row.age == null) return null;
+        const parsed = Number(row.age);
+        return Number.isNaN(parsed) ? null : parsed;
+      })(),
       grade: row.grade || '',
       section: row.section || '',
       parentContact: row.parent_contact || '',
@@ -170,7 +176,7 @@
     students.forEach((s, i) => {
       const row = document.createElement('tr');
       const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
-      const age = computeAge(s.birthdate);
+      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
       const avatar = photo
         ? `<img class="avatar" src="${photo}" alt="${fullName}">`
@@ -184,7 +190,7 @@
             <span class="student-name">${fullName}</span>
           </div>
         </td>
-        <td>${age !== '' ? `${age}` : ''}</td>
+        <td>${age !== '' && age != null ? `${age}` : ''}</td>
         <td>${s.grade || ''}</td>
         <td>${s.section || ''}</td>
         <td>${formatDate(s.createdAt)}</td>
@@ -219,6 +225,7 @@
   function openCreateModal(){
     studentForm?.reset();
     if (birthdateInput) birthdateInput.value = '';
+    if (ageInput) ageInput.value = '';
     editIndex.value = '';
     modalTitle.textContent = 'Add Student';
     resetUploader();
@@ -228,11 +235,11 @@
   function openView(index){
     const s = students[index];
     const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
-    const age = computeAge(s.birthdate);
+    const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
 
     viewLRN.textContent = s.lrn;
     viewName.textContent = fullName;
-    viewAge.textContent = age !== '' ? `${age} yrs` : '—';
+    viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
     viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
     viewGrade.textContent = s.grade || '—';
     viewSection.textContent = s.section || '—';
@@ -262,6 +269,10 @@
     document.getElementById('section').value = s.section;
     document.getElementById('parentContact').value = s.parentContact;
     if (birthdateInput) birthdateInput.value = s.birthdate || '';
+    if (ageInput) {
+      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
+      ageInput.value = age !== '' && age != null ? age : '';
+    }
     editIndex.value = index;
     modalTitle.textContent = 'Edit Student';
 
@@ -290,6 +301,13 @@
       middle_name: document.getElementById('middleName').value.trim() || null,
       last_name: document.getElementById('lastName').value.trim(),
       birthdate: birthdateInput?.value || null,
+      age: (() => {
+        if (!ageInput) return null;
+        const value = ageInput.value.trim();
+        if (value === '') return null;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      })(),
       grade: document.getElementById('grade').value || null,
       section: document.getElementById('section').value.trim() || null,
       parent_contact: document.getElementById('parentContact').value.trim() || null
@@ -319,6 +337,7 @@
       renderTable();
       studentModal.style.display = 'none';
       resetUploader();
+      if (ageInput) ageInput.value = '';
     } catch (err) {
       console.error('[students] save failed', err);
       alert(err.message || 'Failed to save student.');
