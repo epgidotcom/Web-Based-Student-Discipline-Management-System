@@ -293,13 +293,27 @@
   async function persistStudent(event){
     event.preventDefault();
 
+    const lrnField = document.getElementById('lrn');
+    const firstNameField = document.getElementById('firstName');
+    const middleNameField = document.getElementById('middleName');
+    const lastNameField = document.getElementById('lastName');
+    const gradeField = document.getElementById('grade');
+    const sectionField = document.getElementById('section');
+    const parentContactField = document.getElementById('parentContact');
+
+    if (!lrnField || !firstNameField || !lastNameField || !gradeField || !sectionField || !parentContactField) {
+      console.error('[students] Form fields missing', { lrnField, firstNameField, lastNameField, gradeField, sectionField, parentContactField });
+      alert('Student form is missing required fields. Please refresh the page and try again.');
+      return;
+    }
+
     const idx = editIndex.value === '' ? null : Number(editIndex.value);
     const existing = idx !== null ? students[idx] : null;
     const payload = {
-      lrn: document.getElementById('lrn').value.trim(),
-      first_name: document.getElementById('firstName').value.trim(),
-      middle_name: document.getElementById('middleName').value.trim() || null,
-      last_name: document.getElementById('lastName').value.trim(),
+      lrn: lrnField.value.trim() || null,
+      first_name: firstNameField.value.trim(),
+      middle_name: middleNameField?.value.trim() || null,
+      last_name: lastNameField.value.trim(),
       birthdate: birthdateInput?.value || null,
       age: (() => {
         if (!ageInput) return null;
@@ -308,9 +322,9 @@
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : null;
       })(),
-      grade: document.getElementById('grade').value || null,
-      section: document.getElementById('section').value.trim() || null,
-      parent_contact: document.getElementById('parentContact').value.trim() || null
+      grade: gradeField.value || null,
+      section: sectionField.value.trim() || null,
+      parent_contact: parentContactField.value.trim() || null
     };
 
     try {
