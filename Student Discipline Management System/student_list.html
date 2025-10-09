@@ -145,8 +145,7 @@
       <label>Section:</label>
       <input type="text" id="section" placeholder="e.g. A" required>
 
-      <label>Parent's Contact Number:</label>
-      <input type="text" id="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
+      
 
       <button type="submit" class="save-btn">Save</button>
     </form>
@@ -192,7 +191,9 @@
           <span class="label">Section</span>
           <span class="value" id="viewSection"></span>
         </div>
-        
+        <div class="detail-row">
+          <span class="label">Parent’s Contact</span>
+          <span class="value" id="viewParent"></span>    
         </div>
       </div>
     </div>
@@ -240,6 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 </body>
 </html>
+
 
 
 
