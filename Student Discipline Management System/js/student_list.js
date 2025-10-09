@@ -24,11 +24,7 @@
   const viewAvatar = document.getElementById('viewAvatar');
   const viewInitials = document.getElementById('viewInitials');
 
-  const birthdateInput = document.getElementById('birthdate');
   const ageInput = document.getElementById('age');
-  if (birthdateInput) {
-    birthdateInput.max = new Date().toISOString().slice(0, 10);
-  }
 
   /* =================== Photo storage (front-end) =================== */
   const StudentPhotos = {
@@ -224,7 +220,6 @@
 
   function openCreateModal(){
     studentForm?.reset();
-    if (birthdateInput) birthdateInput.value = '';
     if (ageInput) ageInput.value = '';
     editIndex.value = '';
     modalTitle.textContent = 'Add Student';
@@ -268,7 +263,6 @@
     document.getElementById('grade').value = s.grade;
     document.getElementById('section').value = s.section;
     document.getElementById('parentContact').value = s.parentContact;
-    if (birthdateInput) birthdateInput.value = s.birthdate || '';
     if (ageInput) {
       const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       ageInput.value = age !== '' && age != null ? age : '';
@@ -293,6 +287,10 @@
   async function persistStudent(event){
     event.preventDefault();
 
+    if (studentForm && !studentForm.reportValidity()) {
+      return;
+    }
+
     const lrnField = document.getElementById('lrn');
     const firstNameField = document.getElementById('firstName');
     const middleNameField = document.getElementById('middleName');
@@ -301,20 +299,25 @@
     const sectionField = document.getElementById('section');
     const parentContactField = document.getElementById('parentContact');
 
-    if (!lrnField || !firstNameField || !lastNameField || !gradeField || !sectionField || !parentContactField) {
-      console.error('[students] Form fields missing', { lrnField, firstNameField, lastNameField, gradeField, sectionField, parentContactField });
-      alert('Student form is missing required fields. Please refresh the page and try again.');
-      return;
+    const missingControls = [
+      ['lrn', lrnField],
+      ['firstName', firstNameField],
+      ['lastName', lastNameField],
+      ['grade', gradeField],
+      ['section', sectionField],
+      ['parentContact', parentContactField]
+    ].filter(([, el]) => !el);
+    if (missingControls.length) {
+      console.warn('[students] Missing form controls:', missingControls.map(([id]) => `#${id}`).join(', '));
     }
 
     const idx = editIndex.value === '' ? null : Number(editIndex.value);
     const existing = idx !== null ? students[idx] : null;
     const payload = {
-      lrn: lrnField.value.trim() || null,
-      first_name: firstNameField.value.trim(),
-      middle_name: middleNameField?.value.trim() || null,
-      last_name: lastNameField.value.trim(),
-      birthdate: birthdateInput?.value || null,
+      lrn: lrnField?.value?.trim() || null,
+      first_name: firstNameField?.value?.trim() || '',
+      middle_name: middleNameField?.value?.trim() || null,
+      last_name: lastNameField?.value?.trim() || '',
       age: (() => {
         if (!ageInput) return null;
         const value = ageInput.value.trim();
@@ -322,9 +325,9 @@
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : null;
       })(),
-      grade: gradeField.value || null,
-      section: sectionField.value.trim() || null,
-      parent_contact: parentContactField.value.trim() || null
+      grade: gradeField?.value || null,
+      section: sectionField?.value?.trim() || null,
+      parent_contact: parentContactField?.value?.trim() || null
     };
 
     try {
