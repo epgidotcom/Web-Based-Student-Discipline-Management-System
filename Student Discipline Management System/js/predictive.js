@@ -1,3 +1,4 @@
+<script>
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('chartPredictive');
   if (!canvas) return;
@@ -9,7 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const defaultWeeks = ['Jul 7', 'Jul 14', 'Jul 21', 'Jul 28', 'Aug 4', 'Aug 11'];
   const defaultStrands = ['STEM', 'ABM', 'GAS', 'HUMSS', 'TVL'];
-  const defaultViolations = ['Tardiness', 'Cheating', 'Dress Code', 'Disrespect'];
+  // Make sure this label matches what the external API expects:
+  const defaultViolations = ['Tardiness', 'Cheating', 'Dress Code Violation', 'Disrespect'];
 
   const chartWrap = canvas.parentElement;
   const noteEl = document.querySelector('.chart-note');
@@ -22,9 +24,19 @@ document.addEventListener('DOMContentLoaded', () => {
     chartWrap.parentElement.insertBefore(emptyEl, chartWrap.nextSibling);
   }
 
+  // Container to render images when using the external API
+  const imgWrap = document.createElement('div');
+  imgWrap.id = 'predictiveImageWrap';
+  imgWrap.className = 'hidden';
+  imgWrap.style.display = 'grid';
+  imgWrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
+  imgWrap.style.gap = '12px';
+  chartWrap?.parentElement?.insertBefore(imgWrap, chartWrap.nextSibling);
+
   function setEmptyState(show) {
     if (chartWrap) chartWrap.classList.toggle('hidden', show);
     emptyEl?.classList.toggle('hidden', !show);
+    imgWrap?.classList.add('hidden'); // never show image grid in true empty state
   }
 
   function setNote(source) {
@@ -33,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
       noteEl.textContent = `${defaultNote} (using sample data for preview)`;
     } else if (source === 'none') {
       noteEl.textContent = 'Forecast data will appear once the analytics service is connected.';
+    } else if (source === 'external') {
+      noteEl.textContent = `${defaultNote} (external image feed)`;
     } else {
       noteEl.textContent = defaultNote;
     }
@@ -120,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (!weeks || !weeks.length) weeks = defaultWeeks.slice();
 
-    // Ensure every strand/violation combination has an array (fill with zeros if missing)
+    // Ensure complete grid
     strands.forEach((strand) => {
       if (!matrix[strand]) matrix[strand] = {};
       violations.forEach((violation) => {
@@ -140,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
       });
       if (res.status === 404) {
-        console.info('[predictive] backend endpoint not yet available, using simulated data');
+        console.info('[predictive] backend endpoint not yet available, will try external API');
         return false;
       }
       if (!res.ok) {
@@ -161,6 +175,29 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('[predictive] failed to fetch backend forecast', err);
     }
     return false;
+  }
+
+  // ---------- External image API ----------
+  const EXTERNAL_API_BASE = 'https://jembots-test.hf.space/plot';
+  function externalImageURL(strand, violation, steps) {
+    // Encode to support spaces like "Dress Code Violation"
+    const qs = new URLSearchParams({
+      strand: String(strand),
+      violation: String(violation),
+      steps: String(steps),
+    });
+    // Some hosts prefer explicit encoding; URLSearchParams already encodes safely.
+    return `${EXTERNAL_API_BASE}?${qs.toString()}`;
+  }
+
+  async function loadExternalForecast() {
+    // We don’t fetch data here; we just mark source and later render <img> tags.
+    // We still need known lists to build the grid/options.
+    forecastState.weeks = forecastState.weeks?.length ? forecastState.weeks.slice() : defaultWeeks.slice();
+    forecastState.strands = defaultStrands.slice();
+    forecastState.violations = defaultViolations.slice();
+    forecastState.matrix = {}; // unused for external image mode
+    return true;
   }
 
   function syncFilterOptions() {
@@ -192,7 +229,88 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let chartInstance;
 
+  function renderExternalImages() {
+    // Hide chart, show images
+    chartWrap?.classList.add('hidden');
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+    imgWrap.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+
+    // Build selection set
+    const strandSelect = document.getElementById('filterStrand');
+    const violationSelect = document.getElementById('filterViolation');
+    const strandValue = strandSelect?.value || 'All';
+    const violationValue = violationSelect?.value || 'All';
+
+    const steps = forecastState.weeks.length || defaultWeeks.length;
+
+    let strands = strandValue === 'All' ? forecastState.strands : [strandValue];
+    let violations = violationValue === 'All' ? forecastState.violations : [violationValue];
+
+    // Clear previous
+    imgWrap.innerHTML = '';
+
+    // Reasonable cap to avoid too many images
+    const MAX_IMAGES = 20;
+    let count = 0;
+
+    for (const s of strands) {
+      for (const v of violations) {
+        if (count >= MAX_IMAGES) break;
+        const url = externalImageURL(s, v, steps);
+
+        // Card wrapper
+        const card = document.createElement('div');
+        card.style.border = '1px solid #e5e7eb';
+        card.style.borderRadius = '12px';
+        card.style.overflow = 'hidden';
+        card.style.background = '#fff';
+        card.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+
+        const header = document.createElement('div');
+        header.style.padding = '8px 12px';
+        header.style.fontSize = '13px';
+        header.style.fontWeight = '600';
+        header.style.background = '#f9fafb';
+        header.textContent = `${s} — ${v}`;
+
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = `${s} / ${v} (${steps} steps)`;
+        img.style.display = 'block';
+        img.style.width = '100%';
+        img.style.height = 'auto';
+
+        // In case the image fails, show a small fallback
+        img.onerror = () => {
+          const fallback = document.createElement('div');
+          fallback.style.padding = '16px';
+          fallback.style.color = '#991b1b';
+          fallback.style.fontSize = '12px';
+          fallback.textContent = `Unable to load image for ${s} / ${v}`;
+          card.replaceChild(fallback, img);
+        };
+
+        card.appendChild(header);
+        card.appendChild(img);
+        imgWrap.appendChild(card);
+        count++;
+      }
+      if (count >= MAX_IMAGES) break;
+    }
+  }
+
   function updateChart() {
+    if (forecastSource === 'external') {
+      setNote('external');
+      renderExternalImages();
+      return;
+    }
+
+    // Chart.js mode (backend or simulated)
     const strandSelect = document.getElementById('filterStrand');
     const violationSelect = document.getElementById('filterViolation');
     if (!strandSelect || !violationSelect) return;
@@ -247,6 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Show chart, hide image mode
+    imgWrap.classList.add('hidden');
+    chartWrap.classList.remove('hidden');
     setEmptyState(false);
     setNote(forecastSource);
 
@@ -282,19 +403,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (backendLoaded) {
       forecastSource = 'backend';
-    } else if (allowSimulated) {
-      forecastState.weeks = defaultWeeks.slice();
-      forecastState.strands = defaultStrands.slice();
-      forecastState.violations = defaultViolations.slice();
-      forecastState.matrix = generateSimulatedMatrix(defaultWeeks, defaultStrands, defaultViolations);
-      forecastSource = 'simulated';
-      console.info('[predictive] using sample forecast data (DEV_PREVIEW)');
     } else {
-      forecastState.weeks = defaultWeeks.slice();
-      forecastState.strands = [];
-      forecastState.violations = [];
-      forecastState.matrix = {};
-      forecastSource = 'none';
+      const externalLoaded = await loadExternalForecast();
+      if (externalLoaded) {
+        forecastSource = 'external';
+      } else if (allowSimulated) {
+        forecastState.weeks = defaultWeeks.slice();
+        forecastState.strands = defaultStrands.slice();
+        forecastState.violations = defaultViolations.slice();
+        forecastState.matrix = generateSimulatedMatrix(defaultWeeks, defaultStrands, defaultViolations);
+        forecastSource = 'simulated';
+        console.info('[predictive] using sample forecast data (DEV_PREVIEW)');
+      } else {
+        forecastState.weeks = defaultWeeks.slice();
+        forecastState.strands = [];
+        forecastState.violations = [];
+        forecastState.matrix = {};
+        forecastSource = 'none';
+      }
     }
 
     syncFilterOptions();
@@ -306,3 +432,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   init();
 });
+</script>
