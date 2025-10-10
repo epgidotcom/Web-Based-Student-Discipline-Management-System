@@ -1,6 +1,9 @@
 // Generic API helper for student pages
 // Relies on global window.API_BASE provided by ../js/config.js
-const rawBase = (window.API_BASE || window.SDMS_CONFIG?.API_BASE || '').replace(/\/+$/,'');
+const rawBase = (() => {
+  const configured = window.API_BASE || window.SDMS_CONFIG?.API_BASE || '';
+  return configured.replace(/\/+$/, '');
+})();
 
 function getAuthPayload(){
   try {
@@ -18,12 +21,15 @@ function getStoredToken(){
 }
 
 function buildUrl(path){
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   if(!rawBase){
     console.warn('[api] Missing API_BASE, defaulting to /api');
-    return '/api'+path;
+    return `/api${normalizedPath}`;
   }
-  // If rawBase already ends with /api allow path starting with /violations etc.
-  return rawBase.endsWith('/api') ? rawBase + path : rawBase + path;
+  return `${rawBase}${normalizedPath}`;
 }
 
 function redirectToLogin(){
