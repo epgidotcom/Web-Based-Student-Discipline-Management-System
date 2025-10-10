@@ -16,26 +16,42 @@ function shouldFallbackLegacy(err) {
 
 const router = Router();
 
-// List students
-router.get('/', async (_req, res) => {
+// List students (paginated)
+router.get('/', async (req, res) => {
+  const pageRaw = Number.parseInt(req.query.page, 10);
+  const limitRaw = Number.parseInt(req.query.limit, 10);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100;
+  const offset = (page - 1) * limit;
+
+  const selectWithAge = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAge = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+
   try {
     try {
-      const { rows } = await query(
-        `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at
-           from students
-          order by last_name asc, first_name asc`
-      );
-      return res.json(rows);
+      const listResult = await query(selectWithAge, [limit, offset]);
+      const countResult = await query('select count(*)::int as total from students');
+      const total = countResult.rows[0]?.total ?? 0;
+      return res.json({
+        data: listResult.rows,
+        currentPage: page,
+        limit,
+        totalItems: total,
+        totalPages: Math.max(1, Math.ceil(total / limit))
+      });
     } catch (err) {
       if (!isMissingColumnError(err, 'age')) throw err;
+      const listResult = await query(selectWithoutAge, [limit, offset]);
+      const countResult = await query('select count(*)::int as total from students');
+      const total = countResult.rows[0]?.total ?? 0;
+      return res.json({
+        data: listResult.rows.map(row => ({ ...row, age: null })),
+        currentPage: page,
+        limit,
+        totalItems: total,
+        totalPages: Math.max(1, Math.ceil(total / limit))
+      });
     }
-
-    const { rows } = await query(
-      `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at
-         from students
-        order by last_name asc, first_name asc`
-    );
-    res.json(rows.map(row => ({ ...row, age: null })));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
