@@ -175,7 +175,14 @@ router.post('/sanctions/send', async (req, res) => {
     console.info(`[sms] ${messageId} dispatched to ${maskedPhone}`);
   } catch (err) {
     errorDetail = err?.message || 'Unknown SMS gateway error';
-    console.error(`[sms] ${messageId} failed for ${maskedPhone}: ${errorDetail}`);
+    const errMeta = {
+      name: err?.name,
+      code: err?.code ?? err?.cause?.code ?? err?.cause?.errno,
+      syscall: err?.cause?.syscall,
+      hostname: err?.cause?.hostname,
+      type: err?.type
+    };
+    console.error(`[sms] ${messageId} failed for ${maskedPhone}: ${errorDetail}`, errMeta);
   }
 
   try {
