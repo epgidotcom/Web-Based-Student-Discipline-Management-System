@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
   let students = [];
+  let totalStudentCount = 0;
   let violations = [];
   let violationStats = null;
 
@@ -152,7 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function hydrateData() {
     try {
       const [studentsRes, violationsRes, statsRes] = await Promise.all([
-        fetchJson('/students').catch((err) => {
+        fetchJson('/students?limit=1000&page=1').catch((err) => {
           console.warn('[dashboard] failed to load students', err);
           return null;
         }),
@@ -166,8 +167,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }),
       ]);
 
-      if (Array.isArray(studentsRes) && studentsRes.length) {
-        students = studentsRes.map(normalizeStudent);
+      const studentRows = Array.isArray(studentsRes?.data)
+        ? studentsRes.data
+        : Array.isArray(studentsRes)
+          ? studentsRes
+          : [];
+
+      totalStudentCount = (() => {
+        const candidates = [
+          studentsRes?.totalItems,
+          studentsRes?.total,
+          studentsRes?.count,
+          studentsRes?.meta?.totalItems,
+          studentRows.length
+        ];
+        for (const value of candidates) {
+          const num = Number(value);
+          if (Number.isFinite(num) && num >= 0) {
+            return num;
+          }
+        }
+        return studentRows.length;
+      })();
+
+      if (studentRows.length) {
+        students = studentRows.map(normalizeStudent);
       }
       if (Array.isArray(violationsRes) && violationsRes.length) {
         const studentIndex = new Map(students.map((s) => [s.id, s]));
@@ -186,6 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const fallback = generateFallbackData();
       if (!students.length) students = fallback.students;
       if (!violations.length) violations = fallback.violations;
+      totalStudentCount = students.length;
     }
   }
 
@@ -336,7 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateMetrics() {
-    const totalStudents = students.length;
+    const totalStudents = totalStudentCount || students.length;
     const violations30 = violationStats?.last30 ?? computeViolationsLastNDays(violations, 30);
     const openCases = violationStats?.open_cases ?? computeOpenCases(violations);
     const repeatOffenders = violationStats?.repeat_offenders_90 ?? computeRepeatOffenders(violations);
