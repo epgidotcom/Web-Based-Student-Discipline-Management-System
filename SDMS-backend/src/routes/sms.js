@@ -60,6 +60,33 @@ async function ensureFetch() {
   return cachedFetch;
 }
 
+// Lazily ensure the audit table exists (helpful if migrations skipped in a new environment).
+let messageLogTableEnsured = false;
+async function ensureMessageLogTable() {
+  if (messageLogTableEnsured) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      message_id TEXT NOT NULL,
+      student_id UUID,
+      student_name TEXT,
+      student_name_hash TEXT,
+      violation_type TEXT,
+      message_type TEXT,
+      message_status TEXT NOT NULL,
+      date_sent TIMESTAMPTZ NOT NULL DEFAULT now(),
+      sender_account_id UUID,
+      sender_name TEXT,
+      phone_hash TEXT NOT NULL,
+      error_detail TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+  await query('CREATE INDEX IF NOT EXISTS idx_message_logs_message_id ON message_logs(message_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_message_logs_date_sent ON message_logs(date_sent)');
+  messageLogTableEnsured = true;
+}
+
 async function sendViaIProg({ apiToken, phone, message }) {
   const endpoint = 'https://sms.iprogtech.com/api/v1/sms_messages';
   const params = new URLSearchParams({
@@ -153,6 +180,7 @@ router.post('/sanctions/send', async (req, res) => {
   }
 
   try {
+    await ensureMessageLogTable();
     await query(
       `INSERT INTO message_logs (
          message_id,
