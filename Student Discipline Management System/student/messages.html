@@ -24,57 +24,50 @@
   <main class="main">
     <header class="topbar">
       <div class="title">
-        <h1>Messages</h1>
-        <span class="subtitle">View and reply to guidance notifications</span>
-      </div>
-      <div class="profile" id="studentProfile">
-        <div class="name-grade">
-          <strong id="studentName">Student</strong>
-          <small id="studentSection"></small>
-        </div>
-        <img id="studentAvatar" src="images/mpnag_logo.png" alt="Student avatar" class="avatar" />
+        <h1>Messages & Announcements</h1>
+        <span class="subtitle">Guidance / School Notices and Direct Messages</span>
       </div>
     </header>
 
-    <section class="panel conversation" id="messagesPanel">
-      <div class="panel-header">
-        <div>
-          <h3>Guidance Inbox</h3>
-          <span class="hint" id="inboxHint">Messages will appear here once sent by the guidance team.</span>
-        </div>
-        <button class="btn" type="button" id="reloadMessages">
-          <i class="fa fa-rotate"></i> Refresh
-        </button>
-      </div>
-      <div class="message-list" id="messageList">
-        <p class="hint">Loading messages…</p>
-      </div>
-      <form class="conversation-form" id="messageForm" novalidate>
-        <div class="field">
-          <label for="messageSubject">Subject <span class="hint">(optional)</span></label>
-          <input type="text" id="messageSubject" placeholder="Enter a short subject" />
-        </div>
-        <div class="field">
-          <label for="messageBody">Message</label>
-          <textarea id="messageBody" rows="3" placeholder="Type your reply here" required></textarea>
-        </div>
-        <div class="actions">
-          <span class="message-status" id="messageStatus"></span>
-          <button class="btn primary" type="submit" id="sendMessageBtn">
-            <i class="fa fa-paper-plane"></i> Send Message
-          </button>
-        </div>
-      </form>
-    </section>
+    <section class="panel conversation-shell">
+      <div class="conversation-layout">
+        <aside class="conversation-sidebar">
+          <div class="conversation-sidebar__header">
+            <h3>School Staff</h3>
+            <p class="hint">Select a staff member to chat with.</p>
+          </div>
+          <div class="conversation-sidebar__search">
+            <label for="messageSearch" class="sr-only">Search staff</label>
+            <input type="text" id="messageSearch" placeholder="Search" />
+          </div>
+          <ul id="messageContactList" class="conversation-contact-list">
+            <li class="empty">Loading...</li>
+          </ul>
+        </aside>
 
-    <section class="panel" id="announcementsPanel">
-      <div class="panel-header">
-        <h3>Announcements</h3>
-        <span class="hint">Administrative notices and reminders</span>
+        <div class="conversation-main">
+          <div class="conversation-header">
+            <div>
+              <h3 id="messagePartnerName">Select a contact</h3>
+              <p class="hint" id="messagePartnerMeta">Messages sync with the Guidance Office.</p>
+            </div>
+          </div>
+
+          <div class="conversation-body" id="messageThread">
+            <p class="hint">Choose a staff member to start messaging.</p>
+          </div>
+
+          <form id="messageForm" class="conversation-form" autocomplete="off">
+            <label for="messageInput" class="sr-only">Your message</label>
+            <textarea id="messageInput" rows="3" placeholder="Write your message..." required></textarea>
+            <div class="actions">
+              <button class="btn primary" type="submit" id="messageSubmit" disabled>
+                <i class="fa fa-paper-plane"></i> Send Message
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-      <ul class="notices" id="noticeList">
-        <li class="notice">Loading announcements…</li>
-      </ul>
     </section>
   </main>
   <script type="module" src="js/messages.js"></script>

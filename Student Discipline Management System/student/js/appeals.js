@@ -2,7 +2,9 @@ import { api } from './api.js';
 
 const state = {
   appeals: [],
-  selectedAppealId: null
+  selectedAppealId: null,
+  messages: [],
+  loadingMessages: false
 };
 
 const appealRows = document.getElementById('appealRows');
@@ -10,12 +12,26 @@ const appealForm = document.getElementById('appealForm');
 const violationInput = document.getElementById('violationText');
 const reasonInput = document.getElementById('appealReason');
 
+const conversationSection = document.getElementById('appealConversation');
+const conversationMeta = document.getElementById('conversationAppealMeta');
+const conversationStatus = document.getElementById('conversationStatus');
+const messageThread = document.getElementById('messageThread');
+const messageForm = document.getElementById('appealMessageForm');
+const messageInput = document.getElementById('appealMessageInput');
+const messageSubmit = document.getElementById('appealMessageSubmit');
 const studentNameEl = document.getElementById('studentName');
 const studentSectionEl = document.getElementById('studentSection');
 const studentAvatarEl = document.getElementById('studentAvatar');
 
 function getAuthUser() {
   return window.SDMSAuth?.getUser?.() || null;
+}
+
+function getSenderRole() {
+  const user = getAuthUser();
+  if (!user) return 'Student';
+  if (user.role === 'Admin' || user.role === 'Teacher') return user.role;
+  return 'Student';
 }
 
 function populateProfile() {
@@ -48,7 +64,6 @@ function truncate(text, max = 80) {
   if (!text) return '';
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
-
 function renderAppeals() {
   if (!appealRows) return;
   appealRows.innerHTML = '';
@@ -57,18 +72,22 @@ function renderAppeals() {
     row.dataset.placeholder = 'empty';
     row.innerHTML = '<td colspan="5" style="text-align:center; color:#888;">No appeals found.</td>';
     appealRows.appendChild(row);
+    if (conversationSection) {
+      conversationSection.hidden = true;
+      messageSubmit?.setAttribute('disabled', 'disabled');
+    }
     return;
   }
 
   state.appeals.forEach((appeal) => {
     const row = document.createElement('tr');
-    row.dataset.id = String(appeal.id);
+  row.dataset.id = String(appeal.id);
     const statusClass = (appeal.status || 'pending').toLowerCase();
     const latest = appeal.latestMessage;
     const lastPreview = latest
       ? `<div>${truncate(latest.body || '')}</div><small class="hint">${formatDateTime(latest.createdAt)}</small>`
       : '<span class="hint">No messages yet</span>';
-    if (String(appeal.id) === state.selectedAppealId) {
+    if (appeal.id === state.selectedAppealId) {
       row.classList.add('is-selected');
     }
     row.innerHTML = `
@@ -81,19 +100,88 @@ function renderAppeals() {
   });
 }
 
+function updateConversationHeader(appeal) {
+  if (!conversationSection) return;
+  if (!appeal) {
+    conversationSection.hidden = true;
+    messageSubmit?.setAttribute('disabled', 'disabled');
+    if (messageThread) {
+      messageThread.innerHTML = '<p class="hint">Select an appeal to view messages.</p>';
+    }
+    return;
+  }
+
+  conversationSection.hidden = false;
+  messageSubmit?.removeAttribute('disabled');
+  if (conversationMeta) {
+    conversationMeta.textContent = `${appeal.violation || 'Appeal'} • Submitted ${formatDateTime(appeal.createdAt)}`;
+  }
+  if (conversationStatus) {
+    conversationStatus.textContent = appeal.status || 'Pending';
+  }
+}
+
+function renderMessages() {
+  if (!messageThread) return;
+  messageThread.innerHTML = '';
+  if (state.loadingMessages) {
+    messageThread.innerHTML = '<p class="hint">Loading messages...</p>';
+    return;
+  }
+  if (!state.messages.length) {
+    messageThread.innerHTML = '<p class="hint">No messages yet. Start the conversation by sending the first reply.</p>';
+    return;
+  }
+
+  const userRole = getSenderRole();
+  state.messages.forEach((msg) => {
+    const wrapper = document.createElement('div');
+    const isMe = msg.senderRole === userRole;
+    wrapper.className = `message-bubble ${isMe ? 'me' : 'them'}`;
+    const bodyHtml = (msg.body || '').replace(/\n/g, '<br>');
+    wrapper.innerHTML = `
+      <div>${bodyHtml}</div>
+      <div class="message-meta">
+        <span>${isMe ? 'You' : (msg.senderRole || 'Admin')}</span>
+        <span>${formatDateTime(msg.createdAt)}</span>
+      </div>`;
+    messageThread.appendChild(wrapper);
+  });
+
+  messageThread.scrollTop = messageThread.scrollHeight;
+}
+
+async function loadMessages(appealId) {
+  if (!appealId) return;
+  state.loadingMessages = true;
+  renderMessages();
+  try {
+    const data = await api(`/appeals/${appealId}/messages`);
+    state.messages = Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error('[student appeals] messages load failed', err);
+    state.messages = [];
+    if (messageThread) {
+      messageThread.innerHTML = '<p class="hint" style="color:#e11d48;">Failed to load messages.</p>';
+    }
+    return;
+  } finally {
+    state.loadingMessages = false;
+  }
+  renderMessages();
+}
+
 function selectAppeal(appealId) {
   if (!appealId || state.selectedAppealId === appealId) return;
   const normalizedId = String(appealId);
   if (state.selectedAppealId === normalizedId) return;
   state.selectedAppealId = normalizedId;
   const appeal = state.appeals.find((a) => String(a.id) === normalizedId) || null;
+  updateConversationHeader(appeal);
   renderAppeals();
-  if (!appeal) {
-    return;
-  }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  if (violationInput) violationInput.value = appeal.violation || '';
-  if (reasonInput) reasonInput.value = appeal.reason || '';
+  state.messages = [];
+  renderMessages();
+  loadMessages(normalizedId);
 }
 
 function handleAppealRowClick(event) {
@@ -112,38 +200,21 @@ async function loadAppeals() {
   try {
     const data = await api('/appeals?mine=1');
     state.appeals = Array.isArray(data) ? data : [];
-    state.selectedAppealId = null;
     renderAppeals();
-    if (state.appeals.length) selectAppeal(state.appeals[0].id);
+    if (state.appeals.length) {
+      selectAppeal(state.appeals[0].id);
+    } else {
+      updateConversationHeader(null);
+    }
   } catch (err) {
     console.error('[student appeals] load failed', err);
     state.appeals = [];
-    if (appealRows) {
-      appealRows.innerHTML = '';
-      const row = document.createElement('tr');
-      row.innerHTML = '<td colspan="5" style="text-align:center;color:#e11d48;">Failed to load appeals.</td>';
-      appealRows.appendChild(row);
-    }
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="5" style="text-align:center;color:#e11d48;">Failed to load appeals.</td>';
+    appealRows.innerHTML = '';
+    appealRows.appendChild(row);
+    updateConversationHeader(null);
   }
-}
-
-async function sendAppealNotification({ violation, reason, appealId }) {
-  const subject = violation ? `Appeal submitted: ${violation}` : 'New appeal submitted';
-  const lines = [
-    `A new appeal has been submitted${appealId ? ` (#${appealId})` : ''}.`,
-    violation ? `Violation: ${violation}` : null,
-    '',
-    'Reason provided:',
-    reason || '(no reason supplied)'
-  ].filter(Boolean);
-
-  return api('/messages', {
-    method: 'POST',
-    body: {
-      subject,
-      body: lines.join('\n')
-    }
-  });
 }
 
 async function submitAppeal(event) {
@@ -170,39 +241,38 @@ async function submitAppeal(event) {
     renderAppeals();
     appealForm?.reset();
     selectAppeal(created.id);
-    let notified = false;
-    let createdMessage = null;
-    try {
-      createdMessage = await sendAppealNotification({ violation, reason, appealId: created?.id });
-      notified = true;
-    } catch (notifyErr) {
-      console.error('[student appeals] notification error', notifyErr);
-    }
-
-    if (createdMessage) {
-      const idx = state.appeals.findIndex((item) => String(item.id) === String(created.id));
-      if (idx !== -1) {
-        state.appeals[idx] = {
-          ...state.appeals[idx],
-          latestMessage: {
-            senderRole: createdMessage.senderRole,
-            senderName: createdMessage.senderName || null,
-            createdAt: createdMessage.createdAt,
-            body: createdMessage.body
-          }
-        };
-        renderAppeals();
-      }
-    }
-
-    if (notified) {
-      alert('Appeal submitted successfully.');
-    } else {
-      alert('Appeal submitted, but guidance could not be notified automatically.');
-    }
+    alert('Appeal submitted successfully.');
   } catch (err) {
     console.error('[student appeals] submit failed', err);
     alert(err.message || 'Failed to submit appeal.');
+  }
+}
+
+async function submitMessage(event) {
+  event.preventDefault();
+  if (!state.selectedAppealId) return;
+  const body = messageInput.value.trim();
+  if (!body) return;
+
+  messageSubmit?.setAttribute('disabled', 'disabled');
+  try {
+    const created = await api(`/appeals/${state.selectedAppealId}/messages`, {
+      method: 'POST',
+      body: { body }
+    });
+    state.messages.push(created);
+    renderMessages();
+    messageInput.value = '';
+  const appeal = state.appeals.find((a) => String(a.id) === state.selectedAppealId);
+    if (appeal) {
+      appeal.latestMessage = created;
+      renderAppeals();
+    }
+  } catch (err) {
+    console.error('[student appeals] message send failed', err);
+    alert(err.message || 'Failed to send message.');
+  } finally {
+    messageSubmit?.removeAttribute('disabled');
   }
 }
 
@@ -210,4 +280,5 @@ populateProfile();
 loadAppeals();
 appealRows?.addEventListener('click', handleAppealRowClick);
 appealForm?.addEventListener('submit', submitAppeal);
+messageForm?.addEventListener('submit', submitMessage);
 

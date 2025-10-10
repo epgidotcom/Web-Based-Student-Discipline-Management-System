@@ -2,35 +2,35 @@
   const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
   const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
 
-  // ===== PAGINATION CONFIG =====
-  const PAGE_SIZE = 100;
-  let currentPage = 1;
-  let allStudents = [];
-  let filteredStudents = [];
+  let students = [];
 
-  // ===== DOM =====
   const studentTable = document.querySelector('#studentTable tbody');
   const addStudentBtn = document.getElementById('addStudentBtn');
   const studentModal = document.getElementById('studentModal');
   const viewModal = document.getElementById('viewModal');
   const closeBtns = document.querySelectorAll('.close-btn');
   const studentForm = document.getElementById('studentForm');
+
+  const paginationSummary = document.getElementById('studentsPageSummary');
+  const paginationControls = document.getElementById('studentsPagination');
+  const PAGE_LIMIT = 100;
+
+  let paginator = null;
+
   const modalTitle = document.getElementById('modalTitle');
   const editIndex = document.getElementById('editIndex');
-  const ageInput = document.getElementById('age');
-
-  const paginationEl = document.getElementById('studentPagination');
-  const tableInfoEl  = document.getElementById('studentInfo');
-  const tableLoading = document.getElementById('tableLoading');
 
   const viewLRN = document.getElementById('viewLRN');
   const viewName = document.getElementById('viewName');
   const viewAge = document.getElementById('viewAge');
+  const viewBirthdate = document.getElementById('viewBirthdate');
   const viewGrade = document.getElementById('viewGrade');
-  const viewStrand = document.getElementById('viewStrand');
+  const viewSection = document.getElementById('viewSection');
   const viewParent = document.getElementById('viewParent');
   const viewAvatar = document.getElementById('viewAvatar');
   const viewInitials = document.getElementById('viewInitials');
+
+  const ageInput = document.getElementById('age');
 
   /* =================== Photo storage (front-end) =================== */
   const StudentPhotos = {
@@ -149,9 +149,13 @@
       middleName: row.middle_name || '',
       lastName: row.last_name || '',
       birthdate: row.birthdate ? String(row.birthdate).slice(0,10) : '',
-      age: row.age ? Number(row.age) : null,
+      age: (() => {
+        if (row.age == null) return null;
+        const parsed = Number(row.age);
+        return Number.isNaN(parsed) ? null : parsed;
+      })(),
       grade: row.grade || '',
-      strand: row.strand || '',
+      section: row.section || '',
       parentContact: row.parent_contact || '',
       createdAt: row.created_at || ''
     };
@@ -161,229 +165,290 @@
     return name.split(/\s+/).filter(Boolean).map(s => s[0]).join('').slice(0,2).toUpperCase() || '?';
   }
 
-  // ===== PAGINATION CORE =====
-  function getTotalPages() { return Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE)); }
-
-  function getSliceForPage(page) {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredStudents.slice(start, start + PAGE_SIZE);
-  }
-
-  function setInfoBar(page) {
-    const total = filteredStudents.length;
-    if (!tableInfoEl) return;
-    if (total === 0) {
-      tableInfoEl.textContent = 'Showing 0 of 0';
-      return;
-    }
-    const start = (page - 1) * PAGE_SIZE + 1;
-    const end = Math.min(page * PAGE_SIZE, total);
-    tableInfoEl.textContent = `Showing ${start}–${end} of ${total}`;
-  }
-
-  function renderPaginationUI(page) {
-    if (!paginationEl) return;
-    paginationEl.innerHTML = '';
-    const totalPages = getTotalPages();
-    const makeBtn = (label, goTo, opts = {}) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = label;
-      if (opts.title) btn.title = opts.title;
-      if (opts.current) btn.setAttribute('aria-current', 'page');
-      if (opts.disabled) btn.disabled = true;
-      btn.addEventListener('click', () => gotoPage(goTo));
-      return btn;
-    };
-    paginationEl.appendChild(makeBtn('‹', Math.max(1, page - 1), { title: 'Previous', disabled: page === 1 }));
-    const windowSize = 5;
-    let start = Math.max(1, page - Math.floor(windowSize / 2));
-    let end = Math.min(totalPages, start + windowSize - 1);
-    start = Math.max(1, end - windowSize + 1);
-    if (start > 1) {
-      paginationEl.appendChild(makeBtn('1', 1));
-      if (start > 2) paginationEl.appendChild(Object.assign(document.createElement('span'), { textContent: '…', style: 'padding:0 4px' }));
-    }
-    for (let p = start; p <= end; p++) paginationEl.appendChild(makeBtn(String(p), p, { current: p === page }));
-    if (end < totalPages) {
-      if (end < totalPages - 1) paginationEl.appendChild(Object.assign(document.createElement('span'), { textContent: '…', style: 'padding:0 4px' }));
-      paginationEl.appendChild(makeBtn(String(totalPages), totalPages));
-    }
-    paginationEl.appendChild(makeBtn('›', Math.min(totalPages, page + 1), { title: 'Next', disabled: page === totalPages }));
-  }
-
-  function showSpinner(show) {
-    if (!tableLoading) return;
-    tableLoading.classList.toggle('show', !!show);
-    tableLoading.setAttribute('aria-hidden', show ? 'false' : 'true');
-  }
-
-  async function gotoPage(page) {
-    const totalPages = getTotalPages();
-    const next = Math.min(Math.max(1, page), totalPages);
-    if (next === currentPage && studentTable?.children?.length) return;
-    showSpinner(true);
-    studentTable?.classList.add('fade');
-    studentTable?.classList.remove('show');
-    await new Promise(r => setTimeout(r, 220));
-    currentPage = next;
-    renderTable();
-    renderPaginationUI(currentPage);
-    setInfoBar(currentPage);
-    requestAnimationFrame(() => {
-      studentTable?.classList.add('show');
-      showSpinner(false);
-    });
-  }
-
-  // ===== RENDER TABLE =====
-  function renderTable(){
+  function renderTable(list = students){
     if (!studentTable) return;
+    const source = Array.isArray(list) ? list : [];
+    if (list !== students) {
+      students = source;
+    }
     studentTable.innerHTML = '';
-    const rows = getSliceForPage(currentPage);
-    if (!rows.length) {
+    if (!source.length) {
       const row = document.createElement('tr');
-      row.innerHTML = '<td colspan="7" style="text-align:center;color:#6b7280;">No data</td>';
+      row.innerHTML = '<td colspan="7" style="text-align:center;color:#6b7280;">No records found.</td>';
       studentTable.appendChild(row);
       return;
     }
-    rows.forEach((s) => {
+
+    source.forEach((s, i) => {
       const row = document.createElement('tr');
       const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
-      const age = s.age || computeAge(s.birthdate);
+      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
       const avatar = photo
         ? `<img class="avatar" src="${photo}" alt="${fullName}">`
         : `<div class="avatar avatar--fallback">${initialsFromName(fullName)}</div>`;
-      const idx = filteredStudents.indexOf(s);
+
       row.innerHTML = `
         <td>${s.lrn}</td>
-        <td><div class="name-cell">${avatar}<span class="student-name">${fullName}</span></div></td>
-        <td>${age || ''}</td>
+        <td>
+          <div class="name-cell">
+            ${avatar}
+            <span class="student-name">${fullName}</span>
+          </div>
+        </td>
+        <td>${age !== '' && age != null ? `${age}` : ''}</td>
         <td>${s.grade || ''}</td>
-        <td>${s.strand || ''}</td>
+        <td>${s.section || ''}</td>
         <td>${formatDate(s.createdAt)}</td>
         <td>
-          <button class="action-btn" onclick="viewStudent(${idx})" title="View"><i class="fa fa-eye"></i></button>
-          <button class="action-btn edit-btn" onclick="editStudent(${idx})" title="Edit"><i class="fa fa-edit"></i></button>
-          <button class="action-btn delete-btn" onclick="deleteStudent(${idx})" title="Delete"><i class="fa fa-trash"></i></button>
-        </td>`;
+          <button class="action-btn" onclick="viewStudent(${i})" title="View"><i class="fa fa-eye"></i></button>
+          <button class="action-btn edit-btn" onclick="editStudent(${i})" title="Edit"><i class="fa fa-edit"></i></button>
+          <button class="action-btn delete-btn" onclick="deleteStudent(${i})" title="Delete"><i class="fa fa-trash"></i></button>
+        </td>
+      `;
       studentTable.appendChild(row);
     });
   }
 
-  function closeModals(){ studentModal.style.display = viewModal.style.display = 'none'; }
-
-  // ===== DATA =====
-  async function loadStudents(){
-    try {
-      const list = await api('/students');
-      allStudents = Array.isArray(list) ? list.map(normalizeStudent) : [];
-    } catch (err) {
-      console.error('Failed to load students', err);
-      allStudents = [];
+  paginator = window.SDMS?.createPaginationController({
+    limit: PAGE_LIMIT,
+    paginationContainer: paginationControls,
+    summaryElement: paginationSummary,
+    async fetcher(page, limit) {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      return api(`/students?${params.toString()}`);
+    },
+    onData(rows) {
+      students = Array.isArray(rows) ? rows.map(normalizeStudent) : [];
+      renderTable(students);
+    },
+    onError(err) {
+      console.error('[students] failed to load', err);
+      const detail = err?.message ? `\n\nDetails: ${err.message}` : '';
+      alert(`Failed to load students. Please refresh or try again.${detail}`);
+      students = [];
+      renderTable(students);
     }
-    filteredStudents = [...allStudents];
-    currentPage = 1;
-    renderTable(); renderPaginationUI(currentPage); setInfoBar(currentPage);
-    requestAnimationFrame(() => studentTable?.classList.add('show'));
+  });
+
+  async function fetchData(page = 1) {
+    if (paginator) {
+      return paginator.fetchData(page);
+    }
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_LIMIT) });
+    const payload = await api(`/students?${params.toString()}`);
+    const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+    students = Array.isArray(data) ? data.map(normalizeStudent) : [];
+    renderTable(students);
+    if (paginationSummary) {
+      const count = students.length;
+      paginationSummary.textContent = count ? `Showing 1-${count} of ${count}` : 'Showing 0 of 0';
+    }
+    if (paginationControls) {
+      if (students.length <= PAGE_LIMIT) {
+        paginationControls.classList.add('is-hidden');
+      } else {
+        paginationControls.classList.remove('is-hidden');
+      }
+    }
+    return students;
+  }
+
+  async function refreshCurrentPage(preferredPage){
+    if (!paginator) {
+      return fetchData(Math.max(1, preferredPage ?? 1));
+    }
+    const state = paginator.getState?.() || { currentPage: 1 };
+    const targetPage = Math.max(1, preferredPage ?? state.currentPage ?? 1);
+    let data = await fetchData(targetPage);
+    const nextState = paginator.getState?.() || state;
+    if (!data.length && nextState.currentPage > 1) {
+      data = await fetchData(nextState.currentPage - 1);
+    }
+    return data;
+  }
+
+  function renderPagination(totalPages, currentPage){
+    paginator?.renderPagination(totalPages, currentPage);
+  }
+
+  function closeModals(){
+    studentModal && (studentModal.style.display = 'none');
+    viewModal && (viewModal.style.display = 'none');
   }
 
   function openCreateModal(){
-    studentForm.reset(); ageInput.value = ''; editIndex.value = '';
-    modalTitle.textContent = 'Add Student'; resetUploader();
+    studentForm?.reset();
+    if (ageInput) ageInput.value = '';
+    editIndex.value = '';
+    modalTitle.textContent = 'Add Student';
+    resetUploader();
     studentModal.style.display = 'flex';
   }
 
-  function openView(idx){
-    const s = filteredStudents[idx]; if (!s) return;
-    const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g,' ').trim();
-    const age = s.age || computeAge(s.birthdate);
-    viewLRN.textContent = s.lrn; viewName.textContent = fullName;
-    viewAge.textContent = age ? `${age} yrs` : '—';
+  function openView(index){
+    const s = students[index];
+    const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
+    const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
+
+    viewLRN.textContent = s.lrn;
+    viewName.textContent = fullName;
+    viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
+    viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
     viewGrade.textContent = s.grade || '—';
-    viewStrand.textContent = s.strand || '—';
+    viewSection.textContent = s.section || '—';
     viewParent.textContent = s.parentContact || '—';
+
     const photo = StudentPhotos.get(s.lrn);
-    if (photo){ viewAvatar.src = photo; viewAvatar.classList.remove('is-hidden'); viewInitials.classList.add('is-hidden'); }
-    else { viewAvatar.classList.add('is-hidden'); viewInitials.textContent = initialsFromName(fullName); viewInitials.classList.remove('is-hidden'); }
+    if (photo) {
+      viewAvatar.src = photo;
+      viewAvatar.classList.remove('is-hidden');
+      viewInitials.classList.add('is-hidden');
+    } else {
+      viewAvatar.classList.add('is-hidden');
+      viewInitials.textContent = initialsFromName(fullName);
+      viewInitials.classList.remove('is-hidden');
+    }
+
     viewModal.style.display = 'flex';
   }
 
-  function openEdit(idx){
-    const s = filteredStudents[idx]; if (!s) return;
-    const $ = id => document.getElementById(id);
-    $('lrn').value = s.lrn; $('firstName').value = s.firstName;
-    $('middleName').value = s.middleName; $('lastName').value = s.lastName;
-    $('grade').value = s.grade; $('strand').value = s.strand;
-    $('parentContact').value = s.parentContact;
-    ageInput.value = s.age || computeAge(s.birthdate) || '';
-    editIndex.value = allStudents.indexOf(s); modalTitle.textContent = 'Edit Student';
+  function openEdit(index){
+    const s = students[index];
+    document.getElementById('lrn').value = s.lrn;
+    document.getElementById('firstName').value = s.firstName;
+    document.getElementById('middleName').value = s.middleName;
+    document.getElementById('lastName').value = s.lastName;
+    document.getElementById('grade').value = s.grade;
+    document.getElementById('section').value = s.section;
+    document.getElementById('parentContact').value = s.parentContact;
+    if (ageInput) {
+      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
+      ageInput.value = age !== '' && age != null ? age : '';
+    }
+    editIndex.value = index;
+    modalTitle.textContent = 'Edit Student';
+
     const photo = StudentPhotos.get(s.lrn);
-    if (photo){ photoPreview.src = photo; photoPreview.dataset.dataurl = photo;
-      photoPreview.classList.remove('is-hidden'); photoActions.classList.remove('is-hidden'); photoDrop.classList.add('is-hidden');
-    } else resetUploader();
+    if (photo) {
+      photoPreview.src = photo;
+      photoPreview.dataset.dataurl = photo;
+      photoPreview.classList.remove('is-hidden');
+      photoActions.classList.remove('is-hidden');
+      photoDrop.classList.add('is-hidden');
+    } else {
+      resetUploader();
+    }
+
     studentModal.style.display = 'flex';
   }
 
-  async function persistStudent(e){
-    e.preventDefault();
-    if (!studentForm.reportValidity()) return;
-    const $ = id => document.getElementById(id);
+  async function persistStudent(event){
+    event.preventDefault();
+
+    if (studentForm && !studentForm.reportValidity()) {
+      return;
+    }
+
+    const lrnField = document.getElementById('lrn');
+    const firstNameField = document.getElementById('firstName');
+    const middleNameField = document.getElementById('middleName');
+    const lastNameField = document.getElementById('lastName');
+    const gradeField = document.getElementById('grade');
+    const sectionField = document.getElementById('section');
+    const parentContactField = document.getElementById('parentContact');
+
+    const missingControls = [
+      ['lrn', lrnField],
+      ['firstName', firstNameField],
+      ['lastName', lastNameField],
+      ['grade', gradeField],
+      ['section', sectionField],
+      ['parentContact', parentContactField]
+    ].filter(([, el]) => !el);
+    if (missingControls.length) {
+      console.warn('[students] Missing form controls:', missingControls.map(([id]) => `#${id}`).join(', '));
+    }
+
     const idx = editIndex.value === '' ? null : Number(editIndex.value);
-    const existing = idx !== null ? allStudents[idx] : null;
+    const existing = idx !== null ? students[idx] : null;
     const payload = {
-      lrn: $('lrn').value.trim() || null,
-      first_name: $('firstName').value.trim() || '',
-      middle_name: $('middleName').value.trim() || null,
-      last_name: $('lastName').value.trim() || '',
-      age: ageInput.value ? Number(ageInput.value) : null,
-      grade: $('grade').value || null,
-      strand: $('strand').value.trim() || null,
-      parent_contact: $('parentContact').value.trim() || null
+      lrn: lrnField?.value?.trim() || null,
+      first_name: firstNameField?.value?.trim() || '',
+      middle_name: middleNameField?.value?.trim() || null,
+      last_name: lastNameField?.value?.trim() || '',
+      age: (() => {
+        if (!ageInput) return null;
+        const value = ageInput.value.trim();
+        if (value === '') return null;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      })(),
+      grade: gradeField?.value || null,
+      section: sectionField?.value?.trim() || null,
+      parent_contact: parentContactField?.value?.trim() || null
     };
+
     try {
-      let saved = idx === null
-        ? await api('/students', { method: 'POST', body: payload })
-        : await api(`/students/${encodeURIComponent(existing.id)}`, { method: 'PUT', body: payload });
+      let saved;
+      if (idx === null) {
+        saved = await api('/students', { method: 'POST', body: payload });
+      } else {
+        saved = await api(`/students/${encodeURIComponent(existing.id)}`, { method: 'PUT', body: payload });
+      }
+
       const normalized = normalizeStudent(saved);
-      const img = photoPreview?.dataset?.dataurl;
-      if (idx === null){ if (img) StudentPhotos.save(normalized.lrn, img); allStudents.push(normalized); }
-      else { if (existing.lrn && existing.lrn!==normalized.lrn) StudentPhotos.move(existing.lrn, normalized.lrn);
-        if (img) StudentPhotos.save(normalized.lrn, img); allStudents[idx] = normalized; }
-      applySearchFilter($('searchInput')?.value||'');
-      studentModal.style.display='none'; resetUploader(); ageInput.value='';
-    } catch(err){ alert(err.message || 'Failed to save student.'); }
+      const uploadedDataUrl = photoPreview?.dataset?.dataurl;
+      if (idx !== null && existing?.lrn && existing.lrn !== normalized.lrn) {
+        StudentPhotos.move(existing.lrn, normalized.lrn);
+      }
+      if (uploadedDataUrl) {
+        StudentPhotos.save(normalized.lrn, uploadedDataUrl);
+      }
+
+      const state = paginator?.getState?.() || { currentPage: 1 };
+      const targetPage = idx === null ? 1 : state.currentPage;
+      await refreshCurrentPage(targetPage);
+      studentModal.style.display = 'none';
+      resetUploader();
+      if (ageInput) ageInput.value = '';
+    } catch (err) {
+      console.error('[students] save failed', err);
+      alert(err.message || 'Failed to save student.');
+    }
   }
 
-  async function removeStudent(idx){
-    const s = filteredStudents[idx]; if (!s) return;
+  async function removeStudent(index){
+    const target = students[index];
+    if (!target) return;
     if (!confirm('Delete this student?')) return;
     try {
-      await api(`/students/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
-      StudentPhotos.remove(s.lrn);
-      allStudents = allStudents.filter(x=>x!==s);
-      applySearchFilter(document.getElementById('searchInput')?.value||'');
-    } catch(err){ alert(err.message || 'Failed to delete student.'); }
+      await api(`/students/${encodeURIComponent(target.id)}`, { method: 'DELETE' });
+      StudentPhotos.remove(target.lrn);
+      const state = paginator?.getState?.() || { currentPage: 1 };
+      await refreshCurrentPage(state.currentPage);
+    } catch (err) {
+      console.error('[students] delete failed', err);
+      alert(err.message || 'Failed to delete student.');
+    }
   }
 
-  function applySearchFilter(query){
-    const q = query.toLowerCase();
-    filteredStudents = q ? allStudents.filter(s =>
-      `${s.lrn} ${s.firstName} ${s.middleName} ${s.lastName} ${s.strand}`.toLowerCase().includes(q)
-    ) : [...allStudents];
-    currentPage=1;
-    renderTable(); renderPaginationUI(currentPage); setInfoBar(currentPage);
+  function searchStudent(){
+    const input = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    document.querySelectorAll('#studentTable tbody tr').forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(input) ? '' : 'none';
+    });
   }
-
-  function searchStudent(){ applySearchFilter(document.getElementById('searchInput')?.value || ''); }
 
   addStudentBtn?.addEventListener('click', openCreateModal);
-  closeBtns.forEach(b => b.addEventListener('click', closeModals));
+  closeBtns.forEach(btn => btn.addEventListener('click', closeModals));
   studentForm?.addEventListener('submit', persistStudent);
-  window.addEventListener('keydown', e => { if (e.key==='Escape') closeModals(); });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModals();
+  });
 
-  loadStudents();
+  fetchData(1);
 
   window.viewStudent = openView;
   window.editStudent = openEdit;

@@ -2,19 +2,17 @@
 	const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
 	const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
 
-	const PAGE_SIZE = 100;
-	let currentPage = 1;
-	let allViolations = [];
-	let filteredViolations = [];
+	let violations = [];
 	let students = [];
 	let evidenceState = [];
 
 	const tableBody = document.querySelector('#violationTable tbody');
 	const addBtn = document.getElementById('addViolationBtn');
 	const searchInput = document.getElementById('searchInput');
-	const paginationEl = document.getElementById('violationPagination');
-	const tableInfoEl = document.getElementById('violationInfo');
-	const tableLoading = document.getElementById('violationLoading');
+	const paginationSummary = document.getElementById('violationsPageSummary');
+	const paginationControls = document.getElementById('violationsPagination');
+	const PAGE_LIMIT = 100;
+	let paginator = null;
 
 	const violationModal = document.getElementById('violationModal');
 	const violationForm = document.getElementById('violationForm');
@@ -129,128 +127,6 @@
 		renderEvidencePreview(evidencePreview, evidenceState, { selectable: true });
 	}
 
-	function getTotalPages() {
-		return Math.max(1, Math.ceil(filteredViolations.length / PAGE_SIZE));
-	}
-
-	function getSliceForPage(page) {
-		const start = (page - 1) * PAGE_SIZE;
-		return filteredViolations.slice(start, start + PAGE_SIZE);
-	}
-
-	function findViolationById(id) {
-		if (!id) return null;
-		return allViolations.find((v) => String(v.id) === String(id)) || null;
-	}
-
-	function findViolationIndex(id) {
-		if (!id) return -1;
-		return allViolations.findIndex((v) => String(v.id) === String(id));
-	}
-
-	function setInfoBar(page) {
-		if (!tableInfoEl) return;
-		const total = filteredViolations.length;
-		if (!total) {
-			tableInfoEl.textContent = 'Showing 0 of 0';
-			return;
-		}
-		const start = (page - 1) * PAGE_SIZE + 1;
-		const end = Math.min(page * PAGE_SIZE, total);
-		tableInfoEl.textContent = `Showing ${start}\u2013${end} of ${total}`;
-	}
-
-	function renderPaginationUI(page) {
-	if (!paginationEl) return;
-	paginationEl.innerHTML = '';
-
-	const totalRecords = filteredViolations.length;
-	const totalPages = getTotalPages();
-
-	// Always show pagination controls, even if records < PAGE_SIZE
-	const makeBtn = (label, goTo, opts = {}) => {
-		const btn = document.createElement('button');
-		btn.type = 'button';
-		btn.textContent = label;
-		if (opts.title) btn.title = opts.title;
-		if (opts.current) btn.setAttribute('aria-current', 'page');
-		if (opts.disabled) btn.disabled = true;
-		btn.className = opts.current ? 'page-btn active' : 'page-btn';
-		btn.addEventListener('click', () => gotoPage(goTo));
-		return btn;
-	};
-
-	// Previous arrow
-	const prevBtn = makeBtn('‹', Math.max(1, page - 1), {
-		title: 'Previous',
-		disabled: page === 1
-	});
-	paginationEl.appendChild(prevBtn);
-
-	// Numbered page buttons (show up to 5 pages)
-	const windowSize = 5;
-	let start = Math.max(1, page - Math.floor(windowSize / 2));
-	let end = Math.min(totalPages, start + windowSize - 1);
-	start = Math.max(1, end - windowSize + 1);
-
-	if (start > 1) {
-		paginationEl.appendChild(makeBtn('1', 1));
-		if (start > 2) {
-			const ellipsis = document.createElement('span');
-			ellipsis.textContent = '…';
-			paginationEl.appendChild(ellipsis);
-		}
-	}
-
-	for (let p = start; p <= end; p++) {
-		paginationEl.appendChild(makeBtn(String(p), p, { current: p === page }));
-	}
-
-	if (end < totalPages) {
-		if (end < totalPages - 1) {
-			const ellipsis = document.createElement('span');
-			ellipsis.textContent = '…';
-			paginationEl.appendChild(ellipsis);
-		}
-		paginationEl.appendChild(makeBtn(String(totalPages), totalPages));
-	}
-
-	// Next arrow
-	const nextBtn = makeBtn('›', Math.min(totalPages, page + 1), {
-		title: 'Next',
-		disabled: page === totalPages
-	});
-	paginationEl.appendChild(nextBtn);
-
-	// Always update info bar
-	setInfoBar(page);
-}
-
-	function showSpinner(show) {
-		if (!tableLoading) return;
-		tableLoading.classList.toggle('show', !!show);
-		tableLoading.setAttribute('aria-hidden', show ? 'false' : 'true');
-	}
-
-	async function gotoPage(page, { force = false } = {}) {
-		const totalPages = getTotalPages();
-		const next = Math.min(Math.max(1, page), totalPages);
-		if (!force && next === currentPage && tableBody?.children?.length) return;
-		showSpinner(true);
-		tableBody?.classList.add('fade');
-		tableBody?.classList.remove('show');
-		await new Promise((resolve) => setTimeout(resolve, 220));
-		currentPage = next;
-		renderTable();
-		renderPaginationUI(currentPage);
-		setInfoBar(currentPage);
-		requestAnimationFrame(() => {
-			tableBody?.classList.remove('fade');
-			tableBody?.classList.add('show');
-			showSpinner(false);
-		});
-	}
-
 	async function fileToDataURL(file, maxEdge = 1280, quality = 0.9) {
 		const url = URL.createObjectURL(file);
 		const img = new Image();
@@ -299,48 +175,25 @@
 		});
 	}
 
-	function computeFilteredViolations(query = '') {
-		const normalized = query.trim().toLowerCase();
-		if (!normalized) return [...allViolations];
-		return allViolations.filter((v) => {
-			return [
-				v.student_name,
-				v.grade_section,
-				v.offense_type,
-				v.description,
-				v.sanction,
-				v.student_lrn,
-				v.incident_date,
-				v.created_at
-			].some((field) => String(field ?? '').toLowerCase().includes(normalized));
-		});
-	}
-
-	async function refreshTable({ preservePage = false } = {}) {
-		const query = searchInput?.value ?? '';
-		filteredViolations = computeFilteredViolations(query);
-		const totalPages = getTotalPages();
-		const targetPage = preservePage ? Math.min(currentPage, totalPages) : 1;
-		await gotoPage(targetPage, { force: true });
-	}
-
-	function renderTable() {
+	function renderTable(list = violations) {
 		if (!tableBody) return;
+		const source = Array.isArray(list) ? list : [];
+		if (list !== violations) {
+			violations = source;
+		}
 		tableBody.innerHTML = '';
-		const rows = getSliceForPage(currentPage);
-		if (!rows.length) {
+		if (!source.length) {
 			const row = document.createElement('tr');
 			row.dataset.placeholder = 'empty';
-			row.innerHTML = '<td colspan="8" style="text-align:center;color:#6b7280;">No violations recorded</td>';
+			row.innerHTML = '<td colspan="8" style="text-align:center;color:#6b7280;">No records found.</td>';
 			tableBody.appendChild(row);
-			setInfoBar(currentPage);
+			filterTable();
 			return;
 		}
 
-		rows.forEach((v) => {
+		source.forEach((v, idx) => {
 			const pastOffense = (v.repeat_count ?? 0) > 0 ? `${v.repeat_count}` : '—';
 			const row = document.createElement('tr');
-			row.dataset.id = v.id;
 			row.innerHTML = `
 				<td>${v.student_name || '—'}</td>
 				<td>${v.grade_section || '—'}</td>
@@ -350,32 +203,83 @@
 				<td>${v.sanction || '—'}</td>
 				<td>${formatDate(v.created_at)}</td>
 				<td>
-					<button class="action-btn" data-action="view" data-id="${v.id}" title="View"><i class="fa fa-eye"></i></button>
-					<button class="action-btn edit-btn" data-action="edit" data-id="${v.id}" title="Edit"><i class="fa fa-edit"></i></button>
-					<button class="action-btn delete-btn" data-action="delete" data-id="${v.id}" title="Delete"><i class="fa fa-trash"></i></button>
+					<button class="action-btn" data-action="view" data-index="${idx}" title="View"><i class="fa fa-eye"></i></button>
+					<button class="action-btn edit-btn" data-action="edit" data-index="${idx}" title="Edit"><i class="fa fa-edit"></i></button>
+					<button class="action-btn delete-btn" data-action="delete" data-index="${idx}" title="Delete"><i class="fa fa-trash"></i></button>
 				</td>`;
 			tableBody.appendChild(row);
 		});
+
+		filterTable();
 	}
 
-	async function loadViolations() {
-		showSpinner(true);
-		tableBody?.classList.remove('show');
-		try {
-			const list = await api('/violations');
-			allViolations = Array.isArray(list) ? list : [];
-		} catch (err) {
+	paginator = window.SDMS?.createPaginationController({
+		limit: PAGE_LIMIT,
+		paginationContainer: paginationControls,
+		summaryElement: paginationSummary,
+		async fetcher(page, limit) {
+			const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+			return api(`/violations?${params.toString()}`);
+		},
+		onData(rows) {
+			violations = Array.isArray(rows) ? rows : [];
+			renderTable(violations);
+		},
+		onError(err) {
 			console.error('[violations] failed to load', err);
-			alert(`Failed to load violations. ${err.message || ''}`.trim());
-			allViolations = [];
+			alert(`Failed to load violations. ${err?.message || ''}`.trim());
+			violations = [];
+			renderTable(violations);
 		}
-		await refreshTable();
+	});
+
+	async function fetchData(page = 1) {
+		if (paginator) {
+			return paginator.fetchData(page);
+		}
+		const params = new URLSearchParams({ page: String(page), limit: String(PAGE_LIMIT) });
+		const payload = await api(`/violations?${params.toString()}`);
+		const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+		violations = Array.isArray(data) ? data : [];
+		renderTable(violations);
+		if (paginationSummary) {
+			const count = violations.length;
+			paginationSummary.textContent = count ? `Showing 1-${count} of ${count}` : 'Showing 0 of 0';
+		}
+		if (paginationControls) {
+			if (violations.length <= PAGE_LIMIT) {
+				paginationControls.classList.add('is-hidden');
+			} else {
+				paginationControls.classList.remove('is-hidden');
+			}
+		}
+		return violations;
+	}
+
+	async function refreshCurrentPage(preferredPage) {
+		if (!paginator) {
+			return fetchData(Math.max(1, preferredPage ?? 1));
+		}
+		const state = paginator.getState?.() || { currentPage: 1 };
+		const targetPage = Math.max(1, preferredPage ?? state.currentPage ?? 1);
+		let data = await fetchData(targetPage);
+		const nextState = paginator.getState?.() || state;
+		if (!data.length && nextState.currentPage > 1) {
+			data = await fetchData(nextState.currentPage - 1);
+		}
+		return data;
+	}
+
+	function renderPagination(totalPages, currentPage) {
+		paginator?.renderPagination(totalPages, currentPage);
 	}
 
 	async function loadStudents() {
 		try {
-			const list = await api('/students');
-			students = Array.isArray(list) ? list : [];
+			const params = new URLSearchParams({ page: '1', limit: '1000' });
+			const payload = await api(`/students?${params.toString()}`);
+			const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+			students = data;
 		} catch (err) {
 			console.warn('[violations] failed to load students list', err);
 			students = [];
@@ -393,7 +297,7 @@
 			updatePastOffenseDisplay([]);
 			return;
 		}
-		const items = allViolations.filter(v => v.student_id === studentId && v.id !== excludeId);
+		const items = violations.filter(v => v.student_id === studentId && v.id !== excludeId);
 		updatePastOffenseDisplay(items);
 	}
 
@@ -401,24 +305,24 @@
 		violationForm?.reset();
 		violationForm.dataset.studentId = '';
 		editIndexField.value = '';
-		studentLRNField.value = '';
-		studentNameField.value = '';
-		gradeSectionField.value = '';
-		incidentDateField.value = '';
-		descriptionField.value = '';
-		violationTypeField.value = '';
-		sanctionField.value = '';
+			studentLRNField.value = '';
+			studentNameField.value = '';
+			gradeSectionField.value = '';
+			incidentDateField.value = '';
+			descriptionField.value = '';
+			violationTypeField.value = '';
+			sanctionField.value = '';
 		modalTitle.textContent = 'Add Violation';
 		resetEvidence();
 		displayPastOffensesFor(null);
 		openModal(violationModal);
 	}
 
-	function prepareEditModal(id) {
-		const item = findViolationById(id);
+	function prepareEditModal(index) {
+		const item = violations[index];
 		if (!item) return;
 		modalTitle.textContent = 'Edit Violation';
-		editIndexField.value = String(item.id);
+		editIndexField.value = index;
 		violationForm.dataset.studentId = item.student_id ? String(item.student_id) : '';
 
 		const matchingStudent = students.find(s => s.id === item.student_id);
@@ -445,8 +349,8 @@
 		openModal(violationModal);
 	}
 
-	function showViewModal(id) {
-		const item = findViolationById(id);
+	function showViewModal(index) {
+		const item = violations[index];
 		if (!item) return;
 		viewStudent.textContent = item.student_name || '—';
 		viewGradeSection.textContent = item.grade_section || '—';
@@ -456,7 +360,7 @@
 		viewViolationType.textContent = item.offense_type || '—';
 		viewSanction.textContent = item.sanction || '—';
 
-		const history = allViolations.filter(v => v.student_id === item.student_id && v.id !== item.id);
+		const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
 		if (history.length) {
 			viewPastOffenseRow.classList.remove('is-hidden');
 			viewPastOffense.textContent = `${history.length} earlier case${history.length > 1 ? 's' : ''}`;
@@ -497,35 +401,13 @@
 		const studentIdRaw = violationForm.dataset.studentId || '';
 		const studentId = studentIdRaw ? Number(studentIdRaw) : null;
 
-		// If dataset.studentId wasn't set (user may not have blurred the LRN field),
-		// try to resolve the student by the entered LRN now before rejecting.
-		let resolvedStudentId = studentId;
-		if (!resolvedStudentId || Number.isNaN(resolvedStudentId)) {
-			const lrnInput = studentLRNField?.value?.trim();
-			if (lrnInput) {
-				const match = findStudentByLRN(lrnInput);
-				if (match) {
-					resolvedStudentId = Number(match.id);
-					// Cache the resolved id on the form dataset so subsequent checks pass
-					violationForm.dataset.studentId = String(match.id);
-					// Also ensure student name/grade display is populated
-					studentNameField.value = [match.first_name, match.middle_name, match.last_name].filter(Boolean).join(' ');
-					if (!gradeSectionField.value) {
-						const composed = [match.grade, match.section].filter(Boolean).join('-');
-						gradeSectionField.value = composed || gradeSectionField.value;
-					}
-				}
-			}
-		}
-
-		if (!resolvedStudentId || Number.isNaN(resolvedStudentId)) {
+		if (!studentId || Number.isNaN(studentId)) {
 			alert('Please enter a valid student LRN to link this violation to an existing student.');
 			return;
 		}
-		violationForm.dataset.studentId = String(resolvedStudentId);
 
 		const payload = {
-			student_id: resolvedStudentId,
+			student_id: studentId,
 			grade_section: gradeSectionField?.value?.trim() || null,
 			offense_type: violationTypeField?.value || null,
 			description: descriptionField?.value?.trim() || null,
@@ -535,27 +417,22 @@
 		};
 
 		try {
-			let saved;
-			const editId = editIndexField?.value === '' ? null : editIndexField.value;
-			if (editId === null) {
-				saved = await api('/violations', { method: 'POST', body: payload });
-				allViolations.unshift(saved);
+			const editIndex = editIndexField?.value === '' ? null : Number(editIndexField.value);
+			if (editIndex === null) {
+				await api('/violations', { method: 'POST', body: payload });
 			} else {
-				const target = findViolationById(editId);
-				if (!target) throw new Error('Unable to locate violation to update.');
-				saved = await api(`/violations/${encodeURIComponent(target.id)}`, { method: 'PUT', body: payload });
-				const allIdx = findViolationIndex(target.id);
-				if (allIdx >= 0) {
-					allViolations.splice(allIdx, 1, saved);
-				}
+				const target = violations[editIndex];
+				await api(`/violations/${encodeURIComponent(target.id)}`, { method: 'PUT', body: payload });
 			}
-			await refreshTable({ preservePage: editId !== null });
+			const state = paginator?.getState?.() || { currentPage: 1 };
+			const targetPage = editIndex === null ? 1 : state.currentPage;
+			await refreshCurrentPage(targetPage);
 			closeModal(violationModal);
-			violationForm.reset();
-			violationForm.dataset.studentId = '';
-			studentLRNField.value = '';
-			studentNameField.value = '';
-			gradeSectionField.value = '';
+					violationForm.reset();
+					violationForm.dataset.studentId = '';
+					studentLRNField.value = '';
+					studentNameField.value = '';
+					gradeSectionField.value = '';
 			resetEvidence();
 			displayPastOffensesFor(null);
 		} catch (err) {
@@ -564,17 +441,14 @@
 		}
 	}
 
-	async function removeViolation(id) {
-		const item = findViolationById(id);
+	async function removeViolation(index) {
+		const item = violations[index];
 		if (!item) return;
 		if (!confirm('Delete this violation record?')) return;
 		try {
 			await api(`/violations/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
-			const allIdx = findViolationIndex(item.id);
-			if (allIdx >= 0) {
-				allViolations.splice(allIdx, 1);
-			}
-			await refreshTable({ preservePage: true });
+			const state = paginator?.getState?.() || { currentPage: 1 };
+			await refreshCurrentPage(state.currentPage);
 		} catch (err) {
 			console.error('[violations] delete failed', err);
 			alert(err.message || 'Failed to delete violation.');
@@ -582,7 +456,12 @@
 	}
 
 	function filterTable() {
-		refreshTable().catch((err) => console.error('[violations] filter failed', err));
+		const query = searchInput?.value?.toLowerCase() || '';
+		document.querySelectorAll('#violationTable tbody tr').forEach(row => {
+			if (row.dataset?.placeholder === 'empty') return;
+			const text = row.innerText.toLowerCase();
+			row.style.display = query ? (text.includes(query) ? '' : 'none') : '';
+		});
 	}
 
 	function bindEvents() {
@@ -605,11 +484,11 @@
 			const button = event.target.closest('button[data-action]');
 			if (!button) return;
 			const action = button.dataset.action;
-			const id = button.dataset.id;
-			if (!id) return;
-			if (action === 'view') showViewModal(id);
-			else if (action === 'edit') prepareEditModal(id);
-			else if (action === 'delete') removeViolation(id);
+			const index = Number(button.dataset.index);
+			if (Number.isNaN(index)) return;
+			if (action === 'view') showViewModal(index);
+			else if (action === 'edit') prepareEditModal(index);
+			else if (action === 'delete') removeViolation(index);
 		});
 
 		studentLRNField?.addEventListener('blur', () => {
@@ -654,10 +533,10 @@
 
 	async function init() {
 		bindEvents();
-		await Promise.all([loadStudents(), loadViolations()]);
+		await Promise.all([loadStudents(), fetchData(1)]);
 	}
 
-	window.searchViolation = () => filterTable();
+	window.searchViolation = filterTable;
 
 	init();
 })();

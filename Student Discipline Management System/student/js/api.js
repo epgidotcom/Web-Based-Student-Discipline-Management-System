@@ -26,6 +26,19 @@ function buildUrl(path){
   return rawBase.endsWith('/api') ? rawBase + path : rawBase + path;
 }
 
+function redirectToLogin(){
+  if (window.__SDMS_REDIRECTING__) return;
+  window.__SDMS_REDIRECTING__ = true;
+  try {
+    localStorage.removeItem('sdms_auth_v1');
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+  } catch (_) {}
+  const isStudentArea = window.location.pathname.includes('/student/');
+  const target = isStudentArea ? '../index.html' : 'index.html';
+  window.location.href = target;
+}
+
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   const token = getStoredToken();
   const hasBody = body !== undefined && body !== null;
@@ -44,10 +57,7 @@ export async function api(path, { method = 'GET', body, headers = {} } = {}) {
     credentials: 'omit'
   });
   if (res.status === 401) {
-    // Token invalid/expired
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    window.location.href = '../index.html';
+    redirectToLogin();
     return Promise.reject(new Error('Unauthorized'));
   }
   if (!res.ok) {
