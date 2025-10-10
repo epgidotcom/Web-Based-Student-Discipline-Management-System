@@ -1,5 +1,8 @@
 import { api } from './api.js';
 
+const API_ORIGIN = (window.SDMS_CONFIG?.API_BASE || 'https://sdms-backend.onrender.com').replace(/\/+$/, '');
+const APPEALS_BASE = `${API_ORIGIN}/api/appeals`;
+
 const state = {
   appeals: [],
   selectedAppealId: null,
@@ -64,6 +67,7 @@ function truncate(text, max = 80) {
   if (!text) return '';
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
+
 function renderAppeals() {
   if (!appealRows) return;
   appealRows.innerHTML = '';
@@ -81,7 +85,7 @@ function renderAppeals() {
 
   state.appeals.forEach((appeal) => {
     const row = document.createElement('tr');
-  row.dataset.id = String(appeal.id);
+    row.dataset.id = String(appeal.id);
     const statusClass = (appeal.status || 'pending').toLowerCase();
     const latest = appeal.latestMessage;
     const lastPreview = latest
@@ -156,7 +160,7 @@ async function loadMessages(appealId) {
   state.loadingMessages = true;
   renderMessages();
   try {
-    const data = await api(`/appeals/${appealId}/messages`);
+    const data = await api(`${APPEALS_BASE}/${appealId}/messages`);
     state.messages = Array.isArray(data) ? data : [];
   } catch (err) {
     console.error('[student appeals] messages load failed', err);
@@ -198,7 +202,7 @@ function guessLrn(user) {
 
 async function loadAppeals() {
   try {
-    const data = await api('/appeals?mine=1');
+    const data = await api(`${APPEALS_BASE}?mine=1`);
     state.appeals = Array.isArray(data) ? data : [];
     renderAppeals();
     if (state.appeals.length) {
@@ -236,7 +240,7 @@ async function submitAppeal(event) {
   };
 
   try {
-    const created = await api('/appeals', { method: 'POST', body: payload });
+    const created = await api(APPEALS_BASE, { method: 'POST', body: payload });
     state.appeals.unshift(created);
     renderAppeals();
     appealForm?.reset();
@@ -256,14 +260,14 @@ async function submitMessage(event) {
 
   messageSubmit?.setAttribute('disabled', 'disabled');
   try {
-    const created = await api(`/appeals/${state.selectedAppealId}/messages`, {
+    const created = await api(`${APPEALS_BASE}/${state.selectedAppealId}/messages`, {
       method: 'POST',
       body: { body }
     });
     state.messages.push(created);
     renderMessages();
     messageInput.value = '';
-  const appeal = state.appeals.find((a) => String(a.id) === state.selectedAppealId);
+    const appeal = state.appeals.find((a) => String(a.id) === state.selectedAppealId);
     if (appeal) {
       appeal.latestMessage = created;
       renderAppeals();
