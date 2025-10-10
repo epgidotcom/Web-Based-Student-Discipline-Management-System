@@ -14,15 +14,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const chartWrap = canvas.parentElement;
   const noteEl = document.querySelector('.chart-note');
   const defaultNote = noteEl?.textContent?.trim() || '';
+
+  // Empty-state element
   const emptyEl = document.createElement('div');
   emptyEl.id = 'predictiveEmpty';
   emptyEl.className = 'empty hidden';
   emptyEl.textContent = 'Forecast data will appear once the analytics service is connected.';
-  if (chartWrap?.parentElement) {
-    chartWrap.parentElement.insertBefore(emptyEl, chartWrap.nextSibling);
-  }
+  chartWrap?.parentElement?.insertBefore(emptyEl, chartWrap.nextSibling);
 
-  // container for external image mode
+  // External image container
   const imgWrap = document.createElement('div');
   imgWrap.id = 'predictiveImageWrap';
   imgWrap.className = 'hidden';
@@ -31,10 +31,34 @@ document.addEventListener('DOMContentLoaded', () => {
   imgWrap.style.gap = '12px';
   chartWrap?.parentElement?.insertBefore(imgWrap, chartWrap.nextSibling);
 
+  // --- collapse/restore helpers to remove blank space when showing image ---
+  const _orig = { display: '', height: '', padding: '', margin: '' };
+  function enterExternalMode() {
+    _orig.display = chartWrap.style.display;
+    _orig.height  = chartWrap.style.height;
+    _orig.padding = chartWrap.style.padding;
+    _orig.margin  = chartWrap.style.margin;
+
+    chartWrap.style.display = 'none';
+    chartWrap.style.height  = '0px';
+    chartWrap.style.padding = '0';
+    chartWrap.style.margin  = '0';
+  }
+  function exitExternalMode() {
+    chartWrap.style.display = _orig.display;
+    chartWrap.style.height  = _orig.height;
+    chartWrap.style.padding = _orig.padding;
+    chartWrap.style.margin  = _orig.margin;
+  }
+
   function setEmptyState(show) {
-    if (chartWrap) chartWrap.classList.toggle('hidden', show);
-    emptyEl?.classList.toggle('hidden', !show);
-    imgWrap?.classList.add('hidden');
+    if (show) {
+      imgWrap.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+      enterExternalMode(); // collapse any space as well
+    } else {
+      emptyEl?.classList.add('hidden');
+    }
   }
 
   function setNote(source) {
@@ -189,60 +213,58 @@ document.addEventListener('DOMContentLoaded', () => {
   let chartInstance;
 
   function renderExternalImages() {
-  // Hide chart, show image mode
-  chartWrap?.classList.add('hidden');
-  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-  imgWrap.classList.remove('hidden');
-  emptyEl?.classList.add('hidden');
+    // Collapse chart area fully and show image grid
+    enterExternalMode();
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    imgWrap.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
 
-  const strandSelect = document.getElementById('filterStrand');
-  const violationSelect = document.getElementById('filterViolation');
+    const strandSelect = document.getElementById('filterStrand');
+    const violationSelect = document.getElementById('filterViolation');
 
-  const strandValue = strandSelect?.value || 'All';      // e.g., 'STEM' or 'All'
-  const violationValue = violationSelect?.value || 'All';// e.g., 'Tardiness' or 'All'
-  const steps = forecastState.weeks.length || defaultWeeks.length;
+    const strandValue = strandSelect?.value || 'All';
+    const violationValue = violationSelect?.value || 'All';
+    const steps = forecastState.weeks.length || defaultWeeks.length;
 
-  // Clear any previous image(s)
-  imgWrap.innerHTML = '';
+    imgWrap.innerHTML = '';
 
-  // Build ONE image using the current filters (including "All")
-  const url = externalImageURL(strandValue, violationValue, steps);
+    // One image corresponding to current filters (supports "All")
+    const url = externalImageURL(strandValue, violationValue, steps);
 
-  const card = document.createElement('div');
-  card.style.border = '1px solid #e5e7eb';
-  card.style.borderRadius = '12px';
-  card.style.overflow = 'hidden';
-  card.style.background = '#fff';
-  card.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+    const card = document.createElement('div');
+    card.style.border = '1px solid #e5e7eb';
+    card.style.borderRadius = '12px';
+    card.style.overflow = 'hidden';
+    card.style.background = '#fff';
+    card.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
 
-  const header = document.createElement('div');
-  header.style.padding = '8px 12px';
-  header.style.fontSize = '13px';
-  header.style.fontWeight = '600';
-  header.style.background = '#f9fafb';
-  header.textContent = `${strandValue} — ${violationValue}`;
+    const header = document.createElement('div');
+    header.style.padding = '8px 12px';
+    header.style.fontSize = '13px';
+    header.style.fontWeight = '600';
+    header.style.background = '#f9fafb';
+    header.textContent = `${strandValue} — ${violationValue}`;
 
-  const img = document.createElement('img');
-  img.src = url; // accepts "All" now
-  img.alt = `${strandValue} / ${violationValue} (${steps} steps)`;
-  img.style.display = 'block';
-  img.style.width = '100%';
-  img.style.height = 'auto';
-  img.loading = 'lazy';
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = `${strandValue} / ${violationValue} (${steps} steps)`;
+    img.style.display = 'block';
+    img.style.width = '100%';
+    img.style.height = 'auto';
+    img.loading = 'lazy';
+    img.onerror = () => {
+      const fallback = document.createElement('div');
+      fallback.style.padding = '16px';
+      fallback.style.color = '#991b1b';
+      fallback.style.fontSize = '12px';
+      fallback.textContent = `Unable to load image for ${strandValue} / ${violationValue}`;
+      card.replaceChild(fallback, img);
+    };
 
-  img.onerror = () => {
-    const fallback = document.createElement('div');
-    fallback.style.padding = '16px';
-    fallback.style.color = '#991b1b';
-    fallback.style.fontSize = '12px';
-    fallback.textContent = `Unable to load image for ${strandValue} / ${violationValue}`;
-    card.replaceChild(fallback, img);
-  };
-
-  card.appendChild(header);
-  card.appendChild(img);
-  imgWrap.appendChild(card);
-}
+    card.appendChild(header);
+    card.appendChild(img);
+    imgWrap.appendChild(card);
+  }
 
   function updateChart() {
     if (forecastSource === 'external') {
@@ -301,14 +323,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Show chart, hide image mode, and restore wrapper
     imgWrap.classList.add('hidden');
+    exitExternalMode();
     chartWrap.classList.remove('hidden');
     setEmptyState(false);
     setNote(forecastSource);
 
     if (chartInstance) chartInstance.destroy();
-
-    // Ensure Chart is available
     if (typeof Chart === 'undefined') {
       console.error('Chart.js not loaded');
       return;
