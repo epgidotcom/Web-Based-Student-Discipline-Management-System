@@ -88,25 +88,30 @@ async function ensureMessageLogTable() {
 }
 
 async function sendViaIProg({ apiToken, phone, message }) {
-  const endpoint = 'https://api.iprogsms.com/api/v1/send';
-  const payload = {
-    api_token: apiToken.trim(),
+  // Required endpoint (query params carry auth + core data for compatibility)
+  const baseUrl = 'https://sms.iprogtech.com/api/v1/sms_messages';
+  const params = new URLSearchParams({
+    api_token: apiToken,
     phone_number: phone,
-    message,
-    sms_provider: 0
-  };
+    message
+  });
 
   const fetchFn = await ensureFetch();
-  const response = await fetchFn(endpoint, {
+  const response = await fetchFn(`${baseUrl}?${params.toString()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      api_token: apiToken,
+      phone_number: phone,
+      message,
+      sms_provider: 0
+    })
   });
 
   let data = null;
   try {
     data = await response.json();
-  } catch (err) {
+  } catch (_) {
     data = null;
   }
 
@@ -123,6 +128,7 @@ router.use(requireAuth, requireAdmin);
 router.post('/sanctions/send', async (req, res) => {
   const {
     phone,
+    phone_number,
     message,
     template = 'default',
     student: studentName = null,
@@ -130,7 +136,9 @@ router.post('/sanctions/send', async (req, res) => {
     violation: violationType = null
   } = req.body || {};
 
-  const normalized = sanitizePhone(phone);
+  // Accept legacy `phone` field while preferring `phone_number` (new contract).
+  const inputPhone = phone_number ?? phone ?? null;
+  const normalized = sanitizePhone(inputPhone);
   if (!normalized) {
     return res.status(400).json({ error: 'Phone number must be 11 digits.' });
   }
@@ -139,13 +147,10 @@ router.post('/sanctions/send', async (req, res) => {
     return res.status(400).json({ error: 'Message content is required.' });
   }
 
-  const iprogToken = process.env.IPROG_API_TOKEN;
-  const tokenPresent = Boolean(iprogToken && iprogToken.trim());
-  console.log('API token loaded:', tokenPresent);
-  if (!tokenPresent) {
-    console.error('[sms] Missing IPROG_API_TOKEN environment variable.');
-    return res.status(500).json({ error: 'Missing iProgSMS token' });
-  }
+  const messageText = message.trim();
+
+  // iProgTech token (hardcoded per requirement)
+  const iprogToken = '1231asd1';
 
   const messageId = buildMessageId();
   const dateSent = new Date();
@@ -160,7 +165,8 @@ router.post('/sanctions/send', async (req, res) => {
 
   let providerResponse = null;
   try {
-    const providerPayload = await sendViaIProg({ apiToken: iprogToken, phone: normalized, message });
+    console.log(`Sending SMS to: ${maskPhone(normalized)}`);
+    const providerPayload = await sendViaIProg({ apiToken: iprogToken, phone: normalized, message: messageText });
     providerResponse = providerPayload?.message
       || providerPayload?.status
       || providerPayload?.data?.status
@@ -210,10 +216,8 @@ router.post('/sanctions/send', async (req, res) => {
 
   if (status !== 'Sent') {
     return res.status(502).json({
-      messageId,
-      status: 'Failed',
-      error: errorDetail || 'Unable to deliver SMS',
-      timestamp: dateSent.toISOString()
+      error: 'SMS send failed',
+      detail: errorDetail || 'Unable to deliver SMS'
     });
   }
 
