@@ -157,7 +157,7 @@ router.post('/sanctions/send', async (req, res) => {
   const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 1;
 
   // iProgTech token (hardcoded per requirement)
-  const iprogToken = '1231asd1';
+  const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
 
   const messageId = buildMessageId();
   const dateSent = new Date();
