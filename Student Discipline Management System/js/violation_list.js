@@ -398,7 +398,7 @@
 			return;
 		}
 
-		const studentIdRaw = violationForm.dataset.studentId || '';
+		const studentIdRaw = violationForm.dataset.studentLRN || '';
 		const studentId = studentIdRaw ? Number(studentIdRaw) : null;
 
 		if (!studentId || Number.isNaN(studentId)) {
