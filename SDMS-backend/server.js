@@ -8,6 +8,7 @@ import smsRoute from './src/routes/sms.js';
 import studentsRoute from './src/routes/students.js';
 import violationsRoute from './src/routes/violations.js';
 import authRoute from './src/routes/auth.js';
+import appealsRoute from './src/routes/appeals.js';
 import messagesRoute from './src/routes/messages.js';
 import { runMigrations } from './src/migrate.js';
 
@@ -87,6 +88,7 @@ app.use('/api/sms', smsRoute);
 app.use('/api/students', studentsRoute);
 // IMPORTANT: Add violations route (missing earlier caused 404 on /api/violations)
 app.use('/api/violations', violationsRoute);
+app.use('/api/appeals', appealsRoute);
 app.use('/api/messages', messagesRoute);
 
 // Optional debug route to list mounted paths (enable by setting DEBUG_ROUTES=true)
