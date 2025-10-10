@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import axios from 'axios';
 import crypto from 'crypto';
 import { query } from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
@@ -49,17 +50,6 @@ function buildMessageId() {
   return `MSG-${stamp}-${suffix}`;
 }
 
-// Ensure fetch exists even on Node < 18 by lazily importing node-fetch.
-let cachedFetch = null;
-async function ensureFetch() {
-  if (typeof fetch === 'function') return fetch;
-  if (!cachedFetch) {
-    const mod = await import('node-fetch');
-    cachedFetch = mod.default;
-  }
-  return cachedFetch;
-}
-
 // Lazily ensure the audit table exists (helpful if migrations skipped in a new environment).
 let messageLogTableEnsured = false;
 async function ensureMessageLogTable() {
@@ -88,51 +78,29 @@ async function ensureMessageLogTable() {
 }
 
 async function sendViaIProg({ apiToken, phone, message }) {
-  const endpoint = 'https://sms.iprogtech.com/api/v1/sms_messages';
-  const trimmedToken = apiToken.trim();
-  const queryParams = new URLSearchParams({ api_token: trimmedToken });
-  const requestUrl = `${endpoint}?${queryParams.toString()}`;
-  const requestBody = {
-    api_token: trimmedToken,
+  const endpoint = 'https://api.iprogsms.com/api/v1/send';
+  const payload = {
+    api_token: apiToken.trim(),
     phone_number: phone,
     message,
     sms_provider: 0
   };
 
-  const fetchFn = await ensureFetch();
-  const response = await fetchFn(requestUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  });
-
-  let payload = null;
-  let rawText = null;
   try {
-    payload = await response.json();
-  } catch (_) {
-    rawText = await response.text();
-  }
+    const response = await axios.post(endpoint, payload, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 15000
+    });
 
-  if (!response.ok) {
-    const detail = payload?.message || payload?.error || rawText || response.statusText;
-    throw new Error(detail || 'SMS gateway rejected request');
-  }
-
-  const success = (() => {
-    if (!payload) return true; // assume success if gateway returned empty body
-    if (payload.success !== undefined) return Boolean(payload.success);
-    if (payload.status) return String(payload.status).toLowerCase() === 'success';
-    if (payload.data?.status) return String(payload.data.status).toLowerCase().includes('queued');
-    return true;
-  })();
-
-  if (!success) {
-    const detail = payload?.message || payload?.error || rawText || 'SMS gateway reported failure';
+    return response.data || {};
+  } catch (err) {
+    const detail = err.response?.data?.message
+      || err.response?.data?.error
+      || err.response?.statusText
+      || err.message
+      || 'SMS gateway error';
     throw new Error(detail);
   }
-
-  return payload || rawText;
 }
 
 router.use(requireAuth, requireAdmin);
@@ -157,9 +125,11 @@ router.post('/sanctions/send', async (req, res) => {
   }
 
   const iprogToken = process.env.IPROG_API_TOKEN;
-  if (!iprogToken) {
+  const tokenPresent = Boolean(iprogToken && iprogToken.trim());
+  console.log('API token loaded:', tokenPresent);
+  if (!tokenPresent) {
     console.error('[sms] Missing IPROG_API_TOKEN environment variable.');
-    return res.status(500).json({ error: 'SMS gateway not configured.' });
+    return res.status(500).json({ error: 'Missing iProgSMS token' });
   }
 
   const messageId = buildMessageId();
@@ -173,8 +143,13 @@ router.post('/sanctions/send', async (req, res) => {
   let status = 'Failed';
   let errorDetail = null;
 
+  let providerResponse = null;
   try {
-    await sendViaIProg({ apiToken: iprogToken, phone: normalized, message });
+    const providerPayload = await sendViaIProg({ apiToken: iprogToken, phone: normalized, message });
+    providerResponse = providerPayload?.message
+      || providerPayload?.status
+      || providerPayload?.data?.status
+      || 'Accepted';
     status = 'Sent';
     console.info(`[sms] ${messageId} dispatched to ${maskedPhone}`);
   } catch (err) {
@@ -228,9 +203,8 @@ router.post('/sanctions/send', async (req, res) => {
   }
 
   return res.json({
-    messageId,
     status: 'Sent',
-    timestamp: dateSent.toISOString()
+    providerResponse: providerResponse || 'Accepted'
   });
 });
 
