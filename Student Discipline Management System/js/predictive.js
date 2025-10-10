@@ -189,68 +189,60 @@ document.addEventListener('DOMContentLoaded', () => {
   let chartInstance;
 
   function renderExternalImages() {
-    chartWrap?.classList.add('hidden');
-    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-    imgWrap.classList.remove('hidden');
-    emptyEl?.classList.add('hidden');
+  // Hide chart, show image mode
+  chartWrap?.classList.add('hidden');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  imgWrap.classList.remove('hidden');
+  emptyEl?.classList.add('hidden');
 
-    const strandSelect = document.getElementById('filterStrand');
-    const violationSelect = document.getElementById('filterViolation');
-    const strandValue = strandSelect?.value || 'All';
-    const violationValue = violationSelect?.value || 'All';
-    const steps = forecastState.weeks.length || defaultWeeks.length;
+  const strandSelect = document.getElementById('filterStrand');
+  const violationSelect = document.getElementById('filterViolation');
 
-    const strands = strandValue === 'All' ? forecastState.strands : [strandValue];
-    const violations = violationValue === 'All' ? forecastState.violations : [violationValue];
+  const strandValue = strandSelect?.value || 'All';      // e.g., 'STEM' or 'All'
+  const violationValue = violationSelect?.value || 'All';// e.g., 'Tardiness' or 'All'
+  const steps = forecastState.weeks.length || defaultWeeks.length;
 
-    imgWrap.innerHTML = '';
-    const MAX_IMAGES = 20;
-    let count = 0;
+  // Clear any previous image(s)
+  imgWrap.innerHTML = '';
 
-    for (const s of strands) {
-      for (const v of violations) {
-        if (count >= MAX_IMAGES) break;
-        const url = externalImageURL(s, v, steps);
+  // Build ONE image using the current filters (including "All")
+  const url = externalImageURL(strandValue, violationValue, steps);
 
-        const card = document.createElement('div');
-        card.style.border = '1px solid #e5e7eb';
-        card.style.borderRadius = '12px';
-        card.style.overflow = 'hidden';
-        card.style.background = '#fff';
-        card.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+  const card = document.createElement('div');
+  card.style.border = '1px solid #e5e7eb';
+  card.style.borderRadius = '12px';
+  card.style.overflow = 'hidden';
+  card.style.background = '#fff';
+  card.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
 
-        const header = document.createElement('div');
-        header.style.padding = '8px 12px';
-        header.style.fontSize = '13px';
-        header.style.fontWeight = '600';
-        header.style.background = '#f9fafb';
-        header.textContent = `${s} — ${v}`;
+  const header = document.createElement('div');
+  header.style.padding = '8px 12px';
+  header.style.fontSize = '13px';
+  header.style.fontWeight = '600';
+  header.style.background = '#f9fafb';
+  header.textContent = `${strandValue} — ${violationValue}`;
 
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = `${s} / ${v} (${steps} steps)`;
-        img.style.display = 'block';
-        img.style.width = '100%';
-        img.style.height = 'auto';
-        img.loading = 'lazy';
+  const img = document.createElement('img');
+  img.src = url; // accepts "All" now
+  img.alt = `${strandValue} / ${violationValue} (${steps} steps)`;
+  img.style.display = 'block';
+  img.style.width = '100%';
+  img.style.height = 'auto';
+  img.loading = 'lazy';
 
-        img.onerror = () => {
-          const fallback = document.createElement('div');
-          fallback.style.padding = '16px';
-          fallback.style.color = '#991b1b';
-          fallback.style.fontSize = '12px';
-          fallback.textContent = `Unable to load image for ${s} / ${v}`;
-          card.replaceChild(fallback, img);
-        };
+  img.onerror = () => {
+    const fallback = document.createElement('div');
+    fallback.style.padding = '16px';
+    fallback.style.color = '#991b1b';
+    fallback.style.fontSize = '12px';
+    fallback.textContent = `Unable to load image for ${strandValue} / ${violationValue}`;
+    card.replaceChild(fallback, img);
+  };
 
-        card.appendChild(header);
-        card.appendChild(img);
-        imgWrap.appendChild(card);
-        count++;
-      }
-      if (count >= MAX_IMAGES) break;
-    }
-  }
+  card.appendChild(header);
+  card.appendChild(img);
+  imgWrap.appendChild(card);
+}
 
   function updateChart() {
     if (forecastSource === 'external') {
