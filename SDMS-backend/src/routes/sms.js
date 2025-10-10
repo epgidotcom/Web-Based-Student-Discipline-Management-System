@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import axios from 'axios';
 import crypto from 'crypto';
 import { query } from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
@@ -50,6 +49,17 @@ function buildMessageId() {
   return `MSG-${stamp}-${suffix}`;
 }
 
+// Ensure fetch exists even on Node < 18 by lazily importing node-fetch.
+let cachedFetch = null;
+async function ensureFetch() {
+  if (typeof fetch === 'function') return fetch;
+  if (!cachedFetch) {
+    const mod = await import('node-fetch');
+    cachedFetch = mod.default;
+  }
+  return cachedFetch;
+}
+
 // Lazily ensure the audit table exists (helpful if migrations skipped in a new environment).
 let messageLogTableEnsured = false;
 async function ensureMessageLogTable() {
@@ -86,21 +96,26 @@ async function sendViaIProg({ apiToken, phone, message }) {
     sms_provider: 0
   };
 
-  try {
-    const response = await axios.post(endpoint, payload, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 15000
-    });
+  const fetchFn = await ensureFetch();
+  const response = await fetchFn(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-    return response.data || {};
+  let data = null;
+  try {
+    data = await response.json();
   } catch (err) {
-    const detail = err.response?.data?.message
-      || err.response?.data?.error
-      || err.response?.statusText
-      || err.message
-      || 'SMS gateway error';
+    data = null;
+  }
+
+  if (!response.ok) {
+    const detail = data?.message || data?.error || response.statusText || 'SMS gateway error';
     throw new Error(detail);
   }
+
+  return data || {};
 }
 
 router.use(requireAuth, requireAdmin);
