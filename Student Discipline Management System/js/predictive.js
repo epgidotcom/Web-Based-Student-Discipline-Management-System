@@ -1,9 +1,8 @@
-<script>
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('chartPredictive');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  //for merging
+
   const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
   const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
   const allowSimulated = Boolean(window.SDMS_CONFIG?.DEV_PREVIEW);
@@ -373,4 +372,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
   init();
 });
-</script>
