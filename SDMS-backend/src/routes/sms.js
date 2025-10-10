@@ -87,13 +87,14 @@ async function ensureMessageLogTable() {
   messageLogTableEnsured = true;
 }
 
-async function sendViaIProg({ apiToken, phone, message }) {
+async function sendViaIProg({ apiToken, phone, message, provider }) {
   // Required endpoint (query params carry auth + core data for compatibility)
   const baseUrl = 'https://sms.iprogtech.com/api/v1/sms_messages';
   const params = new URLSearchParams({
     api_token: apiToken,
     phone_number: phone,
-    message
+    message,
+    sms_provider: String(provider)
   });
 
   const fetchFn = await ensureFetch();
@@ -104,7 +105,7 @@ async function sendViaIProg({ apiToken, phone, message }) {
       api_token: apiToken,
       phone_number: phone,
       message,
-      sms_provider: 0
+      sms_provider: provider
     })
   });
 
@@ -133,7 +134,8 @@ router.post('/sanctions/send', async (req, res) => {
     template = 'default',
     student: studentName = null,
     studentId = null,
-    violation: violationType = null
+    violation: violationType = null,
+    smsProvider: requestedProvider = 1
   } = req.body || {};
 
   // Accept legacy `phone` field while preferring `phone_number` (new contract).
@@ -148,6 +150,11 @@ router.post('/sanctions/send', async (req, res) => {
   }
 
   const messageText = message.trim();
+
+  const provider = Number.isInteger(requestedProvider)
+    ? requestedProvider
+    : Number.parseInt(requestedProvider, 10);
+  const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 1;
 
   // iProgTech token (hardcoded per requirement)
   const iprogToken = '1231asd1';
@@ -166,7 +173,12 @@ router.post('/sanctions/send', async (req, res) => {
   let providerResponse = null;
   try {
     console.log(`Sending SMS to: ${maskPhone(normalized)}`);
-    const providerPayload = await sendViaIProg({ apiToken: iprogToken, phone: normalized, message: messageText });
+    const providerPayload = await sendViaIProg({
+      apiToken: iprogToken,
+      phone: normalized,
+      message: messageText,
+      provider: smsProvider
+    });
     providerResponse = providerPayload?.message
       || providerPayload?.status
       || providerPayload?.data?.status
