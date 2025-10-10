@@ -1,3 +1,4 @@
+<script>
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('chartPredictive');
   if (!canvas) return;
@@ -372,3 +373,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   init();
 });
+</script>
