@@ -8,6 +8,11 @@
   const isFile = protocol === 'file:';
 
   const FALLBACK_REMOTE = 'https://sdms-backend.onrender.com';
+  const LEGACY_BACKENDS = [
+    'https://web-based-student-discipline-management.onrender.com',
+    'https://web-based-student-discipline-management.onrender.com/api',
+    'https://web-based-student-disciplines.onrender.com'
+  ];
   const FALLBACK_LOCAL = 'http://localhost:3000';
 
   const metaBase = document.querySelector('meta[name="sdms-api-base"]')?.content;
@@ -20,9 +25,14 @@
     .trim()
     .replace(/\/+$/, '');
 
+  function isLegacyBackend(url){
+    if (!url) return false;
+    return LEGACY_BACKENDS.some((legacy) => url.startsWith(legacy));
+  }
+
   function computeBase(raw){
     const cleaned = normalize(raw);
-    if (cleaned) return cleaned;
+    if (cleaned && !isLegacyBackend(cleaned)) return cleaned;
 
     const isLocalOrigin = isLocalHost || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(origin || '');
 
@@ -56,7 +66,7 @@
 
   function setApiBase(next){
     const cfg = deriveConfig(next);
-    try { localStorage.setItem('sdms:api-base', cfg.API_BASE); }
+  try { localStorage.setItem('sdms:api-base', cfg.API_BASE); }
     catch(_){}
     return cfg;
   }
