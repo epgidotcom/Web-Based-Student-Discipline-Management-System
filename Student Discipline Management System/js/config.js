@@ -32,19 +32,26 @@
 
   function computeBase(raw){
     const cleaned = normalize(raw);
-    if (cleaned && !isLegacyBackend(cleaned)) return cleaned;
+    const originIsLocal = isLocalHost || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(origin || '');
 
-    const isLocalOrigin = isLocalHost || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(origin || '');
+    if (cleaned && !isLegacyBackend(cleaned)) {
+      if (!originIsLocal && origin && !isLegacyBackend(origin) && cleaned === FALLBACK_REMOTE) {
+        return origin.replace(/\/+$/, '');
+      }
+      return cleaned;
+    }
 
-    if (isLocalOrigin && origin) {
+    if (originIsLocal && origin) {
       if (LIVE_SERVER_PORTS.has(location?.port)) {
         return FALLBACK_LOCAL;
       }
       return origin.replace(/\/+$/, '');
     }
     if (isFile) return FALLBACK_REMOTE;
-    if (origin && !isLocalOrigin) return FALLBACK_REMOTE;
-    return FALLBACK_LOCAL;
+    if (origin && !originIsLocal && !isLegacyBackend(origin)) {
+      return origin.replace(/\/+$/, '');
+    }
+    return FALLBACK_REMOTE;
   }
 
   function deriveConfig(raw){
