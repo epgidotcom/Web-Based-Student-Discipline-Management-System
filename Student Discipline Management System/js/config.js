@@ -7,7 +7,7 @@
   const LIVE_SERVER_PORTS = new Set(['5500', '5501', '5502']);
   const isFile = protocol === 'file:';
 
-  const FALLBACK_REMOTE = 'https://web-based-student-discipline-management.onrender.com';
+  const FALLBACK_REMOTE = 'https://sdms-backend.onrender.com';
   const FALLBACK_LOCAL = 'http://localhost:3000';
 
   const metaBase = document.querySelector('meta[name="sdms-api-base"]')?.content;
