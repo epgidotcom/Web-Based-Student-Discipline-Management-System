@@ -171,45 +171,24 @@ CREATE TABLE IF NOT EXISTS appeal_messages (
 CREATE INDEX IF NOT EXISTS idx_appeal_messages_appeal ON appeal_messages(appeal_id);
 CREATE INDEX IF NOT EXISTS idx_appeal_messages_created ON appeal_messages(created_at);
 
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  receiver_account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(sender_account_id, receiver_account_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at DESC);
+
+-- SMS logs
 CREATE TABLE IF NOT EXISTS sms_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone TEXT NOT NULL,
   message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
-CREATE TABLE IF NOT EXISTS sms_announcements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT,
-  message TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes
-     WHERE schemaname = current_schema()
-       AND indexname = 'idx_sms_announcements_created'
-  ) THEN
-    EXECUTE 'CREATE INDEX idx_sms_announcements_created ON sms_announcements (created_at DESC)';
-  END IF;
-END$$;
-
--- Internal student messaging (admin <-> student)
-CREATE TYPE IF NOT EXISTS student_message_sender_role AS ENUM ('Admin','Teacher','Student');
-
-CREATE TABLE IF NOT EXISTS student_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  sender_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
-  sender_role student_message_sender_role NOT NULL,
-  subject TEXT,
-  body TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  read_at TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS idx_student_messages_student ON student_messages(student_account_id);
-CREATE INDEX IF NOT EXISTS idx_student_messages_created ON student_messages(created_at DESC);
 
 -- Students (idempotent evolution)
 CREATE TABLE IF NOT EXISTS students (

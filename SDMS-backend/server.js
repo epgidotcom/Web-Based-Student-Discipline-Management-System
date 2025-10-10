@@ -8,6 +8,7 @@ import smsRoute from './src/routes/sms.js';
 import studentsRoute from './src/routes/students.js';
 import violationsRoute from './src/routes/violations.js';
 import authRoute from './src/routes/auth.js';
+import messagesRoute from './src/routes/messages.js';
 import { runMigrations } from './src/migrate.js';
 
 const app = express();
@@ -79,10 +80,6 @@ app.get('/', (_req, res) => {
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 // Debug endpoint to introspect allowed origins (remove or protect later)
-app.get('/_debug/allowed-origins', (_req, res) => {
-  res.json({ allowed, note: 'Modify ALLOWED_ORIGINS env var (comma-separated). Wildcards supported via *.domain.tld' });
-});
-
 app.use('/api/accounts', accountsRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/past-offenses', offensesRoute);
@@ -90,6 +87,7 @@ app.use('/api/sms', smsRoute);
 app.use('/api/students', studentsRoute);
 // IMPORTANT: Add violations route (missing earlier caused 404 on /api/violations)
 app.use('/api/violations', violationsRoute);
+app.use('/api/messages', messagesRoute);
 
 // Optional debug route to list mounted paths (enable by setting DEBUG_ROUTES=true)
 if (process.env.DEBUG_ROUTES === 'true') {

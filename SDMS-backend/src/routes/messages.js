@@ -3,207 +3,207 @@ import { query } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
-const PRIVILEGED_ROLES = new Set(['Admin', 'Teacher']);
+const ADMIN_ROLES = new Set(['Admin', 'Teacher']);
 
-function isPrivileged(user) {
-  return Boolean(user && PRIVILEGED_ROLES.has(user.role));
-}
+const isAdmin = (user) => Boolean(user && ADMIN_ROLES.has(user.role));
 
-function mapMessageRow(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    studentAccountId: row.student_account_id,
-    senderAccountId: row.sender_account_id,
-    senderRole: row.sender_role,
-    senderName: row.sender_name || null,
-    subject: row.subject || null,
-    body: row.body,
-    createdAt: row.created_at,
-    readAt: row.read_at
-  };
-}
+const mapAccount = (row) => ({
+  id: row.id,
+  name: row.full_name,
+  role: row.role,
+  grade: row.grade || null
+});
 
-function mapThreadRow(row) {
-  if (!row) return null;
-  return {
-    studentAccountId: row.student_account_id,
-    studentName: row.student_name,
-    studentUsername: row.student_username,
-    studentGrade: row.student_grade,
-    lastMessage: {
-      subject: row.last_subject || null,
-      body: row.last_body || null,
-      createdAt: row.last_created_at,
-      senderRole: row.last_sender_role,
-      senderName: row.sender_name || null
-    },
-    messageCount: Number(row.message_count || 0)
-  };
-}
+const mapMessageRow = (row) => ({
+  id: row.id,
+  body: row.body,
+  createdAt: row.created_at,
+  sender: {
+    id: row.sender_account_id,
+    name: row.sender_name || null,
+    role: row.sender_role || null
+  },
+  receiver: {
+    id: row.receiver_account_id,
+    name: row.receiver_name || null,
+    role: row.receiver_role || null
+  }
+});
 
-async function getStudentAccount(accountId) {
+async function fetchAccount(accountId) {
   if (!accountId) return null;
   const { rows } = await query(
-    `SELECT id, full_name, username, grade
-       FROM accounts
-      WHERE id = $1 AND role = 'Student'`,
+    'SELECT id, full_name, role, grade FROM accounts WHERE id = $1',
     [accountId]
   );
   return rows[0] || null;
 }
 
-async function markAllRead(studentAccountId) {
-  if (!studentAccountId) return;
-  try {
-    await query(
-      `UPDATE student_messages
-          SET read_at = NOW()
-        WHERE student_account_id = $1
-          AND read_at IS NULL`,
-      [studentAccountId]
-    );
-  } catch (err) {
-    console.warn('[messages] failed marking messages read', err);
-  }
+async function resolveDefaultAdmin() {
+  const { rows } = await query(
+    `SELECT id, full_name, role, grade
+       FROM accounts
+      WHERE role IN ('Admin','Teacher')
+      ORDER BY created_at ASC
+      LIMIT 1`
+  );
+  return rows[0] || null;
 }
 
-router.get('/threads', requireAuth, async (req, res) => {
-  if (!isPrivileged(req.user)) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
+router.use(requireAuth);
+
+router.get('/participants', async (req, res) => {
   try {
+    const user = req.user;
+    const limit = Math.min(parseInt(req.query.limit ?? '200', 10) || 200, 500);
+
+    if (isAdmin(user)) {
+      const { rows } = await query(
+        `SELECT id, full_name, role, grade
+           FROM accounts
+          WHERE role = 'Student'
+          ORDER BY full_name ASC NULLS LAST
+          LIMIT $1`,
+        [limit]
+      );
+      res.json({ success: true, participants: rows.map(mapAccount) });
+      return;
+    }
+
     const { rows } = await query(
-      `WITH ranked AS (
-         SELECT sm.*, 
-                ROW_NUMBER() OVER (PARTITION BY sm.student_account_id ORDER BY sm.created_at DESC) AS rn,
-                COUNT(*) OVER (PARTITION BY sm.student_account_id) AS message_count,
-                stu.full_name AS student_name,
-                stu.username AS student_username,
-                stu.grade AS student_grade,
-                sender.full_name AS sender_name
-           FROM student_messages sm
-           JOIN accounts stu ON stu.id = sm.student_account_id
-           LEFT JOIN accounts sender ON sender.id = sm.sender_account_id
-          WHERE stu.role = 'Student'
-       )
-       SELECT student_account_id,
-              student_name,
-              student_username,
-              student_grade,
-              subject AS last_subject,
-              body AS last_body,
-              created_at AS last_created_at,
-              sender_role AS last_sender_role,
-              sender_name,
-              message_count
-         FROM ranked
-        WHERE rn = 1
-       ORDER BY last_created_at DESC NULLS LAST`
-     );
-    res.json(rows.map(mapThreadRow));
+      `SELECT id, full_name, role, grade
+         FROM accounts
+        WHERE role IN ('Admin','Teacher')
+        ORDER BY created_at ASC
+        LIMIT $1`,
+      [limit]
+    );
+    res.json({ success: true, participants: rows.map(mapAccount) });
   } catch (err) {
-    console.error('[messages] threads failed', err);
-    res.status(500).json({ error: 'Failed to load message threads' });
+    console.error('[messages] participants failed', err);
+    res.status(500).json({ success: false, error: 'Failed to load participants' });
   }
 });
 
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const { studentAccountId } = req.query;
     const user = req.user;
-    const privileged = isPrivileged(user);
+    const participantId = req.query.participantId || req.query.accountId || null;
+    const before = req.query.before ? new Date(req.query.before) : null;
+    const after = req.query.after ? new Date(req.query.after) : null;
+    const limit = Math.min(parseInt(req.query.limit ?? '200', 10) || 200, 500);
 
-    let targetAccountId = studentAccountId || null;
-    if (!targetAccountId) {
-      if (privileged) {
-        return res.status(400).json({ error: 'studentAccountId is required' });
+    const params = [];
+    const whereParts = [];
+
+    const userParam = `$${params.push(user.id)}`;
+
+    if (participantId) {
+      const participant = await fetchAccount(participantId);
+      if (!participant) {
+        return res.status(404).json({ success: false, error: 'Participant not found' });
       }
-      targetAccountId = user.id;
+      if (!isAdmin(user) && participant.role === 'Student' && participant.id !== user.id) {
+        return res.status(403).json({ success: false, error: 'Students may only message school staff.' });
+      }
+      const participantParam = `$${params.push(participantId)}`;
+      whereParts.push(
+        `((m.sender_account_id = ${userParam} AND m.receiver_account_id = ${participantParam})
+         OR (m.sender_account_id = ${participantParam} AND m.receiver_account_id = ${userParam}))`
+      );
+    } else if (!isAdmin(user)) {
+      whereParts.push(`(m.sender_account_id = ${userParam} OR m.receiver_account_id = ${userParam})`);
     }
 
-    if (!privileged && targetAccountId !== user.id) {
-      return res.status(403).json({ error: 'Forbidden' });
+    if (after && !Number.isNaN(after.getTime())) {
+      const p = `$${params.push(after.toISOString())}`;
+      whereParts.push(`m.created_at >= ${p}`);
+    }
+    if (before && !Number.isNaN(before.getTime())) {
+      const p = `$${params.push(before.toISOString())}`;
+      whereParts.push(`m.created_at <= ${p}`);
     }
 
-    const studentAccount = await getStudentAccount(targetAccountId);
-    if (!studentAccount) {
-      return res.status(404).json({ error: 'Student account not found' });
-    }
+    const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const limitParam = `$${params.push(limit)}`;
 
-    const { rows } = await query(
-      `SELECT sm.*, sender.full_name AS sender_name
-         FROM student_messages sm
-         LEFT JOIN accounts sender ON sender.id = sm.sender_account_id
-        WHERE sm.student_account_id = $1
-        ORDER BY sm.created_at ASC`,
-      [studentAccount.id]
-    );
-    if (!privileged) {
-      await markAllRead(studentAccount.id);
-    }
-    res.json(rows.map(mapMessageRow));
+    const sql = `
+      SELECT m.*,
+             sa.full_name AS sender_name, sa.role AS sender_role,
+             ra.full_name AS receiver_name, ra.role AS receiver_role
+        FROM messages m
+        LEFT JOIN accounts sa ON sa.id = m.sender_account_id
+        LEFT JOIN accounts ra ON ra.id = m.receiver_account_id
+      ${whereClause}
+        ORDER BY m.created_at ASC
+        LIMIT ${limitParam}`;
+
+    const { rows } = await query(sql, params);
+    res.json({ success: true, messages: rows.map(mapMessageRow) });
   } catch (err) {
     console.error('[messages] list failed', err);
-    res.status(500).json({ error: 'Failed to load messages' });
+    res.status(500).json({ success: false, error: 'Failed to load messages' });
   }
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const { studentAccountId, subject, body } = req.body || {};
     const user = req.user;
-    const privileged = isPrivileged(user);
-
-    const messageBody = (body || '').trim();
-    if (!messageBody) {
-      return res.status(400).json({ error: 'Message body is required' });
+    let receiverId = req.body?.receiverId || req.body?.receiver_id || null;
+    const content = (req.body?.content ?? req.body?.body ?? '').trim();
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'Message content is required' });
     }
 
-    let targetAccountId = studentAccountId || null;
-    if (privileged) {
-      if (!targetAccountId) {
-        return res.status(400).json({ error: 'studentAccountId is required' });
+    const senderIsAdmin = isAdmin(user);
+
+    if (!receiverId) {
+      if (senderIsAdmin) {
+        return res.status(400).json({ success: false, error: 'receiverId is required' });
       }
-    } else {
-      if (targetAccountId && targetAccountId !== user.id) {
-        return res.status(403).json({ error: 'Forbidden' });
+      const fallback = await resolveDefaultAdmin();
+      if (!fallback) {
+        return res.status(400).json({ success: false, error: 'No administrator available to receive messages.' });
       }
-      targetAccountId = user.id;
+      receiverId = fallback.id;
     }
 
-    const studentAccount = await getStudentAccount(targetAccountId);
-    if (!studentAccount) {
-      return res.status(404).json({ error: 'Student account not found' });
+    if (receiverId === user.id) {
+      return res.status(400).json({ success: false, error: 'Cannot send a message to yourself.' });
     }
 
-    const senderRole = privileged ? user.role : 'Student';
-    const cleanSubject = subject ? String(subject).trim() || null : null;
+    const receiver = await fetchAccount(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ success: false, error: 'Receiver not found' });
+    }
 
-    const insertResult = await query(
-      `INSERT INTO student_messages (student_account_id, sender_account_id, sender_role, subject, body, created_at)
-       VALUES ($1,$2,$3,$4,$5,NOW())
-       RETURNING id`,
-      [studentAccount.id, user.id, senderRole, cleanSubject, messageBody]
-    );
-
-    const insertedId = insertResult.rows[0]?.id;
-    if (!insertedId) {
-      return res.status(500).json({ error: 'Failed to send message' });
+    if (!senderIsAdmin && receiver.role === 'Student' && receiver.id !== user.id) {
+      return res.status(403).json({ success: false, error: 'Students may only message administrators or teachers.' });
     }
 
     const { rows } = await query(
-      `SELECT sm.*, sender.full_name AS sender_name
-         FROM student_messages sm
-         LEFT JOIN accounts sender ON sender.id = sm.sender_account_id
-        WHERE sm.id = $1`,
-      [insertedId]
+      `INSERT INTO messages (sender_account_id, receiver_account_id, body)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [user.id, receiver.id, content]
+    );
+    const inserted = rows[0];
+
+    const { rows: hydrated } = await query(
+      `SELECT m.*,
+              sa.full_name AS sender_name, sa.role AS sender_role,
+              ra.full_name AS receiver_name, ra.role AS receiver_role
+         FROM messages m
+         LEFT JOIN accounts sa ON sa.id = m.sender_account_id
+         LEFT JOIN accounts ra ON ra.id = m.receiver_account_id
+        WHERE m.id = $1`,
+      [inserted.id]
     );
 
-    res.status(201).json(mapMessageRow(rows[0]));
+    res.status(201).json({ success: true, message: mapMessageRow(hydrated[0]) });
   } catch (err) {
     console.error('[messages] create failed', err);
-    res.status(500).json({ error: 'Failed to send message' });
+    res.status(500).json({ success: false, error: 'Failed to send message' });
   }
 });
 
