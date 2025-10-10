@@ -1,7 +1,8 @@
 import { api } from './api.js';
 
 const API_ORIGIN = (window.SDMS_CONFIG?.API_BASE || 'https://sdms-backend.onrender.com').replace(/\/+$/, '');
-const APPEALS_BASE = `${API_ORIGIN}/api/appeals`;
+const API_ROOT = (window.API_BASE || `${API_ORIGIN}/api`).replace(/\/+$/, '');
+const APPEALS_BASE = `${API_ROOT}/appeals`;
 
 const state = {
   appeals: [],
