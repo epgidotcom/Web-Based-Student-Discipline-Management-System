@@ -399,7 +399,7 @@
 		}
 		const studentIdRaw = violationForm.dataset.studentId || '';
 		//const studentIdRaw = studentLRNField.value || '';
-		const studentId = studentIdRaw ? Number(studentIdRaw) : null;
+		const studentId = studentIdRaw ? studentIdRaw : null;
 
 		if (!studentId || Number.isNaN(studentId)) {
 			alert('Please enter a valid student LRN to link this violation to an existing student.');
