@@ -397,8 +397,8 @@
 		if (violationForm && !violationForm.reportValidity()) {
 			return;
 		}
-		//const studentIdRaw = violationForm.dataset.studentid || '';
-		const studentIdRaw = studentLRNField.value || '';
+		const studentIdRaw = violationForm.dataset.studentId || '';
+		//const studentIdRaw = studentLRNField.value || '';
 		const studentId = studentIdRaw ? Number(studentIdRaw) : null;
 
 		if (!studentId || Number.isNaN(studentId)) {
