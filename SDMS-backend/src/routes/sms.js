@@ -89,18 +89,21 @@ async function ensureMessageLogTable() {
 
 async function sendViaIProg({ apiToken, phone, message }) {
   const endpoint = 'https://sms.iprogtech.com/api/v1/sms_messages';
-  const params = new URLSearchParams({
-    api_token: apiToken,
+  const trimmedToken = apiToken.trim();
+  const queryParams = new URLSearchParams({ api_token: trimmedToken });
+  const requestUrl = `${endpoint}?${queryParams.toString()}`;
+  const requestBody = {
+    api_token: trimmedToken,
     phone_number: phone,
     message,
-    sms_provider: '0'
-  });
+    sms_provider: 0
+  };
 
   const fetchFn = await ensureFetch();
-  const response = await fetchFn(endpoint, {
+  const response = await fetchFn(requestUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString()
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
   });
 
   let payload = null;
