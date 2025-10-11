@@ -319,6 +319,96 @@ ALTER TABLE students
   ALTER COLUMN last_name SET NOT NULL;
 
 -- Optional: keep legacy columns for now (student_id, full_name, grade_level). Remove manually later if desired.
+
+-- Schema organization for production readiness (idempotent and safe)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
+    EXECUTE 'CREATE SCHEMA auth';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'discipline') THEN
+    EXECUTE 'CREATE SCHEMA discipline';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'communication') THEN
+    EXECUTE 'CREATE SCHEMA communication';
+  END IF;
+END$$;
+
+-- Move tables into their target schemas without breaking existing code paths
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'accounts') THEN
+    EXECUTE 'ALTER TABLE public.accounts SET SCHEMA auth';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'password_reset_tokens') THEN
+    EXECUTE 'ALTER TABLE public.password_reset_tokens SET SCHEMA auth';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'students') THEN
+    EXECUTE 'ALTER TABLE public.students SET SCHEMA discipline';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'violations') THEN
+    EXECUTE 'ALTER TABLE public.violations SET SCHEMA discipline';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'violation') THEN
+    EXECUTE 'ALTER TABLE public.violation SET SCHEMA discipline';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'past_offenses') THEN
+    EXECUTE 'ALTER TABLE public.past_offenses SET SCHEMA discipline';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'appeals') THEN
+    EXECUTE 'ALTER TABLE public.appeals SET SCHEMA discipline';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'messages') THEN
+    EXECUTE 'ALTER TABLE public.messages SET SCHEMA communication';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'message_logs') THEN
+    EXECUTE 'ALTER TABLE public.message_logs SET SCHEMA communication';
+  END IF;
+END$$;
+
+-- Keep implicit SELECT * queries working by updating the database and role search_path
+DO $$
+DECLARE
+  db_name TEXT := current_database();
+  app_user TEXT := current_user;
+BEGIN
+  BEGIN
+    EXECUTE format('ALTER DATABASE %I SET search_path = auth, discipline, communication, public', db_name);
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Could not alter database search_path (insufficient privileges).';
+  END;
+
+  BEGIN
+    EXECUTE format('ALTER ROLE %I IN DATABASE %I SET search_path = auth, discipline, communication, public', app_user, db_name);
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Could not alter role search_path (insufficient privileges).';
+  END;
+END$$;
+
+-- Ensure backend role retains access to the new schemas and their relations
+DO $$
+DECLARE
+  app_user TEXT := current_user;
+BEGIN
+  BEGIN
+    EXECUTE format('GRANT USAGE ON SCHEMA auth TO %I', app_user);
+    EXECUTE format('GRANT USAGE ON SCHEMA discipline TO %I', app_user);
+    EXECUTE format('GRANT USAGE ON SCHEMA communication TO %I', app_user);
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Could not grant schema usage to % for user % (insufficient privileges).', 'auth/discipline/communication', app_user;
+  END;
+
+  BEGIN
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auth TO %I', app_user);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA discipline TO %I', app_user);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA communication TO %I', app_user);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', app_user);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA discipline GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', app_user);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA communication GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', app_user);
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Could not grant table privileges or default privileges to % (insufficient privileges).', app_user;
+  END;
+END$$;
 `;
   await query(sql);
   console.log('Migration complete');
