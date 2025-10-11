@@ -19,7 +19,7 @@
 html, body {
   height: 100%;
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica Neue, Arial;
+  font-family: Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -309,6 +309,7 @@ textarea {
 .btn.danger:hover {
   background-color: #c82333;
 }
+
 
 
 
