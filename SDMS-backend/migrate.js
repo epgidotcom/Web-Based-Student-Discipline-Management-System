@@ -336,34 +336,32 @@ END$$;
 
 -- Move tables into their target schemas without breaking existing code paths
 DO $$
+DECLARE
+  auth_tables TEXT[] := ARRAY['accounts','password_reset_tokens','password_reset_token'];
+  discipline_tables TEXT[] := ARRAY['students','violations','violation','past_offenses','appeals'];
+  communication_tables TEXT[] := ARRAY['messages','message_logs'];
+  tbl TEXT;
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'accounts') THEN
-    EXECUTE 'ALTER TABLE public.accounts SET SCHEMA auth';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'password_reset_tokens') THEN
-    EXECUTE 'ALTER TABLE public.password_reset_tokens SET SCHEMA auth';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'students') THEN
-    EXECUTE 'ALTER TABLE public.students SET SCHEMA discipline';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'violations') THEN
-    EXECUTE 'ALTER TABLE public.violations SET SCHEMA discipline';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'violation') THEN
-    EXECUTE 'ALTER TABLE public.violation SET SCHEMA discipline';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'past_offenses') THEN
-    EXECUTE 'ALTER TABLE public.past_offenses SET SCHEMA discipline';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'appeals') THEN
-    EXECUTE 'ALTER TABLE public.appeals SET SCHEMA discipline';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'messages') THEN
-    EXECUTE 'ALTER TABLE public.messages SET SCHEMA communication';
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'message_logs') THEN
-    EXECUTE 'ALTER TABLE public.message_logs SET SCHEMA communication';
-  END IF;
+  FOREACH tbl IN ARRAY auth_tables LOOP
+    IF to_regclass('auth.' || tbl) IS NULL AND to_regclass('public.' || tbl) IS NOT NULL THEN
+      EXECUTE format('ALTER TABLE %I.%I SET SCHEMA auth', 'public', tbl);
+      RAISE NOTICE 'Moved %.% to auth', 'public', tbl;
+    END IF;
+  END LOOP;
+
+  FOREACH tbl IN ARRAY discipline_tables LOOP
+    IF to_regclass('discipline.' || tbl) IS NULL AND to_regclass('public.' || tbl) IS NOT NULL THEN
+      EXECUTE format('ALTER TABLE %I.%I SET SCHEMA discipline', 'public', tbl);
+      RAISE NOTICE 'Moved %.% to discipline', 'public', tbl;
+    END IF;
+  END LOOP;
+
+  FOREACH tbl IN ARRAY communication_tables LOOP
+    IF to_regclass('communication.' || tbl) IS NULL AND to_regclass('public.' || tbl) IS NOT NULL THEN
+      EXECUTE format('ALTER TABLE %I.%I SET SCHEMA communication', 'public', tbl);
+      RAISE NOTICE 'Moved %.% to communication', 'public', tbl;
+    END IF;
+  END LOOP;
 END$$;
 
 -- Keep implicit SELECT * queries working by updating the database and role search_path
