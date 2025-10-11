@@ -120,7 +120,7 @@ studentForm && (studentForm.onsubmit = async (e) => {
     firstName: document.getElementById('firstName').value.trim(),
     middleName: document.getElementById('middleName').value.trim(),
     lastName: document.getElementById('lastName').value.trim(),
-    birthdate: document.getElementById('birthdate').value,
+  
     address: document.getElementById('address').value.trim(),
     grade: document.getElementById('grade').value,
     section: document.getElementById('section').value.trim(),
@@ -164,3 +164,4 @@ window.viewStudent=viewStudent; window.editStudent=editStudent; window.deleteStu
 document.getElementById('logoutBtn')?.addEventListener('click', ()=>{ window.location.href='index.html'; });
 
 console.log('[StudentsPage] script finished init');
+
