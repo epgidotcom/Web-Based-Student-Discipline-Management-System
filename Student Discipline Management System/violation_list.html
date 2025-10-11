@@ -52,36 +52,44 @@
     <h3>Violation List</h3>
     <button id="addViolationBtn" class="add-btn"><i class="fa fa-plus"></i> Add Violation</button>
 
-    <!-- 🔍 Filters + Search + Print -->
-    <div class="filter-container">
-      <!-- Dropdown filters -->
-      <select id="filterStrand">
-        <option value="">All Strands</option>
-        <option value="STEM">STEM</option>
-        <option value="HUMSS">HUMSS</option>
-        <option value="ABM">ABM</option>
-        <option value="GAS">GAS</option>
-        <option value="TVL">TVL</option>
-      </select>
+        <!-- Controls Row -->
+    <div class="top-controls">
+      <!-- Left: Search -->
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchViolation()">
+        <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
+      </div>
 
-      <select id="filterViolationType">
-        <option value="">All Violation Types</option>
-        <option value="First Offense">First Offense</option>
-        <option value="Second Offense">Second Offense</option>
-        <option value="Third Offense">Third Offense</option>
-      </select>
+      <!-- Right: Filters + Print -->
+      <div class="filter-container">
+        <select id="filterStrand">
+          <option value="">All Strands</option>
+          <option value="STEM">STEM</option>
+          <option value="HUMSS">HUMSS</option>
+          <option value="ABM">ABM</option>
+          <option value="GAS">GAS</option>
+          <option value="TVL">TVL</option>
+        </select>
 
-      <!-- Text search -->
-      <input type="text" id="filterText" placeholder="Type to search name, strand, or violation..." />
+        <select id="filterViolationType">
+          <option value="">All Violation Types</option>
+          <option value="First Offense">First Offense</option>
+          <option value="Second Offense">Second Offense</option>
+          <option value="Third Offense">Third Offense</option>
+        </select>
 
-      <button id="applyFilterBtn" class="filter-btn">
-        <i class="fa fa-filter"></i> Apply Filter
-      </button>
+        <input type="text" id="filterText" placeholder="Type to search name, strand, or violation..." />
 
-      <button id="printReportBtn" class="print-btn">
-        <i class="fa fa-print"></i> Print Report
-      </button>
+        <button id="applyFilterBtn" class="filter-btn">
+          <i class="fa fa-filter"></i> Apply Filter
+        </button>
+
+        <button id="printReportBtn" class="print-btn">
+          <i class="fa fa-print"></i> Print Report
+        </button>
+      </div>
     </div>
+
 
     <!-- Table -->
     <div class="table-wrap">
