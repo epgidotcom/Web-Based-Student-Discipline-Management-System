@@ -1,3 +1,5 @@
+/* === Global Search Bar (below Add Violation) === */
+/* === Search Bar (same as Student List) === */
 .search-container {
   margin-bottom: 25px;
   display: flex;
@@ -25,6 +27,7 @@
 .search-container button:hover {
   background-color: #2980b9;
 }
+
 
 table {
   width: 100%;
@@ -409,26 +412,67 @@ select option {
 
 
 
-/* === Filter Container (aligned right) === */
-.filter-container {
-  margin: 10px 0 20px;
+/* === Top Controls (Search left + Filters right) === */
+.top-controls {
   display: flex;
-  justify-content: flex-end; /* 👈 pushes everything to the right */
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 10px 0 20px;
+  gap: 10px;
+}
+
+/* Left side: Search bar */
+.search-container {
+  display: flex;
+  align-items: center;
+}
+
+.search-container input[type="text"] {
+  padding: 8px;
+  width: 250px;
+  border: 1px solid #ccc;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.search-container button {
+  padding: 8px 15px;
+  border: none;
+  background-color: #3498db;
+  color: white;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-container button:hover {
+  background-color: #2980b9;
+}
+
+/* Right side: Filters + Buttons */
+.filter-container {
+  display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.filter-container select {
-  width: 180px;
-  padding: 8px;
+.filter-container select,
+#filterText {
+  padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid #ccc;
-  background: #fff;
   font-size: 14px;
+  width: 180px;
 }
 
-.filter-btn, .print-btn {
+.filter-btn,
+.print-btn {
   background-color: #3498db;
   color: #fff;
   border: none;
@@ -444,6 +488,7 @@ select option {
 .filter-btn:hover { background-color: #2980b9; }
 .print-btn { background-color: #2ecc71; }
 .print-btn:hover { background-color: #27ae60; }
+
 
 
 /* === Print Styling === */
@@ -523,4 +568,3 @@ select option {
 #violationTable td:nth-child(5):hover {
   white-space: normal;
 }
-
