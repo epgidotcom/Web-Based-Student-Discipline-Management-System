@@ -12,18 +12,10 @@
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <!-- helpers -->
-  <style>
-    .is-hidden{display:none!important}
-    .past-offense-box{background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;max-height:140px;overflow:auto}
-    .po-list{margin:6px 0 0;padding-left:18px}
-    .po-list li{margin:2px 0}
-  </style>
 </head>
 <body>
 
-<!-- Sidebar (drawer on mobile) -->
+<!-- Sidebar -->
 <nav class="sidebar" id="sidebar" aria-hidden="true">
   <img src="images/mpnag_logo.png" alt="MPNAG Logo">
   <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
@@ -58,37 +50,64 @@
 
   <div class="widget">
     <h3>Violation List</h3>
-
     <button id="addViolationBtn" class="add-btn"><i class="fa fa-plus"></i> Add Violation</button>
 
-    <div class="search-container">
-      <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchViolation()">
-      <button type="button" class="search-btn"><i class="fa fa-search"></i> <span>Search</span></button>
+    <!-- 🔍 Filters + Search + Print -->
+    <div class="filter-container">
+      <!-- Dropdown filters -->
+      <select id="filterStrand">
+        <option value="">All Strands</option>
+        <option value="STEM">STEM</option>
+        <option value="HUMSS">HUMSS</option>
+        <option value="ABM">ABM</option>
+        <option value="GAS">GAS</option>
+        <option value="TVL">TVL</option>
+      </select>
+
+      <select id="filterViolationType">
+        <option value="">All Violation Types</option>
+        <option value="First Offense">First Offense</option>
+        <option value="Second Offense">Second Offense</option>
+        <option value="Third Offense">Third Offense</option>
+      </select>
+
+      <!-- Text search -->
+      <input type="text" id="filterText" placeholder="Type to search name, strand, or violation..." />
+
+      <button id="applyFilterBtn" class="filter-btn">
+        <i class="fa fa-filter"></i> Apply Filter
+      </button>
+
+      <button id="printReportBtn" class="print-btn">
+        <i class="fa fa-print"></i> Print Report
+      </button>
     </div>
 
-    <!-- Wrap table to avoid page-wide horizontal scroll on phones -->
+    <!-- Table -->
     <div class="table-wrap">
       <table id="violationTable">
         <thead>
           <tr>
             <th>Student Name</th>
-            <th>Grade &amp; Section</th>
-            <th>Past Offense</th>
+            <th>Grade & Section</th>
             <th>Incident Date</th>
-            <!-- Description intentionally hidden from the table -->
             <th>Violation Type</th>
+            <th>Violation Description</th>
+            <th>Past Offense</th>
             <th>Sanction</th>
-            <th>Added Date</th>
+            <th>Date Added</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
-      <div class="table-footer">
-        <div class="page-summary" id="violationsPageSummary" aria-live="polite">Showing 0 of 0</div>
-        <nav class="pagination" id="violationsPagination" aria-label="Violation list pagination"></nav>
-      </div>
+
+    <!-- Pagination -->
+    <div class="table-footer">
+      <div class="page-summary" id="violationsPageSummary" aria-live="polite">Showing 0 of 0</div>
+      <nav class="pagination" id="violationsPagination" aria-label="Violation list pagination"></nav>
+    </div>
   </div>
 </div>
 
@@ -102,26 +121,18 @@
       <input type="hidden" id="editIndex">
 
       <label>LRN (Lookup):</label>
-      <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" pattern="[0-9A-Za-z\- ]+" title="Alphanumeric LRN" />
+      <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" />
 
       <label>Student Name:</label>
       <input type="text" id="studentName" autocomplete="off" required>
 
-      <label>Grade &amp; Section:</label>
+      <label>Grade & Section:</label>
       <input type="text" id="gradeSection" placeholder="e.g., Grade 10 - St. Matthew" required>
-
-      <div id="pastOffenseWrap" class="is-hidden">
-        <label>Past Offense:</label>
-        <div id="pastOffenseBox" class="past-offense-box">
-          <p id="pastOffenseEmpty" class="hint">No past offenses.</p>
-          <ul id="pastOffenseList" class="po-list"></ul>
-        </div>
-      </div>
 
       <label>Incident Date:</label>
       <input type="date" id="incidentDate" required>
 
-      <label>Violation's Description:</label>
+      <label>Violation Description:</label>
       <textarea id="description" rows="3" placeholder="Describe the violation..." required></textarea>
 
       <label>Violation Type:</label>
@@ -169,47 +180,22 @@
       <h2>Violation Details</h2>
       <span class="close-btn">&times;</span>
     </div>
-
     <div class="violation-body">
-      <div class="detail-row">
-        <span class="label">Student</span>
-        <span class="value" id="viewStudent"></span>
-      </div>
+      <div class="detail-row"><span class="label">Student</span><span class="value" id="viewStudent"></span></div>
+      <div class="detail-row"><span class="label">Grade & Section</span><span class="value" id="viewGradeSection"></span></div>
+      <div class="detail-row"><span class="label">Incident Date</span><span class="value" id="viewIncidentDate"></span></div>
+      <div class="detail-row"><span class="label">Added Date</span><span class="value" id="viewAddedDate"></span></div>
+      <div class="detail-row"><span class="label">Violation Description</span><span class="value multiline" id="viewDescription"></span></div>
+      <div class="detail-row"><span class="label">Violation Type</span><span class="value" id="viewViolationType"></span></div>
 
-      <div class="detail-row">
-        <span class="label">Grade & Section</span>
-        <span class="value" id="viewGradeSection"></span>
-      </div>
-
+      <!-- 🩵 Added Missing Past Offense Section -->
       <div id="viewPastOffenseRow" class="detail-row is-hidden">
         <span class="label">Past Offense</span>
         <span class="value" id="viewPastOffense"></span>
       </div>
+      <!-- End Added Section -->
 
-      <div class="detail-row">
-        <span class="label">Incident Date</span>
-        <span class="value" id="viewIncidentDate"></span>
-      </div>
-
-      <div class="detail-row">
-        <span class="label">Added Date</span>
-        <span class="value" id="viewAddedDate"></span>
-      </div>
-
-      <div class="detail-row">
-        <span class="label">Violation Description</span>
-        <span class="value multiline" id="viewDescription"></span>
-      </div>
-
-      <div class="detail-row">
-        <span class="label">Violation Type</span>
-        <span class="value" id="viewViolationType"></span>
-      </div>
-
-      <div class="detail-row">
-        <span class="label">Sanction</span>
-        <span class="value" id="viewSanction"></span>
-      </div>
+      <div class="detail-row"><span class="label">Sanction</span><span class="value" id="viewSanction"></span></div>
 
       <div id="viewEvidenceWrap" class="is-hidden evidence-section">
         <strong>Evidence:</strong>
@@ -219,15 +205,14 @@
   </div>
 </div>
 
-<!-- ===== Image Preview Modal ===== -->
+
+<!-- Image Preview Modal -->
 <div id="imagePreviewModal" class="modal image-preview-modal">
   <span class="close-btn" id="imagePreviewClose">&times;</span>
   <img id="imagePreviewFull" class="image-preview-full" alt="Preview">
 </div>
 
-
 <!-- Scripts -->
-<script src="js/config.js"></script>
 <script src="js/config.js" defer></script>
 <script src="js/auth.js" defer></script>
 <script src="js/main.js" defer></script>
@@ -237,7 +222,7 @@
 <script>
   (function(){
     const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
-    const fallback = isLocal ? 'http://localhost:3000' : 'https://web-based-student-discipline-management.onrender.com';
+    const fallback = isLocal ? '' : 'https://web-based-student-discipline-management.onrender.com';
     window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
   })();
 </script>
