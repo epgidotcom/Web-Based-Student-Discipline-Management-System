@@ -2,41 +2,49 @@ import { query } from './db.js';
 
 export async function runMigrations() {
   const sql = `
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'sdms_discipline'
+        AND table_name = 'students'
+        AND column_name = 'full_name'
+    ) THEN
+      BEGIN
+        EXECUTE $$
+          UPDATE sdms_discipline.students
+          SET first_name = COALESCE(first_name, NULLIF(split_part(full_name,' ',1),'')),
+              last_name  = COALESCE(last_name,
+                            CASE
+                              WHEN full_name LIKE '% %' THEN split_part(full_name,' ', array_length(string_to_array(full_name,' '),1))
+                              ELSE full_name
+                            END)
+          WHERE full_name IS NOT NULL
+        $$;
+      EXCEPTION WHEN undefined_column THEN
+        RAISE NOTICE 'Skipped name backfill: column full_name missing';
+      END;
+    END IF;
+  END$$;
 
--- Accounts
-  const sql = `
-CREATE SCHEMA IF NOT EXISTS sdms_auth;
-CREATE SCHEMA IF NOT EXISTS sdms_discipline;
-CREATE SCHEMA IF NOT EXISTS sdms_communication;
-
-SET search_path TO sdms_auth, public;
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
--- Auth schema tables
-CREATE TABLE IF NOT EXISTS accounts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('Admin','Teacher','Student')),
-  grade TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  token TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  expires_at TIMESTAMPTZ NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account ON password_reset_tokens(account_id);
-
-SET search_path TO sdms_discipline, sdms_auth, public;
-
--- Discipline schema tables
+  DO $$
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'sdms_discipline'
+        AND table_name = 'students'
+        AND column_name = 'grade_level'
+    ) THEN
+      BEGIN
+        EXECUTE $$
+          UPDATE sdms_discipline.students
+          SET grade = COALESCE(grade, grade_level)
+          WHERE grade IS NULL
+        $$;
+      EXCEPTION WHEN undefined_column THEN
+        RAISE NOTICE 'Skipped grade backfill: column grade_level missing';
+      END;
+    END IF;
+  END$$;
 CREATE TABLE IF NOT EXISTS students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lrn TEXT UNIQUE,
