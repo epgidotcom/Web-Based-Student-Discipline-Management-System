@@ -2,7 +2,7 @@
 
 body {
   background: #f4f6fb;
-  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-family: Arial, sans-serif;
   color: #1f2937;
   margin: 0;
 }
@@ -305,3 +305,4 @@ body {
     max-width: 100%;
   }
 }
+
