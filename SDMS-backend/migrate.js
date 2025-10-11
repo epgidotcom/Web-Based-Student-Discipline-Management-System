@@ -334,25 +334,57 @@ DECLARE
   discipline_tables TEXT[] := ARRAY['students','violations','violation','past_offenses','appeals'];
   communication_tables TEXT[] := ARRAY['messages','message_logs'];
   tbl TEXT;
+  app_user TEXT := current_user;
+  target_schema TEXT;
 BEGIN
   FOREACH tbl IN ARRAY auth_tables LOOP
     IF to_regclass('auth.' || tbl) IS NULL AND to_regclass('public.' || tbl) IS NOT NULL THEN
-      EXECUTE format('ALTER TABLE %I.%I SET SCHEMA auth', 'public', tbl);
-      RAISE NOTICE 'Moved %.% to auth', 'public', tbl;
+      target_schema := 'auth';
+      BEGIN
+        EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', 'public', tbl, app_user);
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Could not change owner of %.%: %', 'public', tbl, SQLERRM;
+      END;
+      BEGIN
+        EXECUTE format('ALTER TABLE %I.%I SET SCHEMA %I', 'public', tbl, target_schema);
+        RAISE NOTICE 'Moved %.% to %', 'public', tbl, target_schema;
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Failed to move %.% to %: %', 'public', tbl, target_schema, SQLERRM;
+      END;
     END IF;
   END LOOP;
 
   FOREACH tbl IN ARRAY discipline_tables LOOP
     IF to_regclass('discipline.' || tbl) IS NULL AND to_regclass('public.' || tbl) IS NOT NULL THEN
-      EXECUTE format('ALTER TABLE %I.%I SET SCHEMA discipline', 'public', tbl);
-      RAISE NOTICE 'Moved %.% to discipline', 'public', tbl;
+      target_schema := 'discipline';
+      BEGIN
+        EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', 'public', tbl, app_user);
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Could not change owner of %.%: %', 'public', tbl, SQLERRM;
+      END;
+      BEGIN
+        EXECUTE format('ALTER TABLE %I.%I SET SCHEMA %I', 'public', tbl, target_schema);
+        RAISE NOTICE 'Moved %.% to %', 'public', tbl, target_schema;
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Failed to move %.% to %: %', 'public', tbl, target_schema, SQLERRM;
+      END;
     END IF;
   END LOOP;
 
   FOREACH tbl IN ARRAY communication_tables LOOP
     IF to_regclass('communication.' || tbl) IS NULL AND to_regclass('public.' || tbl) IS NOT NULL THEN
-      EXECUTE format('ALTER TABLE %I.%I SET SCHEMA communication', 'public', tbl);
-      RAISE NOTICE 'Moved %.% to communication', 'public', tbl;
+      target_schema := 'communication';
+      BEGIN
+        EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', 'public', tbl, app_user);
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Could not change owner of %.%: %', 'public', tbl, SQLERRM;
+      END;
+      BEGIN
+        EXECUTE format('ALTER TABLE %I.%I SET SCHEMA %I', 'public', tbl, target_schema);
+        RAISE NOTICE 'Moved %.% to %', 'public', tbl, target_schema;
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'Failed to move %.% to %: %', 'public', tbl, target_schema, SQLERRM;
+      END;
     END IF;
   END LOOP;
 END$$;
@@ -376,7 +408,6 @@ BEGIN
   END;
 END$$;
 
--- Ensure backend role retains access to the new schemas and their relations
 DO $$
 DECLARE
   app_user TEXT := current_user;
@@ -400,16 +431,33 @@ BEGIN
     RAISE NOTICE 'Could not grant table privileges or default privileges to % (insufficient privileges).', app_user;
   END;
 END$$;
-
--- Recreate violation_stats view using the relocated violations table
-CREATE OR REPLACE VIEW violation_stats AS
-SELECT
-  student_id,
-  offense_type AS violation_type,
-  COUNT(*) AS count
-FROM discipline.violations
-WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
-GROUP BY student_id, offense_type;
+-- Recreate violation_stats view using the relocated violations table if available
+DO $$
+BEGIN
+  IF to_regclass('discipline.violations') IS NOT NULL THEN
+    EXECUTE $$
+      CREATE OR REPLACE VIEW violation_stats AS
+      SELECT
+        student_id,
+        offense_type AS violation_type,
+        COUNT(*) AS count
+      FROM discipline.violations
+      WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
+      GROUP BY student_id, offense_type
+    $$;
+  ELSIF to_regclass('public.violations') IS NOT NULL THEN
+    EXECUTE $$
+      CREATE OR REPLACE VIEW violation_stats AS
+      SELECT
+        student_id,
+        offense_type AS violation_type,
+        COUNT(*) AS count
+      FROM public.violations
+      WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
+      GROUP BY student_id, offense_type
+    $$;
+  END IF;
+END$$;
 `;
   await query(sql);
   console.log('Migration complete');
