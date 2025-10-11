@@ -121,15 +121,8 @@ END$$;
 -- Helpful index for lookups by student_id
 CREATE INDEX IF NOT EXISTS idx_violations_student_id ON violations(student_id);
 
--- View for frontend to easily detect repeat violation counts per student & type
-CREATE OR REPLACE VIEW violation_stats AS
-SELECT
-  student_id,
-  offense_type AS violation_type, -- preserve legacy view column name for compatibility
-  COUNT(*) AS count
-FROM violations
-WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
-GROUP BY student_id, offense_type;
+-- View will be recreated after schema reorganization to avoid dependency issues
+DROP VIEW IF EXISTS violation_stats;
 
 -- Appeals feature (status enum + table)
 DO $$
@@ -407,6 +400,16 @@ BEGIN
     RAISE NOTICE 'Could not grant table privileges or default privileges to % (insufficient privileges).', app_user;
   END;
 END$$;
+
+-- Recreate violation_stats view using the relocated violations table
+CREATE OR REPLACE VIEW violation_stats AS
+SELECT
+  student_id,
+  offense_type AS violation_type,
+  COUNT(*) AS count
+FROM discipline.violations
+WHERE offense_type IS NOT NULL AND student_id IS NOT NULL
+GROUP BY student_id, offense_type;
 `;
   await query(sql);
   console.log('Migration complete');
