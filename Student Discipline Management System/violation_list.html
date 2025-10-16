@@ -12,6 +12,16 @@
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Datepicker -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/vanillajs-datepicker@1.3.4/dist/css/datepicker.min.css"
+  />
+  <script
+    defer
+    src="https://cdn.jsdelivr.net/npm/vanillajs-datepicker@1.3.4/dist/js/datepicker-full.min.js">
+  </script>
 </head>
 <body>
 
@@ -52,7 +62,7 @@
     <h3>Violation List</h3>
     <button id="addViolationBtn" class="add-btn"><i class="fa fa-plus"></i> Add Violation</button>
 
-        <!-- Controls Row -->
+    <!-- Controls Row -->
     <div class="top-controls">
       <!-- Left: Search -->
       <div class="search-container">
@@ -60,8 +70,20 @@
         <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
       </div>
 
-      <!-- Right: Filters + Print -->
+      <!-- Filters + Print -->
       <div class="filter-container">
+
+        <!-- Date Filter -->
+        <div id="dateFilterWrap" class="filter-date-wrap" style="display:inline-flex;align-items:center;gap:8px;margin-right:8px;">
+          <button id="clearFilterDate" class="date-clear-btn" type="button" title="Clear date" style="display:none;border:none;background:transparent;color:#6b7280;padding:6px;border-radius:6px;">
+            <i class="fa fa-times"></i>
+          </button>
+          <div class="date-input-inner" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;min-width:220px;cursor:pointer;">
+            <i class="fa fa-calendar" style="color:#4b5563;font-size:14px;"></i>
+            <input id="filterDate" type="text" placeholder="Date / Month / Year" autocomplete="off" readonly style="border:none;outline:none;width:150px;background:transparent;cursor:pointer;font-size:13px;color:#111827;" />
+          </div>
+        </div>
+
         <select id="filterStrand">
           <option value="">All Strands</option>
           <option value="STEM">STEM</option>
@@ -90,7 +112,6 @@
       </div>
     </div>
 
-
     <!-- Table -->
     <div class="table-wrap">
       <table id="violationTable">
@@ -102,6 +123,9 @@
             <th>Violation Type</th>
             <th>Violation Description</th>
             <th>Past Offense</th>
+            <!-- Hidden column for Previous Offenses -->
+            <th style="display: none;">Previous Offenses</th>
+            <th>Total Offenses</th>
             <th>Sanction</th>
             <th>Date Added</th>
             <th>Actions</th>
@@ -188,6 +212,7 @@
       <h2>Violation Details</h2>
       <span class="close-btn">&times;</span>
     </div>
+
     <div class="violation-body">
       <div class="detail-row"><span class="label">Student</span><span class="value" id="viewStudent"></span></div>
       <div class="detail-row"><span class="label">Grade & Section</span><span class="value" id="viewGradeSection"></span></div>
@@ -195,13 +220,10 @@
       <div class="detail-row"><span class="label">Added Date</span><span class="value" id="viewAddedDate"></span></div>
       <div class="detail-row"><span class="label">Violation Description</span><span class="value multiline" id="viewDescription"></span></div>
       <div class="detail-row"><span class="label">Violation Type</span><span class="value" id="viewViolationType"></span></div>
-
-      <!-- 🩵 Added Missing Past Offense Section -->
       <div id="viewPastOffenseRow" class="detail-row is-hidden">
-        <span class="label">Past Offense</span>
-        <span class="value" id="viewPastOffense"></span>
+        <span class="label">Previous Offenses</span>
+        <span class="value multiline" id="viewPastOffense"></span>
       </div>
-      <!-- End Added Section -->
 
       <div class="detail-row"><span class="label">Sanction</span><span class="value" id="viewSanction"></span></div>
 
@@ -212,7 +234,6 @@
     </div>
   </div>
 </div>
-
 
 <!-- Image Preview Modal -->
 <div id="imagePreviewModal" class="modal image-preview-modal">
