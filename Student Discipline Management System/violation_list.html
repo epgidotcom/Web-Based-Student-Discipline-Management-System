@@ -74,15 +74,28 @@
       <div class="filter-container">
 
         <!-- Date Filter -->
-        <div id="dateFilterWrap" class="filter-date-wrap" style="display:inline-flex;align-items:center;gap:8px;margin-right:8px;">
-          <button id="clearFilterDate" class="date-clear-btn" type="button" title="Clear date" style="display:none;border:none;background:transparent;color:#6b7280;padding:6px;border-radius:6px;">
+        <!-- Date Range Filter -->
+        <div id="dateRangeWrap" class="filter-date-wrap" style="display:inline-flex;align-items:center;gap:8px;margin-right:8px;">
+          <button id="clearDateRange" class="date-clear-btn" type="button" title="Clear date range"
+                  style="display:none;border:none;background:transparent;color:#6b7280;padding:6px;border-radius:6px;">
             <i class="fa fa-times"></i>
           </button>
-          <div class="date-input-inner" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;min-width:220px;cursor:pointer;">
+
+          <div class="date-input-inner" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;min-width:230px;">
             <i class="fa fa-calendar" style="color:#4b5563;font-size:14px;"></i>
-            <input id="filterDate" type="text" placeholder="Date / Month / Year" autocomplete="off" readonly style="border:none;outline:none;width:150px;background:transparent;cursor:pointer;font-size:13px;color:#111827;" />
+            <input id="dateFrom" type="text" placeholder="From (YYYY-MM-DD)" autocomplete="off" readonly
+                  style="border:none;outline:none;width:130px;background:transparent;font-size:13px;color:#111827;" />
+          </div>
+
+          <span aria-hidden="true" style="color:#6b7280;">to</span>
+
+          <div class="date-input-inner" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;min-width:230px;">
+            <i class="fa fa-calendar" style="color:#4b5563;font-size:14px;"></i>
+            <input id="dateTo" type="text" placeholder="To (YYYY-MM-DD)" autocomplete="off" readonly
+                  style="border:none;outline:none;width:130px;background:transparent;font-size:13px;color:#111827;" />
           </div>
         </div>
+
 
         <select id="filterStrand">
           <option value="">All Strands</option>
