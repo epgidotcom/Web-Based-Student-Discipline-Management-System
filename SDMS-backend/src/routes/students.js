@@ -24,13 +24,27 @@ router.get('/', async (req, res) => {
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100;
   const offset = (page - 1) * limit;
 
-  const selectWithAge = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
-  const selectWithoutAge = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
-
+const selectWithAge = `
+    SELECT id, lrn, first_name, middle_name, last_name, birthdate, age, address,
+           grade, section, parent_contact, active, created_at
+    FROM students
+    WHERE active = TRUE
+    ORDER BY last_name ASC, first_name ASC
+    LIMIT $1 OFFSET $2
+  `;
+  const selectWithoutAge = `
+    SELECT id, lrn, first_name, middle_name, last_name, birthdate, address,
+           grade, section, parent_contact, active, created_at
+    FROM students
+    WHERE active = TRUE
+    ORDER BY last_name ASC, first_name ASC
+    LIMIT $1 OFFSET $2
+  `;
+  
   try {
     try {
       const listResult = await query(selectWithAge, [limit, offset]);
-      const countResult = await query('select count(*)::int as total from students');
+      const countResult = await query('select count(*)::int as total from students WHERE active = TRUE');
       const total = countResult.rows[0]?.total ?? 0;
       return res.json({
         data: listResult.rows,
@@ -42,7 +56,7 @@ router.get('/', async (req, res) => {
     } catch (err) {
       if (!isMissingColumnError(err, 'age')) throw err;
       const listResult = await query(selectWithoutAge, [limit, offset]);
-      const countResult = await query('select count(*)::int as total from students');
+      const countResult = await query('select count(*)::int as total from students WHERE active = TRUE');
       const total = countResult.rows[0]?.total ?? 0;
       return res.json({
         data: listResult.rows.map(row => ({ ...row, age: null })),
@@ -62,7 +76,7 @@ router.get('/:id', async (req, res) => {
   try {
     try {
       const { rows } = await query(
-        `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at
+        `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, active, created_at
            from students where id = $1`,
         [req.params.id]
       );
@@ -73,7 +87,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const { rows } = await query(
-      `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at
+      `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active, created_at
          from students where id = $1`,
       [req.params.id]
     );
@@ -101,19 +115,19 @@ router.post('/', async (req, res) => {
     let rows;
     try {
       ({ rows } = await query(
-        `insert into students (lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, full_name, grade_level)
+        `insert into students (lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, active, full_name, grade_level)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          returning *`,
-  [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, full_name, grade_level]
+  [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive, full_name, grade_level]
       ));
     } catch (err) {
       // If error mentions unknown column (e.g., after we drop legacy columns) retry without them.
       if (shouldFallbackLegacy(err)) {
         ({ rows } = await query(
-          `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact)
+          `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active)
            values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             returning *`,
-          [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null]
+          [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
         ));
       } else {
         throw err;
@@ -131,7 +145,7 @@ router.post('/', async (req, res) => {
 
 // Update student
 router.put('/:id', async (req, res) => {
-  const { lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact } = req.body ?? {};
+  const { lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, active} = req.body ?? {};
   const cleanAge = age === undefined || age === null || age === '' ? null : Number(age);
   if (cleanAge !== null && !Number.isFinite(cleanAge)) {
     return res.status(400).json({ error: 'Invalid age' });
@@ -171,11 +185,12 @@ router.put('/:id', async (req, res) => {
                 grade          = coalesce($8, grade),
                 section        = coalesce($9, section),
                 parent_contact = coalesce($10, parent_contact),
+                active         = coalesce($11, active),
                 full_name      = coalesce($11, full_name),
                 grade_level    = coalesce($12, grade_level)
           where id = $13
           returning *`,
-  [lrn ?? null, first_name ?? null, middle_name ?? null, last_name ?? null, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, full_name, grade_level, req.params.id]
+  [lrn ?? null, first_name ?? null, middle_name ?? null, last_name ?? null, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive, full_name, grade_level, req.params.id]
       ));
     } catch (err) {
       if (shouldFallbackLegacy(err)) {
@@ -190,9 +205,10 @@ router.put('/:id', async (req, res) => {
                   grade          = coalesce($7, grade),
                   section        = coalesce($8, section),
                   parent_contact = coalesce($9, parent_contact)
+                  active         = coalesce($10, active)
             where id = $10
             returning *`,
-          [lrn ?? null, first_name ?? null, middle_name ?? null, last_name ?? null, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, req.params.id]
+          [lrn ?? null, first_name ?? null, middle_name ?? null, last_name ?? null, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, active, req.params.id]
         ));
       } else {
         throw err;
