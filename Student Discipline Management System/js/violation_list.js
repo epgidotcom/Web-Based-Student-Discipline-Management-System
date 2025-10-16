@@ -16,6 +16,24 @@
   let __selectedDate = null; // JS Date or null
   let __datepickerInstance = null;
 
+  // --- Date RANGE filter state (new) ---
+  const dateFromEl = document.getElementById('dateFrom');
+  const dateToEl   = document.getElementById('dateTo');
+  const clearDateRangeBtn = document.getElementById('clearDateRange');
+
+  let __rangeFrom = null; // string 'YYYY-MM-DD' or null
+  let __rangeTo   = null; // string 'YYYY-MM-DD' or null
+  let __dpFrom = null;    // Datepicker instance
+  let __dpTo   = null;    // Datepicker instance
+
+  function toISODateOnly(d) {
+    if (!(d instanceof Date) || isNaN(d)) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   function toYMD(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -122,10 +140,86 @@
     });
   }
 
+  function initDateRangeFilter() {
+    if (!dateFromEl || !dateToEl) return;
+
+    const common = { autohide: true, format: 'yyyy-mm-dd', buttonClass: 'btn' };
+    try {
+      const DP = window.Datepicker || window.datepicker;
+      if (DP) {
+        __dpFrom = new DP(dateFromEl, common);
+        __dpTo   = new DP(dateToEl,   common);
+      }
+    } catch (e) {
+      console.warn('[violations] range datepickers unavailable, falling back to plain inputs', e);
+    }
+
+    function updateClearBtn() {
+      const any = Boolean(__rangeFrom || __rangeTo);
+      if (clearDateRangeBtn) clearDateRangeBtn.style.display = any ? '' : 'none';
+    }
+
+    function onFromChange(e) {
+      const d = (e?.detail?.date) || new Date(dateFromEl.value);
+      __rangeFrom = d && !isNaN(d) ? toISODateOnly(d) : null;
+
+      // keep valid min for "to"
+      if (__dpTo) {
+        __dpTo.setOptions({ minDate: __rangeFrom ? new Date(__rangeFrom) : null });
+      }
+      updateClearBtn();
+
+      // refresh page + re-filter
+      if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+      else fetchData(1).catch(()=>{});
+      applyFilters();
+    }
+
+    function onToChange(e) {
+      const d = (e?.detail?.date) || new Date(dateToEl.value);
+      __rangeTo = d && !isNaN(d) ? toISODateOnly(d) : null;
+
+      // keep valid max for "from"
+      if (__dpFrom) {
+        __dpFrom.setOptions({ maxDate: __rangeTo ? new Date(__rangeTo) : null });
+      }
+      updateClearBtn();
+
+      if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+      else fetchData(1).catch(()=>{});
+      applyFilters();
+    }
+
+    // Events (datepicker or plain input)
+    dateFromEl.addEventListener('change', onFromChange);
+    dateToEl.addEventListener('change', onToChange);
+    dateFromEl.addEventListener('changeDate', onFromChange);
+    dateToEl.addEventListener('changeDate', onToChange);
+
+    clearDateRangeBtn?.addEventListener('click', () => {
+      __rangeFrom = null;
+      __rangeTo = null;
+      if (__dpFrom?.setDate) __dpFrom.setDate({ clear: true });
+      if (__dpTo?.setDate) __dpTo.setDate({ clear: true });
+      dateFromEl.value = '';
+      dateToEl.value = '';
+      if (__dpFrom?.setOptions) __dpFrom.setOptions({ maxDate: null });
+      if (__dpTo?.setOptions) __dpTo.setOptions({ minDate: null });
+      updateClearBtn();
+
+      if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+      else fetchData(1).catch(()=>{});
+      applyFilters();
+    });
+
+    // initial state
+    clearDateRangeBtn && (clearDateRangeBtn.style.display = 'none');
+  }
+
   const addBtn = document.getElementById('addViolationBtn');
   const searchInput = document.getElementById('searchInput');
-  const paginationSummary = document.getElementById('violationsPageSummary');
-  const paginationControls = document.getElementById('violationsPagination');
+  // const paginationSummary = document.getElementById('violationsPageSummary');
+  // const paginationControls = document.getElementById('violationsPagination');
   const PAGE_LIMIT = 100;
   let paginator = null;
 
@@ -343,18 +437,27 @@
 
 
   // === Pagination / Backend ===
+
+  const paginationSummary = document.getElementById('violationsPageSummary');
+  const paginationControls = document.getElementById('violationsPagination');
   paginator = window.SDMS?.createPaginationController({
     limit: PAGE_LIMIT,
     paginationContainer: paginationControls,
     summaryElement: paginationSummary,
     async fetcher(page, limit) {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-      // include date range when selected
-      if (__selectedDate) {
+
+      // 1) Prefer explicit range if set
+      if (__rangeFrom) params.set('date_from', __rangeFrom);
+      if (__rangeTo)   params.set('date_to',   __rangeTo);
+
+      // 2) Otherwise fall back to single date mode (day/month/year)
+      if (!__rangeFrom && !__rangeTo && __selectedDate) {
         const r = computeRange(__selectedDate, __dateMode);
         if (r.from) params.set('date_from', r.from);
-        if (r.to) params.set('date_to', r.to);
+        if (r.to)   params.set('date_to',   r.to);
       }
+
       return api(`/violations?${params.toString()}`);
     },
     onData(rows) {
@@ -609,22 +712,27 @@
   const applyFilterBtn = document.getElementById('applyFilterBtn');
   const printReportBtn = document.getElementById('printReportBtn');
 
-  function applyFilters() {
+    function applyFilters() {
     const strand = (filterStrand?.value || '').toLowerCase();
     const violationType = (filterViolationType?.value || '').toLowerCase();
     const textQuery = (filterText?.value || '').toLowerCase();
     const globalQuery = (searchInput?.value || '').toLowerCase();
 
-    // compute selected range for client-side filtering
-    const range = __selectedDate ? computeRange(__selectedDate, __dateMode) : { from: null, to: null };
-    const fromDate = range.from ? new Date(range.from) : null;
-    const toDate = range.to ? new Date(range.to) : null;
+    // Decide which date window to use
+    let fromDate = null, toDate = null;
+
+    if (__rangeFrom || __rangeTo) {
+      fromDate = __rangeFrom ? new Date(__rangeFrom) : null;
+      toDate   = __rangeTo   ? new Date(__rangeTo)   : null;
+    } else if (__selectedDate) {
+      const r = computeRange(__selectedDate, __dateMode);
+      fromDate = r.from ? new Date(r.from) : null;
+      toDate   = r.to   ? new Date(r.to)   : null;
+    }
 
     document.querySelectorAll('#violationTable tbody tr').forEach(row => {
       if (row.dataset?.placeholder === 'empty') return;
 
-      // 0: Name, 1: Grade&Section, 2: IncidentDate, 3: ViolationType,
-      // 4: Description, 5: PastOffense, 6: Sanction, 7: DateAdded, 8: Actions
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
@@ -636,21 +744,29 @@
       const matchText = !textQuery || [studentName, gradeSection, vType, description].some(s => s.includes(textQuery));
       const matchGlobal = !globalQuery || rowText.includes(globalQuery);
 
-      // date match (if range present)
+      // date match
       let matchDate = true;
-      if (fromDate && toDate) {
+      if (fromDate || toDate) {
         const raw = row.dataset.incident || row.cells[2]?.textContent || '';
-        const rowDt = raw ? new Date(raw) : null;
-        if (!rowDt || Number.isNaN(rowDt.getTime())) {
+        const d = raw ? new Date(raw) : null;
+        if (!d || isNaN(d)) {
           matchDate = false;
         } else {
-          matchDate = (rowDt >= fromDate && rowDt <= toDate);
+          if (fromDate && d < fromDate) matchDate = false;
+          if (toDate && d > toDate)     matchDate = false;
         }
       }
 
       row.style.display = (matchStrand && matchType && matchText && matchGlobal && matchDate) ? '' : 'none';
     });
+
+    // Update "Showing X of Y"
+    const rows = Array.from(document.querySelectorAll('#violationTable tbody tr'))
+      .filter(r => r.dataset?.placeholder !== 'empty');
+    const shown = rows.filter(r => r.style.display !== 'none').length;
+    paginationSummary && (paginationSummary.textContent = `Showing ${shown} of ${rows.length}`);
   }
+
 
   // === Direct Print ===
   let __printStyleEl = null;
@@ -731,6 +847,7 @@
   function bindEvents() {
     // initialize date filter wiring
     initDateFilter();
+    initDateRangeFilter(); // NEW
 
     addBtn?.addEventListener('click', prepareCreateModal);
     document.querySelectorAll('#violationModal .close-btn').forEach(btn => btn.addEventListener('click', () => closeModal(violationModal)));
