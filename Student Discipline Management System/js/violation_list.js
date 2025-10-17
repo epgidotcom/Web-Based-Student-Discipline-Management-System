@@ -590,25 +590,51 @@
     openModal(violationModal);
   }
 
-  function showViewModal(index) {
-    const item = violations[index];
-    if (!item) return;
-    viewStudent.textContent = item.student_name || '—';
-    viewGradeSection.textContent = item.grade_section || '—';
-    viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
-    viewAddedDate.textContent = formatDate(item.created_at) || '—';
-    viewDescription.textContent = item.description || '—';
-    viewViolationType.textContent = item.offense_type || '—';
-    viewSanction.textContent = item.sanction || '—';
+    function showViewModal(index) {
+      const item = violations[index];
+      if (!item) return;
 
-    const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
-    if (history.length) {
-      viewPastOffenseRow.classList.remove('is-hidden');
-      viewPastOffense.textContent = `${history.length} earlier case${history.length > 1 ? 's' : ''}`;
+      // === Current Offense Details ===
+      viewStudent.textContent = item.student_name || '—';
+      viewGradeSection.textContent = item.grade_section || '—';
+      viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
+      viewAddedDate.textContent = formatDate(item.created_at) || '—';
+      viewDescription.textContent = item.description || '—';
+      viewViolationType.textContent = item.offense_type || '—';
+      viewSanction.textContent = item.sanction || '—';
+
+    // === All Offense Cards ===
+    const allWrap = document.getElementById('viewAllOffensesWrap');
+    const allContainer = document.getElementById('viewAllOffenses');
+    allContainer.innerHTML = '';
+
+    const allOffenses = violations
+      .filter(v => v.student_id === item.student_id)
+      .sort((a, b) => new Date(a.incident_date) - new Date(b.incident_date));
+
+    if (allOffenses.length) {
+      allWrap.classList.remove('is-hidden');
+
+      allOffenses.forEach((off, i) => {
+        const card = document.createElement('div');
+        card.className = 'offense-card';
+        card.innerHTML = `
+          <div class="offense-header">
+            <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
+          </div>
+          <div class="offense-body">
+            <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
+            <div><strong>Description:</strong> ${off.description || '—'}</div>
+            <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
+            <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
+          </div>
+        `;
+        allContainer.appendChild(card);
+      });
     } else {
-      viewPastOffenseRow.classList.add('is-hidden');
-      viewPastOffense.textContent = '';
+      allWrap.classList.add('is-hidden');
     }
+
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     if (files.length) {
