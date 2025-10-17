@@ -136,8 +136,8 @@
             <th>Violation Type</th>
             <th>Violation Description</th>
             <th>Past Offense</th>
-            <!-- Hidden column for Previous Offenses -->
-            <th style="display: none;">Previous Offenses</th>
+            <!-- Hidden column for All Offenses -->
+            <th style="display: none;">All Offenses</th>
             <th>Total Offenses</th>
             <th>Sanction</th>
             <th>Date Added</th>
@@ -234,11 +234,16 @@
       <div class="detail-row"><span class="label">Violation Description</span><span class="value multiline" id="viewDescription"></span></div>
       <div class="detail-row"><span class="label">Violation Type</span><span class="value" id="viewViolationType"></span></div>
       <div id="viewPastOffenseRow" class="detail-row is-hidden">
-        <span class="label">Previous Offenses</span>
+        <span class="label">Past Offenses</span>
         <span class="value multiline" id="viewPastOffense"></span>
       </div>
 
       <div class="detail-row"><span class="label">Sanction</span><span class="value" id="viewSanction"></span></div>
+
+      <div id="viewAllOffensesWrap" class="is-hidden">
+        <h3 style="margin-top:10px;margin-bottom:6px;">All Offenses</h3>
+        <div id="viewAllOffenses" class="all-offense-list"></div>
+      </div>
 
       <div id="viewEvidenceWrap" class="is-hidden evidence-section">
         <strong>Evidence:</strong>
