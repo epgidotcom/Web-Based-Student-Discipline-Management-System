@@ -7,10 +7,219 @@
   let evidenceState = [];
 
   const tableBody = document.querySelector('#violationTable tbody');
+
+  const filterDateInput = document.getElementById('filterDate');
+  const clearFilterDateBtn = document.getElementById('clearFilterDate');
+
+  // Date filter state
+  let __dateMode = 'day'; // 'day' | 'month' | 'year'
+  let __selectedDate = null; // JS Date or null
+  let __datepickerInstance = null;
+
+  // --- Date RANGE filter state (new) ---
+  const dateFromEl = document.getElementById('dateFrom');
+  const dateToEl   = document.getElementById('dateTo');
+  const clearDateRangeBtn = document.getElementById('clearDateRange');
+
+  let __rangeFrom = null; // string 'YYYY-MM-DD' or null
+  let __rangeTo   = null; // string 'YYYY-MM-DD' or null
+  let __dpFrom = null;    // Datepicker instance
+  let __dpTo   = null;    // Datepicker instance
+
+  function toISODateOnly(d) {
+    if (!(d instanceof Date) || isNaN(d)) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function toYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function computeRange(date, mode) {
+    if (!date) return { from: null, to: null };
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return { from: null, to: null };
+    if (mode === 'year') {
+      return { from: `${d.getFullYear()}-01-01`, to: `${d.getFullYear()}-12-31` };
+    }
+    if (mode === 'month') {
+      const first = new Date(d.getFullYear(), d.getMonth(), 1);
+      const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      return { from: toYMD(first), to: toYMD(last) };
+    }
+    return { from: toYMD(d), to: toYMD(d) };
+  }
+
+  function applyDateSelection(date, mode) {
+    __selectedDate = date ? new Date(date) : null;
+    __dateMode = mode || __dateMode || 'day';
+    if (__selectedDate) {
+      if (__dateMode === 'year') {
+        filterDateInput.value = String(__selectedDate.getFullYear());
+      } else if (__dateMode === 'month') {
+        filterDateInput.value = `${__selectedDate.toLocaleString(undefined, { month: 'short' })} ${__selectedDate.getFullYear()}`;
+      } else {
+        // let datepicker populate locale string; keep it if available
+        try { filterDateInput.value = __selectedDate.toLocaleDateString(); } catch { filterDateInput.value = String(__selectedDate); }
+      }
+      clearFilterDateBtn?.classList?.remove?.('is-hidden');
+      clearFilterDateBtn && (clearFilterDateBtn.style.display = '');
+    } else {
+      filterDateInput.value = '';
+      clearFilterDateBtn?.classList?.add?.('is-hidden');
+      clearFilterDateBtn && (clearFilterDateBtn.style.display = 'none');
+    }
+    // reload backend & re-filter client-side
+    if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+    else fetchData(1).catch(()=>{});
+    applyFilters();
+  }
+
+  function initDateFilter() {
+    if (!filterDateInput) return;
+    // try to create a vanillajs-datepicker instance if available
+    try {
+      const Datepicker = window.Datepicker || window.datepicker;
+      if (Datepicker) {
+        __datepickerInstance = new Datepicker(filterDateInput, { autohide: true, buttonClass: 'btn' });
+        // when input changes, try to obtain the real Date
+        filterDateInput.addEventListener('change', () => {
+          let chosen = null;
+          // try dp.getDate() if available
+          try {
+            if (__datepickerInstance && typeof __datepickerInstance.getDate === 'function') {
+              chosen = __datepickerInstance.getDate();
+            }
+          } catch (e) { /* ignore */ }
+          // fallback to parsing input text
+          if (!chosen || isNaN(chosen.getTime())) {
+            const parsed = new Date(filterDateInput.value);
+            if (!isNaN(parsed.getTime())) chosen = parsed;
+          }
+          applyDateSelection(chosen, __dateMode);
+        });
+
+        // cycle mode when user clicks the picker's header/title (best-effort)
+        document.addEventListener('click', (ev) => {
+          const sw = ev.target.closest && ev.target.closest('.datepicker .datepicker-switch');
+          if (!sw) return;
+          __dateMode = __dateMode === 'day' ? 'month' : (__dateMode === 'month' ? 'year' : 'day');
+          // update placeholder to give feedback
+          filterDateInput.placeholder = __dateMode === 'year' ? 'Year view' : __dateMode === 'month' ? 'Month view' : 'Day view';
+        });
+      } else {
+        // fallback: clicking opens native date input
+        filterDateInput.addEventListener('click', () => {
+          const native = document.createElement('input');
+          native.type = 'date';
+          native.style.position = 'absolute';
+          native.style.opacity = '0';
+          document.body.appendChild(native);
+          native.click();
+          native.addEventListener('change', () => {
+            const d = native.value ? new Date(native.value) : null;
+            applyDateSelection(d, 'day');
+            native.remove();
+          }, { once: true });
+        });
+      }
+    } catch (err) {
+      console.warn('[violations] datepicker init error', err);
+    }
+
+    // clear button behavior
+    clearFilterDateBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      applyDateSelection(null, 'day');
+    });
+  }
+
+  function initDateRangeFilter() {
+    if (!dateFromEl || !dateToEl) return;
+
+    const common = { autohide: true, format: 'yyyy-mm-dd', buttonClass: 'btn' };
+    try {
+      const DP = window.Datepicker || window.datepicker;
+      if (DP) {
+        __dpFrom = new DP(dateFromEl, common);
+        __dpTo   = new DP(dateToEl,   common);
+      }
+    } catch (e) {
+      console.warn('[violations] range datepickers unavailable, falling back to plain inputs', e);
+    }
+
+    function updateClearBtn() {
+      const any = Boolean(__rangeFrom || __rangeTo);
+      if (clearDateRangeBtn) clearDateRangeBtn.style.display = any ? '' : 'none';
+    }
+
+    function onFromChange(e) {
+      const d = (e?.detail?.date) || new Date(dateFromEl.value);
+      __rangeFrom = d && !isNaN(d) ? toISODateOnly(d) : null;
+
+      // keep valid min for "to"
+      if (__dpTo) {
+        __dpTo.setOptions({ minDate: __rangeFrom ? new Date(__rangeFrom) : null });
+      }
+      updateClearBtn();
+
+      // refresh page + re-filter
+      if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+      else fetchData(1).catch(()=>{});
+      applyFilters();
+    }
+
+    function onToChange(e) {
+      const d = (e?.detail?.date) || new Date(dateToEl.value);
+      __rangeTo = d && !isNaN(d) ? toISODateOnly(d) : null;
+
+      // keep valid max for "from"
+      if (__dpFrom) {
+        __dpFrom.setOptions({ maxDate: __rangeTo ? new Date(__rangeTo) : null });
+      }
+      updateClearBtn();
+
+      if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+      else fetchData(1).catch(()=>{});
+      applyFilters();
+    }
+
+    // Events (datepicker or plain input)
+    dateFromEl.addEventListener('change', onFromChange);
+    dateToEl.addEventListener('change', onToChange);
+    dateFromEl.addEventListener('changeDate', onFromChange);
+    dateToEl.addEventListener('changeDate', onToChange);
+
+    clearDateRangeBtn?.addEventListener('click', () => {
+      __rangeFrom = null;
+      __rangeTo = null;
+      if (__dpFrom?.setDate) __dpFrom.setDate({ clear: true });
+      if (__dpTo?.setDate) __dpTo.setDate({ clear: true });
+      dateFromEl.value = '';
+      dateToEl.value = '';
+      if (__dpFrom?.setOptions) __dpFrom.setOptions({ maxDate: null });
+      if (__dpTo?.setOptions) __dpTo.setOptions({ minDate: null });
+      updateClearBtn();
+
+      if (paginator?.fetchData) paginator.fetchData(1).catch(()=>{});
+      else fetchData(1).catch(()=>{});
+      applyFilters();
+    });
+
+    // initial state
+    clearDateRangeBtn && (clearDateRangeBtn.style.display = 'none');
+  }
+
   const addBtn = document.getElementById('addViolationBtn');
   const searchInput = document.getElementById('searchInput');
-  const paginationSummary = document.getElementById('violationsPageSummary');
-  const paginationControls = document.getElementById('violationsPagination');
+  // const paginationSummary = document.getElementById('violationsPageSummary');
+  // const paginationControls = document.getElementById('violationsPagination');
   const PAGE_LIMIT = 100;
   let paginator = null;
 
@@ -175,25 +384,33 @@
     });
   }
 
-  // === RENDER TABLE (with Description + Past Offense before Sanction) ===
+  // === RENDER TABLE ===
   function renderTable(list = violations) {
     if (!tableBody) return;
     const source = Array.isArray(list) ? list : [];
-    if (list !== violations) {
-      violations = source;
-    }
+    if (list !== violations) violations = source;
+
     tableBody.innerHTML = '';
     if (!source.length) {
       const row = document.createElement('tr');
       row.dataset.placeholder = 'empty';
-      row.innerHTML = '<td colspan="9" style="text-align:center;color:#6b7280;">No records found.</td>';
+      row.innerHTML = '<td colspan="10" style="text-align:center;color:#6b7280;">No records found.</td>';
       tableBody.appendChild(row);
-      applyFilters(); // keep current filter state
+      applyFilters();
       return;
     }
 
+    // Compute total violations per student (client-side grouping)
+    const totalByStudent = {};
+    source.forEach(v => {
+      const key = v.student_id || v.student_name || 'unknown';
+      totalByStudent[key] = (totalByStudent[key] || 0) + 1;
+    });
+
     source.forEach((v, idx) => {
       const pastOffense = (v.repeat_count ?? 0) > 0 ? `${v.repeat_count}` : '—';
+      const totalViolations = totalByStudent[v.student_id || v.student_name || 'unknown'] || 1;
+
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${v.student_name || '—'}</td>
@@ -202,26 +419,45 @@
         <td>${v.offense_type || '—'}</td>
         <td>${v.description || '—'}</td>
         <td>${pastOffense}</td>
+        <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
         <td>${formatDate(v.created_at)}</td>
         <td>
           <button class="action-btn" data-action="view" data-index="${idx}" title="View"><i class="fa fa-eye"></i></button>
           <button class="action-btn edit-btn" data-action="edit" data-index="${idx}" title="Edit"><i class="fa fa-edit"></i></button>
           <button class="action-btn delete-btn" data-action="delete" data-index="${idx}" title="Delete"><i class="fa fa-trash"></i></button>
-        </td>`;
+        </td>
+      `;
+      row.dataset.incident = v.incident_date ? String(v.incident_date) : '';
       tableBody.appendChild(row);
     });
 
-    applyFilters(); // re-apply UI filters whenever we render
+    applyFilters(); 
   }
 
+
   // === Pagination / Backend ===
+
+  const paginationSummary = document.getElementById('violationsPageSummary');
+  const paginationControls = document.getElementById('violationsPagination');
   paginator = window.SDMS?.createPaginationController({
     limit: PAGE_LIMIT,
     paginationContainer: paginationControls,
     summaryElement: paginationSummary,
     async fetcher(page, limit) {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+
+      // 1) Prefer explicit range if set
+      if (__rangeFrom) params.set('date_from', __rangeFrom);
+      if (__rangeTo)   params.set('date_to',   __rangeTo);
+
+      // 2) Otherwise fall back to single date mode (day/month/year)
+      if (!__rangeFrom && !__rangeTo && __selectedDate) {
+        const r = computeRange(__selectedDate, __dateMode);
+        if (r.from) params.set('date_from', r.from);
+        if (r.to)   params.set('date_to',   r.to);
+      }
+
       return api(`/violations?${params.toString()}`);
     },
     onData(rows) {
@@ -469,24 +705,34 @@
     });
   }
 
-  // === NEW: Dropdown + Text filters + keep global search ===
+  // === Dropdown + Text filters + keep global search ===
   const filterStrand = document.getElementById('filterStrand');
   const filterViolationType = document.getElementById('filterViolationType');
   const filterText = document.getElementById('filterText');
   const applyFilterBtn = document.getElementById('applyFilterBtn');
   const printReportBtn = document.getElementById('printReportBtn');
 
-  function applyFilters() {
+    function applyFilters() {
     const strand = (filterStrand?.value || '').toLowerCase();
     const violationType = (filterViolationType?.value || '').toLowerCase();
     const textQuery = (filterText?.value || '').toLowerCase();
     const globalQuery = (searchInput?.value || '').toLowerCase();
 
+    // Decide which date window to use
+    let fromDate = null, toDate = null;
+
+    if (__rangeFrom || __rangeTo) {
+      fromDate = __rangeFrom ? new Date(__rangeFrom) : null;
+      toDate   = __rangeTo   ? new Date(__rangeTo)   : null;
+    } else if (__selectedDate) {
+      const r = computeRange(__selectedDate, __dateMode);
+      fromDate = r.from ? new Date(r.from) : null;
+      toDate   = r.to   ? new Date(r.to)   : null;
+    }
+
     document.querySelectorAll('#violationTable tbody tr').forEach(row => {
       if (row.dataset?.placeholder === 'empty') return;
 
-      // 0: Name, 1: Grade&Section, 2: IncidentDate, 3: ViolationType,
-      // 4: Description, 5: PastOffense, 6: Sanction, 7: DateAdded, 8: Actions
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
@@ -498,11 +744,31 @@
       const matchText = !textQuery || [studentName, gradeSection, vType, description].some(s => s.includes(textQuery));
       const matchGlobal = !globalQuery || rowText.includes(globalQuery);
 
-      row.style.display = (matchStrand && matchType && matchText && matchGlobal) ? '' : 'none';
+      // date match
+      let matchDate = true;
+      if (fromDate || toDate) {
+        const raw = row.dataset.incident || row.cells[2]?.textContent || '';
+        const d = raw ? new Date(raw) : null;
+        if (!d || isNaN(d)) {
+          matchDate = false;
+        } else {
+          if (fromDate && d < fromDate) matchDate = false;
+          if (toDate && d > toDate)     matchDate = false;
+        }
+      }
+
+      row.style.display = (matchStrand && matchType && matchText && matchGlobal && matchDate) ? '' : 'none';
     });
+
+    // Update "Showing X of Y"
+    const rows = Array.from(document.querySelectorAll('#violationTable tbody tr'))
+      .filter(r => r.dataset?.placeholder !== 'empty');
+    const shown = rows.filter(r => r.style.display !== 'none').length;
+    paginationSummary && (paginationSummary.textContent = `Showing ${shown} of ${rows.length}`);
   }
 
-  // === Direct Print (hide Actions, keep Description) ===
+
+  // === Direct Print ===
   let __printStyleEl = null;
   let __printHeaderEl = null;
 
@@ -641,6 +907,10 @@
   }
 
   function bindEvents() {
+    // initialize date filter wiring
+    initDateFilter();
+    initDateRangeFilter(); // NEW
+
     addBtn?.addEventListener('click', prepareCreateModal);
     document.querySelectorAll('#violationModal .close-btn').forEach(btn => btn.addEventListener('click', () => closeModal(violationModal)));
     document.querySelectorAll('#viewModal .close-btn').forEach(btn => btn.addEventListener('click', () => closeModal(viewModal)));

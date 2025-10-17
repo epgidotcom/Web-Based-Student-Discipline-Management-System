@@ -10,7 +10,6 @@ import violationsRoute from './src/routes/violations.js';
 import authRoute from './src/routes/auth.js';
 import appealsRoute from './src/routes/appeals.js';
 import messagesRoute from './src/routes/messages.js';
-import { runMigrations } from './src/migrate.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -138,3 +137,4 @@ app.use((err, _req, res, _next) => {
     console.log(`SDMS backend listening on ${PORT}`);
   });
 })();
+
