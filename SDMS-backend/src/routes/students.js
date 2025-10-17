@@ -97,23 +97,26 @@ router.post('/', async (req, res) => {
     const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim() || null;
     const grade_level = grade ?? null; // mirror grade into legacy grade_level if present
 
+    // Default "active" column to TRUE
+    const isActive = true;
+    
     // Try inserting with legacy columns; if they do not exist (future clean schema) fallback gracefully.
     let rows;
     try {
       ({ rows } = await query(
-        `insert into students (lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, full_name, grade_level)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        `insert into students (lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, full_name, grade_level, active)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          returning *`,
-  [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, full_name, grade_level]
+  [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, full_name, grade_level, isActive]
       ));
     } catch (err) {
       // If error mentions unknown column (e.g., after we drop legacy columns) retry without them.
       if (shouldFallbackLegacy(err)) {
         ({ rows } = await query(
-          `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact)
+          `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active)
            values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             returning *`,
-          [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null]
+          [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
         ));
       } else {
         throw err;
