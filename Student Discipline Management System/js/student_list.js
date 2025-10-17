@@ -23,7 +23,7 @@
   const viewLRN = document.getElementById('viewLRN');
   const viewName = document.getElementById('viewName');
   const viewAge = document.getElementById('viewAge');
-  const viewBirthdate = document.getElementById('viewBirthdate');
+
   const viewGrade = document.getElementById('viewGrade');
   const viewSection = document.getElementById('viewSection');
   const viewParent = document.getElementById('viewParent');
@@ -148,7 +148,6 @@
       firstName: row.first_name || '',
       middleName: row.middle_name || '',
       lastName: row.last_name || '',
-      birthdate: row.birthdate ? String(row.birthdate).slice(0,10) : '',
       age: (() => {
         if (row.age == null) return null;
         const parsed = Number(row.age);
@@ -182,7 +181,7 @@
     source.forEach((s, i) => {
       const row = document.createElement('tr');
       const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
-      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
+      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : '';
       const photo = StudentPhotos.get(s.lrn);
       const avatar = photo
         ? `<img class="avatar" src="${photo}" alt="${fullName}">`
@@ -289,12 +288,12 @@
   function openView(index){
     const s = students[index];
     const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
-    const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
+    const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : '';
 
     viewLRN.textContent = s.lrn;
     viewName.textContent = fullName;
     viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
-    viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
+
     viewGrade.textContent = s.grade || '—';
     viewSection.textContent = s.section || '—';
     viewParent.textContent = s.parentContact || '—';
@@ -322,9 +321,8 @@
     document.getElementById('grade').value = s.grade;
     document.getElementById('section').value = s.section;
     document.getElementById('parentContact').value = s.parentContact;
-    if (ageInput) {
-      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
-      ageInput.value = age !== '' && age != null ? age : '';
+    if (typeof ageInput !== 'undefined' && ageInput) {
+      ageInput.value = s.age != null ? s.age : '';
     }
     editIndex.value = index;
     modalTitle.textContent = 'Edit Student';
