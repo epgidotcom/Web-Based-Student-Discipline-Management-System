@@ -603,37 +603,58 @@
       viewViolationType.textContent = item.offense_type || '—';
       viewSanction.textContent = item.sanction || '—';
 
-    // === All Offense Cards ===
-    const allWrap = document.getElementById('viewAllOffensesWrap');
-    const allContainer = document.getElementById('viewAllOffenses');
-    allContainer.innerHTML = '';
+      // === All Offense Cards ===
+      const allWrap = document.getElementById('viewAllOffensesWrap');
+      const allContainer = document.getElementById('viewAllOffenses');
+      allContainer.innerHTML = '';
 
-    const allOffenses = violations
-      .filter(v => v.student_id === item.student_id)
-      .sort((a, b) => new Date(a.incident_date) - new Date(b.incident_date));
+      const allOffenses = violations
+        .filter(v => v.student_id === item.student_id)
+        .sort((a, b) => new Date(a.incident_date) - new Date(b.incident_date));
 
-    if (allOffenses.length) {
-      allWrap.classList.remove('is-hidden');
+      if (allOffenses.length) {
+        allWrap.classList.remove('is-hidden');
 
-      allOffenses.forEach((off, i) => {
-        const card = document.createElement('div');
-        card.className = 'offense-card';
-        card.innerHTML = `
-          <div class="offense-header">
-            <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
-          </div>
-          <div class="offense-body">
-            <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
-            <div><strong>Description:</strong> ${off.description || '—'}</div>
-            <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
-            <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
-          </div>
-        `;
-        allContainer.appendChild(card);
-      });
-    } else {
-      allWrap.classList.add('is-hidden');
-    }
+        // ensure one-time badge styles exist
+        if (!document.getElementById('sdms-status-badge-style')) {
+          const style = document.createElement('style');
+          style.id = 'sdms-status-badge-style';
+          style.textContent = `
+            .status-badge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:600; }
+            .status-pending  { background:#FEF3C7; color:#92400E; }   /* amber */
+            .status-approved { background:#DCFCE7; color:#166534; }   /* green */
+            .status-rejected { background:#FEE2E2; color:#991B1B; }   /* red */
+          `;
+          document.head.appendChild(style);
+        }
+
+        allOffenses.forEach((off, i) => {
+          const card = document.createElement('div');
+          card.className = 'offense-card';
+
+          // derive normalized status + badge class; default to 'pending'
+          const rawStatus = (off.status || 'pending').toString().trim().toLowerCase();
+          const statusNorm = ['approved', 'rejected', 'pending'].includes(rawStatus) ? rawStatus : 'pending';
+          const badgeClass = `status-badge status-${statusNorm}`;
+          const statusLabel = statusNorm.charAt(0).toUpperCase() + statusNorm.slice(1);
+
+          card.innerHTML = `
+            <div class="offense-header">
+              <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
+            </div>
+            <div class="offense-body">
+              <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
+              <div><strong>Description:</strong> ${off.description || '—'}</div>
+              <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
+              <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
+              <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
+            </div>
+          `;
+          allContainer.appendChild(card);
+        });
+      } else {
+        allWrap.classList.add('is-hidden');
+      }
 
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
@@ -1036,7 +1057,6 @@ if (printReportBtn) {
     ensureModalZStack();
     bindEvents();
 
-    // also bind once page is fully loaded (covers dynamic DOM changes)
     window.addEventListener('load', bindEvents, { once: true });
 
     await Promise.all([loadStudents(), fetchData(1)]);
