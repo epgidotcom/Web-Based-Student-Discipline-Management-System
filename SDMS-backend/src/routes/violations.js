@@ -173,10 +173,12 @@
   // Create
   router.post('/', async (req, res) => {
     try {
-      const { student_id, grade_section, offense_type, description, sanction, incident_date, status, evidence } = req.body || {};
+      const { student_id, grade_section, offense_type, sanction, incident_date, status, evidence } = req.body || {};
       if (!student_id) return res.status(400).json({ error: 'student_id required' });
       if (!offense_type || !offense_type.trim()) return res.status(400).json({ error: 'offense_type required' });
-      if (!description || !description.trim()) return res.status(400).json({ error: 'description required' });
+    
+    // We no longer use description (remove violation description)
+    const description = null;
 
       const student = await fetchStudent(student_id);
       if (!student) return res.status(400).json({ error: 'Student not found' });
@@ -201,7 +203,7 @@
         student_name,
         gradeSectionFinal,
         offense_type.trim(),
-        description.trim(),
+        description,
         sanction || null,
         incident_date || null,
         status || null,
@@ -220,8 +222,8 @@
   // Update
   router.put('/:id', async (req, res) => {
     try {
-      const { student_id, grade_section, offense_type, description, sanction, incident_date, status, evidence } = req.body || {};
-
+      const { student_id, grade_section, offense_type, sanction, incident_date, status, evidence } = req.body || {};
+      const description = null; // description removed
       let student_name = null;
       let gradeSectionFinal = grade_section || null;
       if (student_id) {

@@ -134,7 +134,6 @@
             <th>Grade & Section</th>
             <th>Incident Date</th>
             <th>Violation Type</th>
-            <th>Violation Description</th>
             <th>Past Offense</th>
             <!-- Hidden column for Previous Offenses -->
             <th style="display: none;">Previous Offenses</th>
@@ -177,15 +176,13 @@
       <label>Incident Date:</label>
       <input type="date" id="incidentDate" required>
 
-      <label>Violation Description:</label>
-      <textarea id="description" rows="3" placeholder="Describe the violation..." required></textarea>
-
       <label>Violation Type:</label>
       <select id="violationType" required>
-        <option value="" disabled selected>Select type</option>
-        <option value="First Offense">First Offense</option>
-        <option value="Second Offense">Second Offense</option>
-        <option value="Third Offense">Third Offense</option>
+      <option value="" disabled selected>Select type</option>
+      <option value="Classroom Misconduct">Classroom Misconduct</option>
+      <option value="Tardiness">Tardiness</option>
+      <option value="Cutting Classes">Cutting Classes</option>
+      <option value="Dress Code">Dress Code</option>
       </select>
 
       <label>Sanction:</label>
@@ -231,7 +228,6 @@
       <div class="detail-row"><span class="label">Grade & Section</span><span class="value" id="viewGradeSection"></span></div>
       <div class="detail-row"><span class="label">Incident Date</span><span class="value" id="viewIncidentDate"></span></div>
       <div class="detail-row"><span class="label">Added Date</span><span class="value" id="viewAddedDate"></span></div>
-      <div class="detail-row"><span class="label">Violation Description</span><span class="value multiline" id="viewDescription"></span></div>
       <div class="detail-row"><span class="label">Violation Type</span><span class="value" id="viewViolationType"></span></div>
       <div id="viewPastOffenseRow" class="detail-row is-hidden">
         <span class="label">Previous Offenses</span>
