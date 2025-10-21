@@ -88,6 +88,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${acc.fullName || ''}</td>
+        <td>${acc.first_name || ''}</td>
+        <td>${acc.middle_name || ''}</td>
+        <td>${acc.last_name || ''}</td>
         <td>${acc.username || ''}</td>
         <td>${acc.email || ''}</td>
         <td>${acc.role || ''}</td>
@@ -121,8 +124,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle form submission
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const fullNameInput = (document.getElementById("fullName")?.value || '').trim();
+    const firstName = document.getElementById("firstName").value.trim();
+    const middleName = document.getElementById("middleName").value.trim();
+    const lastName = document.getElementById("lastName").value.trim();
 
-    const fullName = document.getElementById("fullName").value.trim();
+    // Build a computed full name but prefer explicit fullName input when provided
+    const computedFullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
+    const fullName = fullNameInput || computedFullName;
+
     const email = document.getElementById("email").value.trim();
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value;
@@ -139,7 +149,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const newUser = {
-      fullName,
+      first_name: firstName,
+      middle_name: middleName || null,
+      last_name: lastName,
+      fullName, // explicit input preferred, otherwise computed
       email,
       username,
       password,

@@ -52,7 +52,24 @@
     <form id="accountForm">
 
       <label for="fullName">Full Name:</label>
-      <input type="text" id="fullName" required>
+      <input type="text" id="fullName" placeholder="Enter Full Name" />
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input id="firstName" name="first_name" type="text" required />
+        </div>
+
+        <div class="form-group">
+          <label for="middleName">Middle Name</label>
+          <input id="middleName" name="middle_name" type="text" />
+        </div>
+
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input id="lastName" name="last_name" type="text" required />
+        </div>
+      </div>
 
       <label for="email">Email:</label>
       <input type="email" id="email" required>
@@ -117,6 +134,9 @@
         <thead>
           <tr>
             <th>Full Name</th>
+            <th>First Name</th>
+            <th>Middle Name</th>
+            <th>Last Name</th>
             <th>Username</th>
             <th>Email</th>
             <th>Role</th>
