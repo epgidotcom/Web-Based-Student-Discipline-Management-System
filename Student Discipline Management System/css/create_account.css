@@ -10,9 +10,14 @@
   color: #333;
 }
 
+/* Ensure grouped fields (grade/section/lrn/age) match spacing of other form controls */
+.widget form .field {
+  margin: 10px 0;
+}
 .widget form input[type="text"],
 .widget form input[type="email"],
 .widget form input[type="password"],
+.widget form input[type="number"],
 .widget form select {
   width: 100%;
   padding: 10px;
@@ -23,11 +28,13 @@
   transition: border-color 0.3s;
 }
 
-.widget form input:focus,
-.widget form select:focus {
-  border-color: #3498db;
-  outline: none;
-  box-shadow: 0 0 6px rgba(52, 152, 219, 0.3);
+.widget form input[type="number"] {
+  -moz-appearance: textfield;
+}
+.widget form input[type="number"]::-webkit-outer-spin-button,
+.widget form input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .widget form button.add-btn {
