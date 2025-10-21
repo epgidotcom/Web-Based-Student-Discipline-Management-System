@@ -6,29 +6,22 @@
   <title>SDMS - Dashboard</title>
   <link rel="stylesheet" href="css/student.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="js/student_auth_guard.js"></script>
 </head>
 <body>
-
-  <!-- Toggle button for mobile -->
-  <button class="sidebar-toggle" id="sidebarToggle">
-    <i class="fa fa-bars"></i>
-  </button>
-
-  <!-- Sidebar -->
+  <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
   <aside class="sidebar">
-    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
-    <a href="student_dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
-    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
-    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
-    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+    <img src="../images/mpnag_logo.png" alt="School Logo" class="logo"/>
+  <a href="student_dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+  <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
-
-  <!-- Backdrop for mobile -->
   <div class="backdrop" id="sidebarBackdrop"></div>
-
-  <!-- Main -->
   <main class="main">
     <header class="topbar">
       <div class="title">
@@ -37,158 +30,229 @@
       </div>
       <div class="profile">
         <div class="name-grade">
-          <strong id="studentName">Juan Dela Cruz</strong>
-          <small id="studentSection">Grade 9 • Emerald</small>
+          <strong>Student</strong>
+          <small>Grade idk • Section idk</small>
         </div>
-        <img src="images/sample_avatar.png"
-             onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
-             alt="Avatar" class="avatar"/>
+  <img src="../images/mpnag_logo.png" alt="Avatar" class="avatar"/>
       </div>
     </header>
-
-    <!-- Welcome Banner -->
-    <section class="welcome-banner">
+    <!-- Welcome banner (populated with production data when available) -->
+    <div class="welcome-banner" id="welcomeBanner">
       <div class="welcome-text">
-        <h2>Welcome back, Juan!</h2>
-        <p>Keep track of your conduct and stay informed about your student discipline records.</p>
+        <h2 id="welcomeTitle">Welcome back, Student!</h2>
+        <p id="welcomeSubtitle">Keep track of your conduct and stay informed about your student discipline records.</p>
       </div>
       <div class="welcome-illustration">
-        <i class="fa-solid fa-user-graduate"></i>
+        <!-- Production uses a decorative icon when no image is provided -->
+        <i id="welcomeIcon" class="fa fa-user-graduate" aria-hidden="true"></i>
+        <img id="welcomeIllustration" src="" alt="" style="display:none;"/>
+      </div>
+    </div>
+    <section class="cards">
+      <div class="card">
+        <div class="icon"><i class="fa fa-exclamation-circle"></i></div>
+        <div class="data"><div class="value" id="totalViolations">—</div><div class="label">Total Violations</div></div>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-folder-open"></i></div>
+        <div class="data"><div class="value" id="openCases">—</div><div class="label">Open Cases</div></div>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-calendar"></i></div>
+        <div class="data"><div class="value" id="lastViolation">—</div><div class="label">Last Violation</div></div>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-user-check"></i></div>
+        <div class="data"><div class="value"><span class="status" id="studentStatus">—</span></div><div class="label">Status</div></div>
       </div>
     </section>
-
-
-    <!-- Charts -->
+    <!-- subtle notice area used when data could not be loaded (connection error) -->
+    <div id="dataNotice" class="notice" style="display:none; margin-top:10px; margin-bottom:12px;">Unable to load violation data. If this persists, please check your connection or try again later.</div>
     <section class="grid-2">
-      <div class="panel">
-        <div class="panel-header"><h3>My Violations Over Time</h3></div>
-        <canvas id="lineChart" height="140"></canvas>
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>Violation Breakdown</h3></div>
-        <canvas id="barChart" height="140"></canvas>
-      </div>
+      <div class="panel"><div class="panel-header"><h3>My Violations Over Time</h3></div><canvas id="lineChart" height="140"></canvas></div>
+      <div class="panel"><div class="panel-header"><h3>Violation Breakdown</h3></div><canvas id="barChart" height="140"></canvas></div>
     </section>
-
-    <!-- Violation History -->
     <section class="panel">
       <div class="panel-header"><h3>Violation History</h3></div>
       <div class="table-wrap">
         <table class="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Remarks</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="violationRows">
-            <!-- Dynamically filled from backend -->
-          </tbody>
+          <thead><tr><th>Date</th><th>Type</th><th>Remarks</th><th>Status</th></tr></thead>
+          <tbody id="violationRows"></tbody>
         </table>
       </div>
     </section>
   </main>
-
-  <!-- JS -->
-  <script>
-    let allViolations = [];
+  <script type="module">
+    import { api, getStudentId } from './js/api.js';
+    let violations = [];
     let lineChart, barChart;
 
-    // Load dashboard data from backend
-    async function loadDashboardData() {
+    // Populate profile area (name and grade/section) using student profile endpoint
+    async function loadProfile(studentId){
       try {
-        const res = await fetch('/api/dashboard/student'); // <-- replace with your endpoint
-        if (!res.ok) throw new Error('Failed to fetch dashboard data');
-        const data = await res.json();
-
-        // Expect structure: { student: {...}, violations: [...] }
-        if (data.student) {
-          document.getElementById("studentName").textContent = data.student.name || "—";
-          document.getElementById("studentSection").textContent = data.student.section || "—";
-        }
-
-        if (data.violations && Array.isArray(data.violations)) {
-          allViolations = data.violations;
-          renderTable(allViolations);
-          renderCharts(allViolations);
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Unable to load dashboard data. Please try again later.");
+        if (!studentId) return null;
+        const profile = await api(`/students/${encodeURIComponent(studentId)}`);
+        return profile;
+      } catch (e){
+        // ignore profile failures (page still usable)
+        console.warn('Failed to load student profile', e);
+        return null;
       }
     }
 
-    // Render table
-    function renderTable(rows) {
-      const tbody = document.getElementById("violationRows");
-      tbody.innerHTML = "";
-      rows.forEach(v => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${v.date || '-'}</td>
-          <td>${v.type || '-'}</td>
-          <td>${v.remarks || '-'}</td>
-          <td><span class="status ${v.status?.toLowerCase() || ''}">${v.status || '-'}</span></td>
-        `;
+    function updateProfileUI(profile){
+      if (!profile) return;
+      try {
+        const nameEl = document.querySelector('.name-grade strong');
+        const metaEl = document.querySelector('.name-grade small');
+        const avatarEl = document.querySelector('.profile .avatar');
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim();
+        if (nameEl) nameEl.textContent = fullName || (profile.full_name || 'Student');
+        if (metaEl) metaEl.textContent = `${profile.grade ? 'Grade ' + profile.grade : ''}${profile.grade && profile.section ? ' • ' : ''}${profile.section || ''}`;
+        if (avatarEl && profile.photo_url) avatarEl.src = profile.photo_url;
+
+        // Welcome banner (production-ready: populated from profile)
+        const banner = document.getElementById('welcomeBanner');
+        const welcomeTitle = document.getElementById('welcomeTitle');
+        const welcomeSubtitle = document.getElementById('welcomeSubtitle');
+        const welcomeIllustration = document.getElementById('welcomeIllustration');
+        if (welcomeTitle) welcomeTitle.textContent = `Welcome back, ${fullName || profile.full_name || 'Student'}`;
+        if (welcomeSubtitle) welcomeSubtitle.textContent = profile.welcome_message || `You have ${profile.pending_appeals || 0} pending appeal(s).`;
+        const welcomeIcon = document.getElementById('welcomeIcon');
+        if (welcomeIllustration && profile.banner_image_url) {
+          welcomeIllustration.src = profile.banner_image_url;
+          welcomeIllustration.alt = profile.school_name || 'Banner';
+          welcomeIllustration.style.display = '';
+          if (welcomeIcon) welcomeIcon.style.display = 'none';
+        } else {
+          // no image — show the decorative icon like production
+          if (welcomeIllustration) welcomeIllustration.style.display = 'none';
+          if (welcomeIcon) welcomeIcon.style.display = '';
+        }
+  // banner is visible by default; we just replace text when profile loads
+  if (banner) banner.style.display = '';
+      } catch (e){ console.warn('updateProfileUI error', e); }
+    }
+
+    function updateCards(){
+      const totalEl = document.getElementById('totalViolations');
+      const openEl = document.getElementById('openCases');
+      const lastEl = document.getElementById('lastViolation');
+      const statusEl = document.getElementById('studentStatus');
+      const noticeEl = document.getElementById('dataNotice');
+
+      if (violations === null) {
+        // Data couldn't be fetched — show 'unknown' placeholders and a subtle notice.
+        if (totalEl) totalEl.textContent = '—';
+        if (openEl) openEl.textContent = '—';
+        if (lastEl) lastEl.textContent = '—';
+        if (statusEl) statusEl.textContent = 'Unknown';
+        if (noticeEl) { noticeEl.style.display = ''; }
+        return;
+      }
+
+      // violations is an array (possibly empty) — this represents a successful fetch
+      if (noticeEl) { noticeEl.style.display = 'none'; }
+      const open = violations.filter(v=> (v.status||'').toLowerCase() === 'pending').length;
+      if (totalEl) totalEl.textContent = String(violations.length);
+      if (openEl) openEl.textContent = String(open);
+      if (lastEl) lastEl.textContent = violations.length ? violations[violations.length-1].date : '—';
+      if (statusEl) statusEl.textContent = open>=3 ? 'On Probation' : 'Good Standing';
+    }
+
+    function renderTable(){
+      const tbody = document.getElementById('violationRows');
+      tbody.innerHTML='';
+      if (violations === null) {
+        // couldn't fetch — show a single-row notice that is not the same as "no violations"
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Violation data unavailable (could not connect to server)</td></tr>';
+        return;
+      }
+      violations.forEach(v=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${v.date}</td><td>${v.type}</td><td>${v.remarks}</td><td><span class="status ${ (v.status||'').toLowerCase() }">${v.status}</span></td>`;
         tbody.appendChild(tr);
       });
+      if(!violations.length){
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No violations yet</td></tr>';
+      }
     }
 
-    // Render charts
-    function renderCharts(rows) {
-      if (lineChart) lineChart.destroy();
-      if (barChart) barChart.destroy();
-
-      const sorted = rows.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
-      const labels = sorted.map(v => v.date);
-      const counts = sorted.map((_, i) => i + 1);
-
-      // Line chart
-      lineChart = new Chart(document.getElementById("lineChart"), {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: "Violations",
-            data: counts,
-            borderColor: "#e74c3c",
-            backgroundColor: "rgba(231, 76, 60, 0.3)",
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: { plugins: { legend: { display: false } }, responsive: true }
-      });
-
-      // Bar chart
-      const byType = {};
-      rows.forEach(v => { if(v.type) byType[v.type] = (byType[v.type] || 0) + 1; });
-
-      barChart = new Chart(document.getElementById("barChart"), {
-        type: "bar",
-        data: {
-          labels: Object.keys(byType),
-          datasets: [{
-            label: "Count",
-            data: Object.values(byType),
-            backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
-          }]
-        },
-        options: { plugins: { legend: { display: false } }, responsive: true }
-      });
+    function renderCharts(){
+      if(lineChart) lineChart.destroy();
+      if(barChart) barChart.destroy();
+      // If data is unavailable, render empty charts (or a small placeholder)
+      if (violations === null || !violations.length) {
+        // create empty charts with no data to keep layout stable
+          lineChart = new Chart(document.getElementById('lineChart'),{
+            type:'line',
+            data:{labels:[],datasets:[{label:'Violations',data:[],borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},
+            options:{
+              plugins:{legend:{display:false}},
+              responsive:true,
+              scales: { x: { display: false }, y: { display: false } }
+            }
+          });
+          barChart = new Chart(document.getElementById('barChart'),{
+              type:'bar',
+              data:{labels:[],datasets:[{label:'Count',data:[],backgroundColor:[]}]},
+              options:{
+                plugins:{legend:{display:false}},
+                responsive:true,
+                scales: { x: { display: false }, y: { display: false } }
+              }
+            });
+        return;
+      }
+      const labels = violations.map(v=>v.date);
+      const counts = violations.map((_,i)=>i+1);
+      lineChart = new Chart(document.getElementById('lineChart'),{
+          type:'line',
+          data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},
+          options:{
+            plugins:{legend:{display:false}},
+            responsive:true,
+            scales: { x: { display: false }, y: { display: false } }
+          }
+        });
+      const byType={}; violations.forEach(v=>{byType[v.type]=(byType[v.type]||0)+1});
+      barChart = new Chart(document.getElementById('barChart'),{
+          type:'bar',
+          data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},
+          options:{
+            plugins:{legend:{display:false}},
+            responsive:true,
+            scales: { x: { display: false }, y: { display: false } }
+          }
+        });
     }
 
-    // Sidebar toggle
-    const sidebar = document.querySelector(".sidebar");
-    const toggleBtn = document.getElementById("sidebarToggle");
-    toggleBtn.addEventListener("click", () => sidebar.classList.toggle("closed"));
+    async function loadData(){
+      const studentId = getStudentId();
+      // load profile first to replace hardcoded name/grade
+      const profile = await loadProfile(studentId || 'me');
+      updateProfileUI(profile);
 
-    // Init
-    loadDashboardData();
+      try {
+        const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
+        violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({
+          date: (v.date || v.created_at || '').slice(0,10),
+            type: v.type || v.violation_type || v.offense || 'Unknown',
+            remarks: v.remarks || v.description || '',
+            status: v.status || 'Pending'
+        }));
+      } catch (e){
+        console.error('Failed to load violations for dashboard', e);
+        // distinguish between "no violations" and "fetch failed"
+        // use `null` to indicate data couldn't be retrieved (likely connection issue)
+        violations = null;
+      }
+      updateCards();
+      renderTable();
+      renderCharts();
+    }
+    loadData();
   </script>
-
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>
