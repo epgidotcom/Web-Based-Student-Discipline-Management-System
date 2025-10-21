@@ -7,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
   const gradeField = document.getElementById("grade");
-  // new: section + lrn nodes
   const sectionGroup = document.getElementById("sectionGroup");
   const sectionField = document.getElementById("section");
   const lrnGroup = document.getElementById("lrnGroup");
