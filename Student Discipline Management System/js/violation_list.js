@@ -1,4 +1,4 @@
-(() => {
+;(() => {
   const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
   const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
 
@@ -232,7 +232,6 @@
   const studentNameField = document.getElementById('studentName');
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
-  const descriptionField = document.getElementById('description');
   const violationTypeField = document.getElementById('violationType');
   const sanctionField = document.getElementById('sanction');
   const remarksField = document.getElementById('remarks');
@@ -257,7 +256,6 @@
   const viewPastOffense = document.getElementById('viewPastOffense');
   const viewIncidentDate = document.getElementById('viewIncidentDate');
   const viewAddedDate = document.getElementById('viewAddedDate');
-  const viewDescription = document.getElementById('viewDescription');
   const viewViolationType = document.getElementById('viewViolationType');
   const viewSanction = document.getElementById('viewSanction');
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
@@ -418,7 +416,6 @@
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
         <td>${v.offense_type || '—'}</td>
-        <td>${v.description || '—'}</td>
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
@@ -551,7 +548,6 @@
     studentNameField.value = '';
     gradeSectionField.value = '';
     incidentDateField.value = '';
-    descriptionField.value = '';
     violationTypeField.value = '';
     sanctionField.value = '';
     remarksField.value = '';
@@ -580,7 +576,6 @@
     }
 
     incidentDateField.value = item.incident_date ? String(item.incident_date).slice(0, 10) : '';
-    descriptionField.value = item.description || '';
     violationTypeField.value = item.offense_type || '';
     sanctionField.value = item.sanction || '';
     remarksField.value = item.remarks || '';
@@ -600,8 +595,7 @@
     viewGradeSection.textContent = item.grade_section || '—';
     viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
     viewAddedDate.textContent = formatDate(item.created_at) || '—';
-    viewDescription.textContent = item.description || '—';
-    viewViolationType.textContent = item.offense_type || '—';
+    violationTypeField.value = item.description || item.offense_type || '';
     viewSanction.textContent = item.sanction || '—';
     
     const remarksRow = document.createElement('div');
@@ -807,6 +801,7 @@
         ${filterText?.value ? 'Search: ' + filterText.value : 'No text filter'}
       </div>
     `;
+
     table.parentNode.insertBefore(header, table);
     __printHeaderEl = header;
 
@@ -840,6 +835,67 @@
     window.onafterprint = cleanupPrintArtifacts;
   }
 
+  // === NEW: Download (CSV) of the currently filtered/visible rows ===
+  function downloadFilteredReport() {
+    const table = document.getElementById('violationTable');
+    if (!table) return;
+
+    const strand = (filterStrand?.value || 'All Strands');
+    const vtype  = (filterViolationType?.value || 'All Violations');
+    const txt    = (filterText?.value || 'No text filter');
+
+    // headers (exclude the last "Actions" column)
+    const ths = Array.from(table.querySelectorAll('thead th'));
+    const headers = ths.slice(0, ths.length - 1).map(th => th.textContent.trim());
+
+    // visible rows only (respect filters + CSS display)
+    const bodyRows = Array.from(table.tBodies?.[0]?.rows || []).filter(r => {
+      if (r.dataset?.placeholder === 'empty') return false;
+      const disp = (r.style.display || '').trim();
+      const cssDisp = getComputedStyle(r).display;
+      return disp !== 'none' && cssDisp !== 'none';
+    });
+
+    const rows = bodyRows.map(tr => {
+      const cells = Array.from(tr.cells);
+      const wanted = cells.slice(0, Math.max(0, cells.length - 1)); // drop Actions col
+      return wanted.map(td => (td.textContent || '').trim());
+    });
+
+    // CSV helpers
+    const esc = (s) => {
+      const v = String(s ?? '').replace(/\r?\n/g, ' ').replace(/"/g, '""');
+      return /[",\n]/.test(v) ? `"${v}"` : v;
+    };
+
+    // Metadata (Excel-friendly)
+    const meta = [
+      ['Student Violation Report'],
+      ['Generated on', new Date().toLocaleString()],
+      ['Filters', `Strand: ${strand} | Violation: ${vtype} | Search: ${txt}`],
+      []
+    ];
+
+    const csvLines = []
+      .concat(meta.map(arr => arr.map(esc).join(',')))
+      .concat([headers.map(esc).join(',')])
+      .concat(rows.map(r => r.map(esc).join(',')));
+
+    const csv = '\uFEFF' + csvLines.join('\r\n'); // BOM for Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.href = url;
+    a.download = `Violation_Report_${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // inject minimal runtime CSS to ensure modals are always on top
   function ensureModalZStack() {
     if (document.getElementById('sdms-modal-zfix')) return;
     const s = document.createElement('style');
@@ -938,17 +994,25 @@
 
     // filter + print
     applyFilterBtn?.addEventListener('click', applyFilters);
-    filterStrand?.addEventListener('change', applyFilters);
-    filterViolationType?.addEventListener('change', applyFilters);
-    filterText?.addEventListener('input', applyFilters);
-    printReportBtn?.addEventListener('click', printFilteredReport);
+  filterStrand?.addEventListener('change', applyFilters);
+  filterViolationType?.addEventListener('change', applyFilters);
+  filterText?.addEventListener('input', applyFilters); // <-- fixed typo here
+
+if (printReportBtn) {
+  printReportBtn.textContent = 'Download Report';
+  printReportBtn.title = 'Download the filtered rows as CSV';
+  // avoid duplicate handlers when bindEvents runs more than once
+  printReportBtn.removeEventListener?.('click', printFilteredReport);
+  printReportBtn.removeEventListener?.('click', downloadFilteredReport);
+  printReportBtn.addEventListener('click', downloadFilteredReport);
   }
 
+  }
+  
   async function init() {
     ensureModalZStack();
     bindEvents();
 
-    // also bind once page is fully loaded (covers dynamic DOM changes)
     window.addEventListener('load', bindEvents, { once: true });
 
     await Promise.all([loadStudents(), fetchData(1)]);
