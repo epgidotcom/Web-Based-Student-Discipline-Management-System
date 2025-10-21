@@ -595,7 +595,7 @@
     viewGradeSection.textContent = item.grade_section || '—';
     viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
     viewAddedDate.textContent = formatDate(item.created_at) || '—';
-    violationTypeField.value = item.description || item.offense_type || '';
+    violationTypeField.value =  item.offense_type || '—';
     viewSanction.textContent = item.sanction || '—';
     
     const remarksRow = document.createElement('div');
@@ -652,7 +652,6 @@
       student_id: studentId,
       grade_section: gradeSectionField?.value?.trim() || null,
       offense_type: violationTypeField?.value || null,
-      description: descriptionField?.value?.trim() || null,
       sanction: sanctionField?.value || null,
       remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
@@ -739,12 +738,11 @@
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
-      const description = row.cells[4]?.textContent.toLowerCase() || '';
       const rowText = row.innerText.toLowerCase();
 
       const matchStrand = !strand || gradeSection.includes(strand);
       const matchType = !violationType || vType.includes(violationType);
-      const matchText = !textQuery || [studentName, gradeSection, vType, description].some(s => s.includes(textQuery));
+      const matchText = !textQuery || [studentName, gradeSection, vType].some(s => s.includes(textQuery));
       const matchGlobal = !globalQuery || rowText.includes(globalQuery);
 
       // date match
