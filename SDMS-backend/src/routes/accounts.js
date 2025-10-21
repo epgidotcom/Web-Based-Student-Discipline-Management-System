@@ -51,18 +51,15 @@ router.post('/', async (req, res) => {
         await query('BEGIN');
         try {
           const { rows } = await query(
-            `INSERT INTO accounts (full_name, email, username, password_hash, role, grade, lrn, section)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-             RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
+            `INSERT INTO accounts (full_name, email, username, password_hash, role)
+             VALUES ($1,$2,$3,$4,$5)
+             RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
             [
               fullName.trim(),
               email.toLowerCase().trim(),
               username.toLowerCase().trim(),
               hash,
-              role,
-              role === 'Student' ? (grade || null) : null,
-              role === 'Student' ? (lrn || null) : null,
-              role === 'Student' ? (section || null) : null
+              role
             ]
           );
           const acct = rows[0];
@@ -70,9 +67,9 @@ router.post('/', async (req, res) => {
           if (role === 'Student') {
             // Insert into students table 
             await query(
-              `INSERT INTO students (account_id, full_name, first_name, middle_name, last_name, lrn, section, grade, age, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-              [acct.id, fullName.trim(), firstName || null, middleName || null, lastName || null, lrn || null, section || null, grade || null, age || null, acct.createdAt]
+              `INSERT INTO students (id, full_name, first_name, middle_name, last_name, lrn, section, grade, age, created_at, grade_level)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+              [acct.id, fullName.trim(), firstName || null, middleName || null, lastName || null, lrn || null, section || null, grade || null, age || null, acct.createdAt, grade || null]
             );
           }
 
@@ -94,7 +91,7 @@ router.post('/', async (req, res) => {
       const { rows } = await query(
         `INSERT INTO accounts (full_name, email, username, password_hash, role)
          VALUES ($1,$2,$3,$4,$5)
-         RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
+         RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
         [fullName.trim(), email.toLowerCase().trim(), username.toLowerCase().trim(), hash, role]
       );
       res.status(201).json({ ...rows[0], age: null, bootstrap: true });
@@ -133,18 +130,12 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
             email = COALESCE($2, email),
             username = COALESCE($3, username),
             role = COALESCE($4, role),
-            grade = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($5, grade) ELSE NULL END,
-            lrn = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($6, lrn) ELSE NULL END,
-            section = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($7, section) ELSE NULL END,
-            password_hash = $8
-        WHERE id = $9`,
+            password_hash = $5
+        WHERE id = $6`,
         [fullName ? fullName.trim() : null,
          email ? email.toLowerCase().trim() : null,
          username ? username.toLowerCase().trim() : null,
          role || null,
-         grade || null,
-         lrn || null,
-         section || null,
          password_hash,
          req.params.id]);
 
@@ -154,16 +145,16 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
         if ((role && role === 'Student') && (age === undefined || age === null)) {
           // if age not provided in this update but student already existed, we allow keeping existing age;
           // if no students row exists and age missing, error
-          const sCheck = await query('SELECT 1 FROM students WHERE account_id = $1', [req.params.id]);
+          const sCheck = await query('SELECT 1 FROM students WHERE id = $1', [req.params.id]);
           if (!sCheck.rows.length) {
             await query('ROLLBACK');
             return res.status(400).json({ error: 'Student accounts require age' });
           }
         }
         await query(
-          `INSERT INTO students (account_id, full_name, lrn, section, grade, age)
+          `INSERT INTO students (id, full_name, lrn, section, grade, age)
            VALUES ($1,$2,$3,$4,$5,$6)
-           ON CONFLICT (account_id) DO UPDATE
+           ON CONFLICT (id) DO UPDATE
              SET full_name = EXCLUDED.full_name,
                  lrn = EXCLUDED.lrn,
                  section = EXCLUDED.section,
@@ -178,13 +169,13 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
         );
       } else {
         // not a student anymore -> remove students entry
-        await query('DELETE FROM students WHERE account_id = $1', [req.params.id]);
+        await query('UPDATE students set active = false where id = $1', [req.params.id]);
       }
 
       // Return the combined account + student record
       const { rows } = await query(
         `SELECT a.id, a.full_name AS "fullName", a.email, a.username, a.role,
-                a.grade, a.lrn, a.section, s.age AS age, a.created_at AS "createdAt"
+                s.grade, s.lrn, s.section, s.age AS age, a.created_at AS "createdAt"
          FROM accounts a
          LEFT JOIN students s ON a.id = s.account_id
          WHERE a.id = $1`,
