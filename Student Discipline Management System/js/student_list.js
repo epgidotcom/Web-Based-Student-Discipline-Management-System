@@ -439,6 +439,117 @@
     });
   }
 
+  /* drop-down filters */
+    (function(){
+    function normalize(v){
+      return (v || '').toString().trim().toLowerCase();
+    }
+
+    function getGradeFromRow(row){
+      // prefer data-grade attribute
+      if (row.dataset && row.dataset.grade) return normalize(row.dataset.grade);
+      // fallback to Grade column (index 3)
+      try {
+        var cell = row.cells && row.cells[3];
+        if (cell) return normalize(cell.textContent || cell.innerText);
+      } catch(e){}
+      return '';
+    }
+
+    function getStrandFromRow(row){
+      // prefer data-strand attribute
+      if (row.dataset && row.dataset.strand) return normalize(row.dataset.strand);
+      // optional fallback: try to find a cell marked for strand (data-col="strand")
+      var strandCell = row.querySelector && row.querySelector('[data-col="strand"]');
+      if (strandCell) return normalize(strandCell.textContent || strandCell.innerText);
+      // if no strand info is present, return empty -> will be treated as non-matching when a strand filter is active
+      return '';
+    }
+
+    function updateStudentsSummary(visibleCount){
+      var summaryEl = document.getElementById('studentsPageSummary');
+      var table = document.getElementById('studentTable');
+      var total = 0;
+      if (table) {
+        // derive total from non-placeholder rows
+        var tbody = table.tBodies[0];
+        if (tbody) {
+          total = Array.from(tbody.rows).filter(function(r){
+            return !(r.cells.length === 1 && r.cells[0].hasAttribute('colspan'));
+          }).length;
+        }
+      }
+      if (summaryEl) summaryEl.textContent = 'Showing ' + visibleCount + ' of ' + total;
+    }
+
+    function applyDropdownFilters(){
+      var selStrand = normalize(document.getElementById('filterStrand') && document.getElementById('filterStrand').value);
+      var selGrade  = normalize(document.getElementById('filterGrade') && document.getElementById('filterGrade').value);
+
+      var table = document.getElementById('studentTable');
+      if (!table) return;
+      var tbody = table.tBodies[0];
+      if (!tbody) return;
+
+      var rows = Array.from(tbody.rows);
+      var visibleCount = 0;
+      var placeholder = null;
+
+      rows.forEach(function(row){
+        if (row.cells.length === 1 && row.cells[0].hasAttribute('colspan')) {
+          placeholder = row;
+          row.style.display = 'none';
+          return;
+        }
+
+        var rowGrade = getGradeFromRow(row);
+        var rowStrand = getStrandFromRow(row);
+
+        var matchesGrade = true;
+        var matchesStrand = true;
+
+        if (selGrade) {
+          matchesGrade = (rowGrade === selGrade || rowGrade === ('grade ' + selGrade));
+        }
+        if (selStrand) {
+          // require exact match on strand; rows without strand info will not match
+          matchesStrand = (rowStrand === selStrand);
+        }
+
+        var keep = matchesGrade && matchesStrand;
+        row.style.display = keep ? '' : 'none';
+        if (keep) visibleCount++;
+      });
+
+      if (visibleCount === 0 && placeholder) {
+        placeholder.style.display = '';
+      }
+
+      updateStudentsSummary(visibleCount);
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      var filterStrand = document.getElementById('filterStrand');
+      var filterGrade  = document.getElementById('filterGrade');
+
+      if (filterStrand) filterStrand.addEventListener('change', applyDropdownFilters);
+      if (filterGrade)  filterGrade.addEventListener('change', applyDropdownFilters);
+
+      // ensure summary reflects initial state
+      // compute initial visible rows count
+      (function initSummary(){
+        var table = document.getElementById('studentTable');
+        if (!table) return;
+        var tbody = table.tBodies[0];
+        if (!tbody) return;
+        var rows = Array.from(tbody.rows).filter(function(r){
+          return !(r.cells.length === 1 && r.cells[0].hasAttribute('colspan'));
+        });
+        updateStudentsSummary(rows.length);
+      })();
+    });
+  })();
+
   addStudentBtn?.addEventListener('click', openCreateModal);
   closeBtns.forEach(btn => btn.addEventListener('click', closeModals));
   studentForm?.addEventListener('submit', persistStudent);
