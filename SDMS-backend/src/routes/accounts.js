@@ -69,8 +69,8 @@ router.post('/', async (req, res) => {
             // Insert into students table 
             await query(
               `INSERT INTO students (id, full_name, lrn, section, grade, grade_level, age, created_at)
-               VALUES ($1,$2,$3,$4,$5,$5,$6,$7)`,
-              [acct.id, fullName.trim(), lrn || null, section || null, grade || null, age || null, acct.createdAt]
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+              [acct.id, fullName.trim(), lrn || null, section || null, grade || null, grade || null, age || null, acct.createdAt]
             );
           }
 
