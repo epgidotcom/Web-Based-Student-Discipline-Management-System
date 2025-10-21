@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const sectionField = document.getElementById("section");
   const lrnGroup = document.getElementById("lrnGroup");
   const lrnField = document.getElementById("lrn");
+  const ageGroup = document.getElementById("ageGroup");
+  const ageField = document.getElementById("age");
 
   const updateGradeVisibility = (value) => {
     if (!gradeGroup) return;
@@ -23,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // show LRN
       if (lrnGroup) lrnGroup.style.display = "block";
       lrnField?.setAttribute("required", "true");
+      // show Age
+      if (ageGroup) ageGroup.style.display = "block";
+      ageField?.setAttribute("required", "true");
     } else {
       gradeGroup.style.display = "none";
       gradeField?.removeAttribute("required");
@@ -32,6 +37,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // hide LRN
       if (lrnGroup) lrnGroup.style.display = "none";
       lrnField?.removeAttribute("required");
+      // hide Age
+      if (ageGroup) ageGroup.style.display = "none";
+      ageField?.removeAttribute("required");
     }
   };
 
@@ -83,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${acc.username || ''}</td>
         <td>${acc.email || ''}</td>
         <td>${acc.role || ''}</td>
+        <td>${acc.age ?? ''}</td>
         <td>${acc.role === 'Student' ? ((acc.grade || '') + (acc.section ? (' / ' + acc.section) : '') + (acc.lrn ? (' / ' + acc.lrn) : '')) : ''}</td>
         <td>
           <button class="action-btn delete-btn" data-id="${acc.id}" title="Delete"><i class="fa fa-trash"></i></button>
@@ -122,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const grade = document.getElementById("grade").value;
     const section = document.getElementById("section").value.trim();
     const lrn = document.getElementById("lrn").value.trim();
+    const age = document.getElementById("age") ? document.getElementById("age").value.trim() : '';
 
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
@@ -134,7 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
       username,
       password,
       role,
-      ...(role === "Student" && { grade, section, lrn }),
+      ...(role === "Student" && { grade, section, lrn, age: age === '' ? null : Number(age) }),
     };
 
     // Create via API
@@ -151,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
       gradeGroup.style.display = "none";
       if (sectionGroup) sectionGroup.style.display = "none";
       if (lrnGroup) lrnGroup.style.display = "none";
+      if (ageGroup) ageGroup.style.display = "none";
     }catch(err){
       console.error(err);
       alert('Failed to create account.');

@@ -98,6 +98,12 @@
         <input type="text" id="lrn" maxlength="20" placeholder="Enter Student's LRN" />
       </div>
 
+      <!-- Age field shown only for Student role -->
+      <div id="ageGroup" class="field" style="display:none;">
+        <label for="age">Age</label>
+        <input type="number" id="age" min="1" max="120" placeholder="Enter Age" />
+      </div>
+
       <button type="submit" class="add-btn" style="margin-top: 12px;">
         <i class="fa fa-user-plus"></i> Create Account
       </button>
@@ -114,7 +120,9 @@
             <th>Username</th>
             <th>Email</th>
             <th>Role</th>
-            <th>Grade / Section / LRN</th> <!-- adjusted header -->
+            <th>Age</th>
+            <th>Grade</th>
+            <th>Section</th>
             <th>Actions</th>
           </tr>
         </thead>
