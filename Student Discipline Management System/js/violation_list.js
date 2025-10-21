@@ -232,7 +232,6 @@
   const studentNameField = document.getElementById('studentName');
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
-  const descriptionField = document.getElementById('description');
   const violationTypeField = document.getElementById('violationType');
   const sanctionField = document.getElementById('sanction');
 
@@ -256,7 +255,6 @@
   const viewPastOffense = document.getElementById('viewPastOffense');
   const viewIncidentDate = document.getElementById('viewIncidentDate');
   const viewAddedDate = document.getElementById('viewAddedDate');
-  const viewDescription = document.getElementById('viewDescription');
   const viewViolationType = document.getElementById('viewViolationType');
   const viewSanction = document.getElementById('viewSanction');
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
@@ -417,7 +415,6 @@
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
         <td>${v.offense_type || '—'}</td>
-        <td>${v.description || '—'}</td>
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
@@ -550,7 +547,6 @@
     studentNameField.value = '';
     gradeSectionField.value = '';
     incidentDateField.value = '';
-    descriptionField.value = '';
     violationTypeField.value = '';
     sanctionField.value = '';
     modalTitle.textContent = 'Add Violation';
@@ -578,7 +574,6 @@
     }
 
     incidentDateField.value = item.incident_date ? String(item.incident_date).slice(0, 10) : '';
-    descriptionField.value = item.description || '';
     violationTypeField.value = item.offense_type || '';
     sanctionField.value = item.sanction || '';
 
@@ -590,72 +585,24 @@
     openModal(violationModal);
   }
 
-    function showViewModal(index) {
-      const item = violations[index];
-      if (!item) return;
+  function showViewModal(index) {
+    const item = violations[index];
+    if (!item) return;
+    viewStudent.textContent = item.student_name || '—';
+    viewGradeSection.textContent = item.grade_section || '—';
+    viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
+    viewAddedDate.textContent = formatDate(item.created_at) || '—';
+    violationTypeField.value = item.description || item.offense_type || '';
+    viewSanction.textContent = item.sanction || '—';
 
-      // === Current Offense Details ===
-      viewStudent.textContent = item.student_name || '—';
-      viewGradeSection.textContent = item.grade_section || '—';
-      viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
-      viewAddedDate.textContent = formatDate(item.created_at) || '—';
-      viewDescription.textContent = item.description || '—';
-      viewViolationType.textContent = item.offense_type || '—';
-      viewSanction.textContent = item.sanction || '—';
-
-      // === All Offense Cards ===
-      const allWrap = document.getElementById('viewAllOffensesWrap');
-      const allContainer = document.getElementById('viewAllOffenses');
-      allContainer.innerHTML = '';
-
-      const allOffenses = violations
-        .filter(v => v.student_id === item.student_id)
-        .sort((a, b) => new Date(a.incident_date) - new Date(b.incident_date));
-
-      if (allOffenses.length) {
-        allWrap.classList.remove('is-hidden');
-
-        // ensure one-time badge styles exist
-        if (!document.getElementById('sdms-status-badge-style')) {
-          const style = document.createElement('style');
-          style.id = 'sdms-status-badge-style';
-          style.textContent = `
-            .status-badge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:600; }
-            .status-pending  { background:#FEF3C7; color:#92400E; }   /* amber */
-            .status-approved { background:#DCFCE7; color:#166534; }   /* green */
-            .status-rejected { background:#FEE2E2; color:#991B1B; }   /* red */
-          `;
-          document.head.appendChild(style);
-        }
-
-        allOffenses.forEach((off, i) => {
-          const card = document.createElement('div');
-          card.className = 'offense-card';
-
-          // derive normalized status + badge class; default to 'pending'
-          const rawStatus = (off.status || 'pending').toString().trim().toLowerCase();
-          const statusNorm = ['approved', 'rejected', 'pending'].includes(rawStatus) ? rawStatus : 'pending';
-          const badgeClass = `status-badge status-${statusNorm}`;
-          const statusLabel = statusNorm.charAt(0).toUpperCase() + statusNorm.slice(1);
-
-          card.innerHTML = `
-            <div class="offense-header">
-              <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
-            </div>
-            <div class="offense-body">
-              <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
-              <div><strong>Description:</strong> ${off.description || '—'}</div>
-              <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
-              <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
-              <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
-            </div>
-          `;
-          allContainer.appendChild(card);
-        });
-      } else {
-        allWrap.classList.add('is-hidden');
-      }
-
+    const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
+    if (history.length) {
+      viewPastOffenseRow.classList.remove('is-hidden');
+      viewPastOffense.textContent = `${history.length} earlier case${history.length > 1 ? 's' : ''}`;
+    } else {
+      viewPastOffenseRow.classList.add('is-hidden');
+      viewPastOffense.textContent = '';
+    }
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     if (files.length) {
@@ -694,14 +641,14 @@
     }
 
     const payload = {
-      student_id: studentId,
-      grade_section: gradeSectionField?.value?.trim() || null,
-      offense_type: violationTypeField?.value || null,
-      description: descriptionField?.value?.trim() || null,
-      sanction: sanctionField?.value || null,
-      incident_date: incidentDateField?.value || null,
-      evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
-    };
+  student_id: studentId,
+  grade_section: gradeSectionField?.value?.trim() || null,
+  offense_type: violationTypeField?.value || null,
+  description: violationTypeField?.value || null, // use same value for description
+  sanction: sanctionField?.value || null,
+  incident_date: incidentDateField?.value || null,
+  evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
+  };
 
     try {
       const editIndex = editIndexField?.value === '' ? null : Number(editIndexField.value);
