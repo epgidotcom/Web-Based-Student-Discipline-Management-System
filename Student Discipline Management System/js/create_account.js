@@ -162,6 +162,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Create via API
     try{
+
+      const test = JSON.stringify(newUser);
       const res = await fetch(`${API_BASE}/api/accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
