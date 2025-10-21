@@ -163,9 +163,9 @@ router.post('/', async (req, res) => {
       INSERT INTO violations (
         student_id, student_name, grade_section,
         description, sanction,
-        incident_date, status, evidence
+        incident_date, status, evidence, offense_type
       )
-      VALUES ($1,$2,$3,$4,$5,COALESCE($6::date, CURRENT_DATE),COALESCE($7::violation_status_type,'Pending'),$8)
+      VALUES ($1,$2,$3,$4,$5,COALESCE($6::date, CURRENT_DATE),COALESCE($7::violation_status_type,'Pending'),$8,$9)
       RETURNING id, student_id, student_name, grade_section,
                 description AS violation_type, sanction, incident_date, status,
                 repeat_count_at_insert, evidence, created_at, updated_at;
@@ -179,7 +179,8 @@ router.post('/', async (req, res) => {
       sanction || null,
       incident_date || null,
       status || null,
-      normEvidence
+      normEvidence,
+      'NA'
     ];
 
     const { rows } = await query(insertSQL, params);
