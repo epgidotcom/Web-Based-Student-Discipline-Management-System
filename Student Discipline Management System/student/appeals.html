@@ -2,60 +2,62 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SDMS - Appeals</title>
   <link rel="stylesheet" href="css/student.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="js/student_auth_guard.js"></script>
 </head>
 <body>
-  <button class="sidebar-toggle" id="sidebarToggle">
-    <i class="fa fa-bars"></i>
-  </button>
+  <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
 
-  <!-- Sidebar -->
   <aside class="sidebar">
-    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo" />
     <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
     <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
     <a href="appeals.html" class="active"><i class="fa fa-file-circle-question"></i> Appeals</a>
-    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+    <a href="messages.html"><i class="fa fa-envelope"></i> Messages</a>
+    <a href="../index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
   </aside>
 
-  <!-- Backdrop for mobile -->
   <div class="backdrop" id="sidebarBackdrop"></div>
 
-  <!-- Main -->
   <main class="main">
     <header class="topbar">
       <div class="title">
         <h1>Student Discipline Management System</h1>
         <span class="subtitle">Appeals</span>
       </div>
-
-      <!-- Profile section -->
       <div class="profile" id="studentProfile">
         <div class="name-grade">
           <strong id="studentName">Loading...</strong>
           <small id="studentSection"></small>
         </div>
-        <img id="studentAvatar"
-             src="images/mpnag_logo.png"
-             alt="Avatar"
-             class="avatar" />
+        <img id="studentAvatar" src="images/mpnag_logo.png" alt="Avatar" class="avatar" />
       </div>
     </header>
 
-    <!-- Appeals Panel -->
     <section class="panel">
-      <div class="panel-header"><h3>Submit an Appeal</h3></div>
+      <div class="panel-header">
+        <h3>Submit an Appeal</h3>
+      </div>
       <form id="appealForm" class="appeal-form">
         <div class="field">
           <label for="violationText">Violation</label>
-          <input type="text" id="violationText" placeholder="Enter violation type..." />
+          <div class="violation-picker">
+            <input type="text" id="violationText" placeholder="Enter the violation you want to appeal" required />
+            <button type="button" id="violationToggle" class="btn" aria-expanded="false" aria-haspopup="listbox" title="Choose from policy violations">▾</button>
+            <div id="violationDropdown" class="violation-dropdown" role="listbox" aria-label="School violation list" hidden>
+              <div class="violation-search"><input id="violationSearch" type="search" placeholder="Search violations..." /></div>
+              <ul id="violationList" class="violation-list"></ul>
+            </div>
+          </div>
         </div>
         <div class="field">
           <label for="appealReason">Reason / Explanation</label>
-          <textarea id="appealReason" rows="4" placeholder="Explain why you are appealing…"></textarea>
+          <textarea id="appealReason" rows="4" placeholder="Explain why you are appealing" required></textarea>
         </div>
         <button class="btn primary" type="submit">
           <i class="fa fa-file-circle-check"></i> Submit Appeal
@@ -63,9 +65,10 @@
       </form>
     </section>
 
-    <!-- Appeal History -->
     <section class="panel">
-      <div class="panel-header"><h3>My Appeals</h3></div>
+      <div class="panel-header">
+        <h3>My Appeals</h3>
+      </div>
       <div class="table-wrap">
         <table class="table">
           <thead>
@@ -74,21 +77,23 @@
               <th>Violation</th>
               <th>Reason</th>
               <th>Status</th>
+              <th>Last Message</th>
             </tr>
           </thead>
           <tbody id="appealRows">
-            <tr>
-              <td colspan="4" style="text-align:center; color:#888;">No appeals found.</td>
+            <tr data-placeholder="empty">
+              <td colspan="5" style="text-align:center; color:#888;">No appeals found.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
-  </main>
 
-  <!-- JS -->
-  <script src="js/student_appeals.js"></script>
+  
+
+  <script type="module" src="js/appeals.js"></script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
+
