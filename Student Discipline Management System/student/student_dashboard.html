@@ -61,6 +61,32 @@
     let violations = [];
     let lineChart, barChart;
 
+    // Populate profile area (name and grade/section) using student profile endpoint
+    async function loadProfile(studentId){
+      try {
+        if (!studentId) return null;
+        const profile = await api(`/students/${encodeURIComponent(studentId)}`);
+        return profile;
+      } catch (e){
+        // ignore profile failures (page still usable)
+        console.warn('Failed to load student profile', e);
+        return null;
+      }
+    }
+
+    function updateProfileUI(profile){
+      if (!profile) return;
+      try {
+        const nameEl = document.querySelector('.name-grade strong');
+        const metaEl = document.querySelector('.name-grade small');
+        const avatarEl = document.querySelector('.profile .avatar');
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim();
+        if (nameEl) nameEl.textContent = fullName || (profile.full_name || 'Student');
+        if (metaEl) metaEl.textContent = `${profile.grade ? 'Grade ' + profile.grade : ''}${profile.grade && profile.section ? ' • ' : ''}${profile.section || ''}`;
+        if (avatarEl && profile.photo_url) avatarEl.src = profile.photo_url;
+      } catch (e){ console.warn('updateProfileUI error', e); }
+    }
+
     function updateCards(){
       const open = violations.filter(v=> (v.status||'').toLowerCase() === 'pending').length;
       document.getElementById('totalViolations').textContent = violations.length;
@@ -68,6 +94,7 @@
       document.getElementById('lastViolation').textContent = violations.length ? violations[violations.length-1].date : '—';
       document.getElementById('studentStatus').textContent = open>=3 ? 'On Probation' : 'Good Standing';
     }
+
     function renderTable(){
       const tbody = document.getElementById('violationRows');
       tbody.innerHTML='';
@@ -80,6 +107,7 @@
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No violations yet</td></tr>';
       }
     }
+
     function renderCharts(){
       if(lineChart) lineChart.destroy();
       if(barChart) barChart.destroy();
@@ -89,8 +117,13 @@
       const byType={}; violations.forEach(v=>{byType[v.type]=(byType[v.type]||0)+1});
       barChart = new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},options:{plugins:{legend:{display:false}},responsive:true}});
     }
+
     async function loadData(){
       const studentId = getStudentId();
+      // load profile first to replace hardcoded name/grade
+      const profile = await loadProfile(studentId || 'me');
+      updateProfileUI(profile);
+
       try {
         const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
         violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({

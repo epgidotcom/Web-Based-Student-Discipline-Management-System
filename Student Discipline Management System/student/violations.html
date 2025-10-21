@@ -63,8 +63,48 @@
     let violations = [];
     let lineChart, barChart;
 
+    // Load student profile and show name/grade in the page header
+    async function loadProfile(studentId){
+      try {
+        if (!studentId) return null;
+        const profile = await api(`/students/${encodeURIComponent(studentId)}`);
+        return profile;
+      } catch (e) {
+        console.warn('Failed to load student profile', e);
+        return null;
+      }
+    }
+
+    function updateProfileUI(profile){
+      if (!profile) return;
+      try {
+        const titleEl = document.querySelector('.title');
+        if (!titleEl) return;
+        // avoid duplicating if run multiple times
+        let meta = document.getElementById('studentProfileMeta');
+        if (!meta) {
+          meta = document.createElement('div');
+          meta.id = 'studentProfileMeta';
+          meta.style.marginTop = '6px';
+          meta.style.fontSize = '0.95rem';
+          titleEl.appendChild(meta);
+        }
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || (profile.full_name || 'Student');
+        const grade = profile.grade ? `Grade ${profile.grade}` : '';
+        const section = profile.section ? `Section ${profile.section}` : '';
+        meta.innerHTML = `<strong style="display:block">${fullName}</strong><small style="color:var(--muted, #666)">${grade}${grade && section ? ' • ' : ''}${section}</small>`;
+      } catch (e) { console.warn('updateProfileUI error', e); }
+    }
+
     async function loadViolations(){
       const studentId = getStudentId();
+      // load profile (best-effort) and update UI
+      try {
+        const profile = await loadProfile(studentId || 'me');
+        updateProfileUI(profile);
+      } catch (e) {
+        // continue even if profile fails
+      }
       try {
         // Prefer a dedicated endpoint if available; fallback to generic with query.
         const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
