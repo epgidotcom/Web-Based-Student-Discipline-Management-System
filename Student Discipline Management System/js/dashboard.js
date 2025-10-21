@@ -103,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
       id: row.id,
       studentId: row.student_id,
       studentName: row.student_name || buildStudentName(student),
+      description: (row.description ?? row.violation_description ?? row.details ?? row.violation ?? row.offense_type ?? '').toString().trim(),
       type: row.offense_type || 'Violation',
       status: row.status || 'Pending',
       date: row.incident_date || row.created_at || new Date().toISOString().slice(0, 10),
@@ -233,6 +234,23 @@ document.addEventListener("DOMContentLoaded", () => {
       map.set(v.grade, (map.get(v.grade) || 0) + 1);
     });
     return [...map.entries()].map(([grade, count]) => ({ grade, count })).sort((a, b) => a.grade - b.grade);
+  }
+
+  // Violation category mapping used for the Top Types chart — only these categories are counted
+  const VIOLATION_CATEGORIES = [
+    'Classroom Misconduct',
+    'Dress Code Violation',
+    'Tardiness',
+    'Cutting Classes',
+  ];
+
+  function toCategory(v) {
+    const s = (v?.description || v?.type || '').toString().toLowerCase().trim();
+    if (s.includes('classroom')) return 'Classroom Misconduct';
+    if (s.includes('dress')) return 'Dress Code Violation';
+    if (s.includes('tardi')) return 'Tardiness';
+    if (s.includes('cut') || s.includes('absent without')) return 'Cutting Classes';
+    return null; // anything else won’t be counted
   }
 
   function initFilters() {
@@ -418,10 +436,56 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
+  function updateTopTypesChart(records) {
+    // Previously grouped by `violation_type` which produced "N/A" labels.
+    // Now group by `violation_description` and skip records without a valid description.
+    const counts = {};
+    records.forEach(r => {
+      // Use the human-readable description field
+      const desc = (r.violation_description || '').trim();
+      // Skip entries with no description to avoid "N/A" placeholder labels
+      if (!desc) return;
+      counts[desc] = (counts[desc] || 0) + 1;
+    });
+
+    // Convert counts to sorted arrays (top items first)
+    const entries = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8); // keep top N (preserve original behavior if it limited items)
+
+    const labels = entries.map(e => e[0]);
+    const values = entries.map(e => e[1]);
+
+    // Update the existing Chart.js instance (chartTopTypes) exactly as before
+    if (typeof chartTopTypes !== 'undefined' && chartTopTypes) {
+      chartTopTypes.data.labels = labels;
+      chartTopTypes.data.datasets[0].data = values;
+      chartTopTypes.update();
+    }
+
+    // Maintain the existing empty-state behavior
+    const emptyEl = document.getElementById('emptyTypes');
+    if (emptyEl) {
+      emptyEl.classList.toggle('hidden', entries.length > 0);
+    }
+
+    // Update hint (if original code did so)
+    const hintEl = document.getElementById('typesHint');
+    if (hintEl) {
+      const total = values.reduce((s, v) => s + v, 0);
+      hintEl.textContent = total > 0 ? `${total} total` : '';
+    }
+  }
+
   function renderTopTypes(list) {
-    const agg = countByType(list).slice(0, 5);
-    const labels = agg.map((a) => a.type);
-    const values = agg.map((a) => a.count);
+    // init counts with zero for all 4
+    const counts = Object.fromEntries(VIOLATION_CATEGORIES.map((c) => [c, 0]));
+    for (const it of list) {
+      const cat = toCategory(it);
+      if (cat && Object.prototype.hasOwnProperty.call(counts, cat)) counts[cat] += 1;
+    }
+    const labels = VIOLATION_CATEGORIES;
+    const values = labels.map((l) => counts[l]);
     const hasData = values.some((v) => v > 0);
     els.emptyTypes?.classList.toggle('hidden', hasData);
 

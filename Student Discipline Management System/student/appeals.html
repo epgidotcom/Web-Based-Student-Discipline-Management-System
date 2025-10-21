@@ -46,7 +46,14 @@
       <form id="appealForm" class="appeal-form">
         <div class="field">
           <label for="violationText">Violation</label>
-          <input type="text" id="violationText" placeholder="Enter the violation you want to appeal" required />
+          <div class="violation-picker">
+            <input type="text" id="violationText" placeholder="Enter the violation you want to appeal" required />
+            <button type="button" id="violationToggle" class="btn" aria-expanded="false" aria-haspopup="listbox" title="Choose from policy violations">▾</button>
+            <div id="violationDropdown" class="violation-dropdown" role="listbox" aria-label="School violation list" hidden>
+              <div class="violation-search"><input id="violationSearch" type="search" placeholder="Search violations..." /></div>
+              <ul id="violationList" class="violation-list"></ul>
+            </div>
+          </div>
         </div>
         <div class="field">
           <label for="appealReason">Reason / Explanation</label>

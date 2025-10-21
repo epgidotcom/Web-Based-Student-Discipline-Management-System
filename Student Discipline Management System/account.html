@@ -73,10 +73,10 @@
         <option value="Teacher">Teacher</option>
       </select>
 
-      <div id="gradeGroup" style="display: none;">
-        <label for="grade">Grade:</label>
+      <div id="gradeGroup" class="field">
+        <label for="grade">Grade</label>
         <select id="grade">
-          <option value="">-- Select Grade --</option>
+          <option value="">Select grade</option>
           <option value="7">Grade 7</option>
           <option value="8">Grade 8</option>
           <option value="9">Grade 9</option>
@@ -84,6 +84,24 @@
           <option value="11">Grade 11</option>
           <option value="12">Grade 12</option>
         </select>
+      </div>
+
+      <!-- section field shown only for Student role -->
+      <div id="sectionGroup" class="field" style="display:none;">
+        <label for="section">Section</label>
+        <input type="text" id="section" maxlength="50" placeholder="Enter Section" />
+      </div>
+
+      <!-- LRN field shown only for Student role -->
+      <div id="lrnGroup" class="field" style="display:none;">
+        <label for="lrn">LRN</label>
+        <input type="text" id="lrn" maxlength="20" placeholder="Enter Student's LRN" />
+      </div>
+
+      <!-- Age field shown only for Student role -->
+      <div id="ageGroup" class="field" style="display:none;">
+        <label for="age">Age</label>
+        <input type="number" id="age" min="1" max="120" placeholder="Enter Age" />
       </div>
 
       <button type="submit" class="add-btn" style="margin-top: 12px;">
@@ -102,11 +120,15 @@
             <th>Username</th>
             <th>Email</th>
             <th>Role</th>
+            <th>Age</th>
             <th>Grade</th>
+            <th>Section</th>
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+          <!-- ...existing rows rendered by JS... -->
+        </tbody>
       </table>
     </div>
   </div>

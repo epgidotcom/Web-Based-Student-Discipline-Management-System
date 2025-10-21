@@ -1,0 +1,303 @@
+{
+  "generated_at": "2025-10-21T13:06:58.855433Z",
+  "version": "1.0",
+  "school_policy": {
+    "title": "Student Code of Conduct – Violations (English)",
+    "categories": [
+      {
+        "code": "A",
+        "category": "Devices & Technology",
+        "items": [
+          {
+            "id": "A1",
+            "description": "Using a cellphone during class. (Allowed only for genuine emergencies with the teacher’s permission.)"
+          },
+          {
+            "id": "A2",
+            "description": "Using gadgets that create noise during class unless permitted by the teacher for academic use."
+          }
+        ]
+      },
+      {
+        "code": "B",
+        "category": "Attendance & Punctuality",
+        "items": [
+          {
+            "id": "B1",
+            "description": "Frequent absences of more than one week without a written explanation."
+          },
+          {
+            "id": "B2",
+            "description": "Habitual tardiness (frequently arriving late to classes within a week)."
+          },
+          {
+            "id": "B3",
+            "description": "Frequent cutting of classes."
+          }
+        ]
+      },
+      {
+        "code": "C",
+        "category": "Campus Movement & Permission",
+        "items": [
+          {
+            "id": "C1",
+            "description": "Leaving the classroom without the teacher’s permission (discourtesy/disrespect)."
+          },
+          {
+            "id": "C2",
+            "description": "Exiting the school gate without proper permission recorded by the guard and without teacher approval."
+          },
+          {
+            "id": "C3",
+            "description": "Leaving school grounds without valid health reasons and proper documentation. (Only allowed for illness requiring medical attention, with a recorded pass slip and escort/parent pickup.)"
+          }
+        ]
+      },
+      {
+        "code": "D",
+        "category": "Dress Code & Identification",
+        "items": [
+          {
+            "id": "D1",
+            "description": "Failure to wear the proper school uniform."
+          },
+          {
+            "id": "D2",
+            "description": "Failure to wear the school identification card (ID)."
+          },
+          {
+            "id": "D3",
+            "description": "Wearing earrings/body piercings (male or female) that give an undesirable impression for a student."
+          },
+          {
+            "id": "D4",
+            "description": "Wearing rings, spikes, or large metal belt buckles that could be used as weapons."
+          }
+        ]
+      },
+      {
+        "code": "E",
+        "category": "Safety & Prohibited Items",
+        "items": [
+          {
+            "id": "E1",
+            "description": "Bringing or displaying objects resembling explosives or items associated with terrorism."
+          }
+        ]
+      },
+      {
+        "code": "F",
+        "category": "Cleanliness, Facilities & Smoking",
+        "items": [
+          {
+            "id": "F1",
+            "description": "Spitting anywhere."
+          },
+          {
+            "id": "F2",
+            "description": "Leaving the restroom dirty after use."
+          },
+          {
+            "id": "F3",
+            "description": "Smoking within school premises."
+          },
+          {
+            "id": "F4",
+            "description": "Throwing trash anywhere."
+          }
+        ]
+      },
+      {
+        "code": "G",
+        "category": "Property, Vandalism & Damage",
+        "items": [
+          {
+            "id": "G1",
+            "description": "Vandalism and related acts."
+          },
+          {
+            "id": "G2",
+            "description": "Intentionally damaging school property (chairs, doors, windows, lights, classroom/school facilities)."
+          },
+          {
+            "id": "G3",
+            "description": "Damaging the school ID."
+          },
+          {
+            "id": "G4",
+            "description": "Failure to return borrowed school property (learning materials, library equipment, laboratory items)."
+          },
+          {
+            "id": "G5",
+            "description": "Stealing school property or belongings of teachers/staff."
+          }
+        ]
+      },
+      {
+        "code": "H",
+        "category": "Substances, Gambling & Obscenity",
+        "items": [
+          {
+            "id": "H1",
+            "description": "Bringing or drinking alcoholic beverages, or entering school under the influence of alcohol."
+          },
+          {
+            "id": "H2",
+            "description": "Possession or use of illegal drugs or similar substances (e.g., marijuana, shabu)."
+          },
+          {
+            "id": "H3",
+            "description": "Gambling in any form."
+          },
+          {
+            "id": "H4",
+            "description": "Displaying obscene or indecent behavior."
+          },
+          {
+            "id": "H5",
+            "description": "Bringing pornographic materials or watching obscene films with others."
+          },
+          {
+            "id": "H6",
+            "description": "Dissemination or distribution of obscene materials."
+          }
+        ]
+      },
+      {
+        "code": "I",
+        "category": "Academic Integrity & Records",
+        "items": [
+          {
+            "id": "I1",
+            "description": "Cheating during quizzes, examinations, or academic work."
+          },
+          {
+            "id": "I2",
+            "description": "Cheating or falsifying school records."
+          },
+          {
+            "id": "I3",
+            "description": "Forging the signature of a parent, guardian, teacher, or school staff; using forged signatures for fraudulent purposes."
+          }
+        ]
+      },
+      {
+        "code": "J",
+        "category": "ID Misuse",
+        "items": [
+          {
+            "id": "J1",
+            "description": "Using another person’s ID to enter the school."
+          },
+          {
+            "id": "J2",
+            "description": "Lending one’s own ID to another student to allow entry."
+          }
+        ]
+      },
+      {
+        "code": "K",
+        "category": "Conduct & Disruption",
+        "items": [
+          {
+            "id": "K1",
+            "description": "Creating noise that disturbs classes."
+          },
+          {
+            "id": "K2",
+            "description": "Loitering in corridors causing noise or disturbance that disrupts classes."
+          },
+          {
+            "id": "K3",
+            "description": "Using vulgar or obscene language that offends others."
+          },
+          {
+            "id": "K4",
+            "description": "Disrespect toward teachers and school personnel."
+          }
+        ]
+      },
+      {
+        "code": "L",
+        "category": "Bullying, Harassment & Violence",
+        "items": [
+          {
+            "id": "L1",
+            "description": "Provoking or engaging in fights that cause disorder inside or outside the school."
+          },
+          {
+            "id": "L2",
+            "description": "Bullying of any kind (verbal threats, intimidation, excessive teasing, extortion, exclusion), including physical, psychological, emotional, or cyberbullying, and any acts covered by the Anti-Bullying policy."
+          },
+          {
+            "id": "L3",
+            "description": "Sexual harassment (verbal or physical), including touching of private parts, exposure of private parts, rape, or any act covered by the Child Protection Policy (CPP)."
+          },
+          {
+            "id": "L4",
+            "description": "Physically hurting a fellow student or a teacher."
+          },
+          {
+            "id": "L5",
+            "description": "Killing a fellow student or any person within the school."
+          },
+          {
+            "id": "L6",
+            "description": "Disrespect or violence toward teachers and school personnel."
+          }
+        ]
+      },
+      {
+        "code": "M",
+        "category": "Organizations & Group Misconduct",
+        "items": [
+          {
+            "id": "M1",
+            "description": "Joining a fraternity or sorority that causes harm or disorder."
+          },
+          {
+            "id": "M2",
+            "description": "Starting a brawl or riot inside or outside the school that endangers others."
+          },
+          {
+            "id": "M3",
+            "description": "Participation in initiation/hazing that may cause injury or death (sanctions depend on the effect on the victim)."
+          }
+        ]
+      },
+      {
+        "code": "N",
+        "category": "Solicitation, Fraud & School Reputation",
+        "items": [
+          {
+            "id": "N1",
+            "description": "Soliciting outside the school without legal authorization or permission."
+          },
+          {
+            "id": "N2",
+            "description": "Deceiving or misleading parents or guardians regarding approved school activities or collections."
+          },
+          {
+            "id": "N3",
+            "description": "Selling tickets not authorized by the school administration."
+          },
+          {
+            "id": "N4",
+            "description": "Using the school’s name in wrongdoing or in activities that damage its good reputation."
+          }
+        ]
+      },
+      {
+        "code": "O",
+        "category": "Repeated or Aggravated Misconduct",
+        "items": [
+          {
+            "id": "O1",
+            "description": "Frequent and repeated violations of school rules and regulations, subject to sanctions depending on the degree and nature of the offense."
+          }
+        ]
+      }
+    ]
+  }
+}

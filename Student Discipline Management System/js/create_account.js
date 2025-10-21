@@ -7,14 +7,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
 
   const gradeField = document.getElementById("grade");
+  const sectionGroup = document.getElementById("sectionGroup");
+  const sectionField = document.getElementById("section");
+  const lrnGroup = document.getElementById("lrnGroup");
+  const lrnField = document.getElementById("lrn");
+  const ageGroup = document.getElementById("ageGroup");
+  const ageField = document.getElementById("age");
+
   const updateGradeVisibility = (value) => {
     if (!gradeGroup) return;
     if (value === "Student") {
       gradeGroup.style.display = "block";
       gradeField?.setAttribute("required", "true");
+      // show Section
+      if (sectionGroup) sectionGroup.style.display = "block";
+      sectionField?.setAttribute("required", "true");
+      // show LRN
+      if (lrnGroup) lrnGroup.style.display = "block";
+      lrnField?.setAttribute("required", "true");
+      // show Age
+      if (ageGroup) ageGroup.style.display = "block";
+      ageField?.setAttribute("required", "true");
     } else {
       gradeGroup.style.display = "none";
       gradeField?.removeAttribute("required");
+      // hide Section
+      if (sectionGroup) sectionGroup.style.display = "none";
+      sectionField?.removeAttribute("required");
+      // hide LRN
+      if (lrnGroup) lrnGroup.style.display = "none";
+      lrnField?.removeAttribute("required");
+      // hide Age
+      if (ageGroup) ageGroup.style.display = "none";
+      ageField?.removeAttribute("required");
     }
   };
 
@@ -66,7 +91,8 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${acc.username || ''}</td>
         <td>${acc.email || ''}</td>
         <td>${acc.role || ''}</td>
-        <td>${acc.role === 'Student' ? (acc.grade || '') : ''}</td>
+        <td>${acc.age ?? ''}</td>
+        <td>${acc.role === 'Student' ? ((acc.grade || '') + (acc.section ? (' / ' + acc.section) : '') + (acc.lrn ? (' / ' + acc.lrn) : '')) : ''}</td>
         <td>
           <button class="action-btn delete-btn" data-id="${acc.id}" title="Delete"><i class="fa fa-trash"></i></button>
         </td>
@@ -103,6 +129,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const confirmPassword = document.getElementById("confirmPassword").value;
     const role = document.getElementById("role").value;
     const grade = document.getElementById("grade").value;
+    const section = document.getElementById("section").value.trim();
+    const lrn = document.getElementById("lrn").value.trim();
+    const age = document.getElementById("age") ? document.getElementById("age").value.trim() : '';
 
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
@@ -115,11 +144,13 @@ document.addEventListener("DOMContentLoaded", () => {
       username,
       password,
       role,
-      ...(role === "Student" && { grade }),
+      ...(role === "Student" && { grade, section, lrn, age: age === '' ? null : Number(age) }),
     };
 
     // Create via API
     try{
+
+      const test = JSON.stringify(newUser);
       const res = await fetch(`${API_BASE}/api/accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -130,6 +161,9 @@ document.addEventListener("DOMContentLoaded", () => {
       alert(`${role} account created successfully!`);
       form.reset();
       gradeGroup.style.display = "none";
+      if (sectionGroup) sectionGroup.style.display = "none";
+      if (lrnGroup) lrnGroup.style.display = "none";
+      if (ageGroup) ageGroup.style.display = "none";
     }catch(err){
       console.error(err);
       alert('Failed to create account.');
