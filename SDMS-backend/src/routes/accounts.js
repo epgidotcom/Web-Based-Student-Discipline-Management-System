@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
       const { rows } = await query(
         `INSERT INTO accounts (full_name, email, username, password_hash, role)
          VALUES ($1,$2,$3,$4,$5)
-         RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
+         RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
         [fullName.trim(), email.toLowerCase().trim(), username.toLowerCase().trim(), hash, role]
       );
       res.status(201).json({ ...rows[0], age: null, bootstrap: true });
