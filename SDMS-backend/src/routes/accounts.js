@@ -68,7 +68,7 @@ router.post('/', async (req, res) => {
           if (role === 'Student') {
             // Insert into students table 
             await query(
-              `INSERT INTO students (account_id, full_name, lrn, section, grade, age, created_at)
+              `INSERT INTO students (id, full_name, lrn, section, grade, age, created_at)
                VALUES ($1,$2,$3,$4,$5,$6,$7)`,
               [acct.id, fullName.trim(), lrn || null, section || null, grade || null, age || null, acct.createdAt]
             );
