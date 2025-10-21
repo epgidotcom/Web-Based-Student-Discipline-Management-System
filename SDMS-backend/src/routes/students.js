@@ -211,12 +211,19 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete student
 router.delete('/:id', async (req, res) => {
   try {
-    const { rowCount } = await query('delete from students where id = $1', [req.params.id]);
+    const { rowCount } = await query(
+      `UPDATE students
+       SET active = FALSE
+       WHERE id = $1
+       RETURNING *`,
+      [req.params.id]
+    );
+
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    res.status(204).end();
+
+    res.status(200).json({ message: 'Student deactivated successfully.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
