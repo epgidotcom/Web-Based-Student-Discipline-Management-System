@@ -31,6 +31,7 @@ router.get('/', requireAuth, requireAdmin, async (_req, res) => {
 // Create account. If there are zero accounts, allow bootstrap without auth.
 router.post('/', async (req, res) => {
   try {
+    console.log("Received body:", req.body)
     const { fullName, email, username, password, role, grade, lrn, section, age } = req.body;
     if (!fullName || !email || !username || !password || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -53,7 +54,7 @@ router.post('/', async (req, res) => {
           const { rows } = await query(
             `INSERT INTO accounts (full_name, email, username, password_hash, role, grade, lrn, section)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-             RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
+             RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
             [
               fullName.trim(),
               email.toLowerCase().trim(),
