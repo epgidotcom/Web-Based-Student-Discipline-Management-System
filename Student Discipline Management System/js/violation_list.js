@@ -234,6 +234,7 @@
   const incidentDateField = document.getElementById('incidentDate');
   const violationTypeField = document.getElementById('violationType');
   const sanctionField = document.getElementById('sanction');
+  const remarksField = document.getElementById('remarks');
 
   const pastOffenseWrap = document.getElementById('pastOffenseWrap');
   const pastOffenseList = document.getElementById('pastOffenseList');
@@ -549,6 +550,7 @@
     incidentDateField.value = '';
     violationTypeField.value = '';
     sanctionField.value = '';
+    remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
     resetEvidence();
     displayPastOffensesFor(null);
@@ -576,6 +578,7 @@
     incidentDateField.value = item.incident_date ? String(item.incident_date).slice(0, 10) : '';
     violationTypeField.value = item.offense_type || '';
     sanctionField.value = item.sanction || '';
+    remarksField.value = item.remarks || '';
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     evidenceState = files.slice(0, 3);
@@ -594,6 +597,11 @@
     viewAddedDate.textContent = formatDate(item.created_at) || '—';
     violationTypeField.value = item.description || item.offense_type || '';
     viewSanction.textContent = item.sanction || '—';
+    
+    const remarksRow = document.createElement('div');
+    remarksRow.classList.add('detail-row');
+    remarksRow.innerHTML = `<span class="label">Remarks</span><span class="value multiline">${item.remarks || '—'}</span>`;
+    document.querySelector('.violation-body').appendChild(remarksRow);
 
     const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
     if (history.length) {
@@ -640,14 +648,16 @@
       return;
     }
 
- const payload = {
-  student_id: studentId,
-  grade_section: gradeSectionField?.value?.trim() || null,
-  violationType: violationTypeField?.value || null, 
-  sanction: sanctionField?.value || null,
-  incident_date: incidentDateField?.value || null,
-  evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
-};
+    const payload = {
+      student_id: studentId,
+      grade_section: gradeSectionField?.value?.trim() || null,
+      offense_type: violationTypeField?.value || null,
+      description: descriptionField?.value?.trim() || null,
+      sanction: sanctionField?.value || null,
+      remarks: remarksField?.value?.trim() || null,
+      incident_date: incidentDateField?.value || null,
+      evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
+    };
 
     try {
       const editIndex = editIndexField?.value === '' ? null : Number(editIndexField.value);

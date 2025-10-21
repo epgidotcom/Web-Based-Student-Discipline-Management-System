@@ -159,29 +159,29 @@ router.post('/', async (req, res) => {
 
     const normEvidence = normalizeEvidence(evidence);
 
-    const insertSQL = `
-      INSERT INTO violations (
-        student_id, student_name, grade_section,
-        description, sanction,
-        incident_date, status, evidence, offense_type
-      )
-      VALUES ($1,$2,$3,$4,$5,COALESCE($6::date, CURRENT_DATE),COALESCE($7::violation_status_type,'Pending'),$8,$9)
-      RETURNING id, student_id, student_name, grade_section,
-                description AS violation_type, sanction, incident_date, status,
-                repeat_count_at_insert, evidence, created_at, updated_at;
-    `;
+      const insertSQL = `
+        INSERT INTO violations (
+          student_id, student_name, grade_section,
+          offense_type, description, sanction, remarks,
+          incident_date, status, evidence
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::date, CURRENT_DATE),COALESCE($8::violation_status_type,'Pending'),$9)
+        RETURNING id, student_id, student_name, grade_section,
+                  offense_type, description, sanction, remarks, incident_date, status,
+                  repeat_count_at_insert, evidence, created_at, updated_at`;
 
-    const params = [
-      student_id,
-      student_name,
-      gradeSectionFinal,
-      violationType.trim(),
-      sanction || null,
-      incident_date || null,
-      status || null,
-      normEvidence,
-      'NA'
-    ];
+      const params = [
+        student_id,
+        student_name,
+        gradeSectionFinal,
+        offense_type.trim(),
+        description.trim(),
+        sanction || null,
+        remarks || null,
+        incident_date || null,
+        status || null,
+        normEvidence
+      ];
 
     const { rows } = await query(insertSQL, params);
     const row = rows[0];
@@ -193,10 +193,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// === UPDATE violation
-router.put('/:id', async (req, res) => {
-  try {
-    const { student_id, grade_section, violationType, sanction, incident_date, status, evidence } = req.body || {};
+  // Update
+  router.put('/:id', async (req, res) => {
+    try {
+      const { student_id, grade_section, offense_type, description, sanction, remarks, incident_date, status, evidence } = req.body || {};
 
     let student_name = null;
     let gradeSectionFinal = grade_section || null;
@@ -210,34 +210,37 @@ router.put('/:id', async (req, res) => {
 
     const normEvidence = normalizeEvidence(evidence);
 
-    const updateSQL = `
-      UPDATE violations SET
-        student_id    = COALESCE($1, student_id),
-        student_name  = COALESCE($2, student_name),
-        grade_section = COALESCE($3, grade_section),
-        description   = COALESCE($4, description),
-        sanction      = COALESCE($5, sanction),
-        incident_date = COALESCE($6::date, incident_date),
-        status        = COALESCE($7::violation_status_type, status),
-        evidence      = $8,
-        updated_at    = NOW()
-      WHERE id = $9
-      RETURNING id, student_id, student_name, grade_section,
-                description AS violation_type, sanction, incident_date, status,
-                repeat_count_at_insert, evidence, created_at, updated_at;
-    `;
+      const updateSQL = `
+        UPDATE violations SET
+          student_id    = COALESCE($1, student_id),
+          student_name  = COALESCE($2, student_name),
+          grade_section = COALESCE($3, grade_section),
+          offense_type  = COALESCE($4, offense_type),
+          description   = COALESCE($5, description),
+          sanction      = COALESCE($6, sanction),
+          remarks       = COALESCE($7, remarks),
+          incident_date = COALESCE($8::date, incident_date),
+          status        = COALESCE($9::violation_status_type, status),
+          evidence      = $10,
+          updated_at    = NOW()
+        WHERE id = $11
+        RETURNING id, student_id, student_name, grade_section,
+                  offense_type, description, sanction, remarks, incident_date, status,
+                  repeat_count_at_insert, evidence, created_at, updated_at`;
 
-    const params = [
-      student_id || null,
-      student_name,
-      gradeSectionFinal,
-      violationType || null,
-      sanction || null,
-      incident_date || null,
-      status || null,
-      normEvidence,
-      req.params.id
-    ];
+      const params = [
+        student_id || null,
+        student_name,
+        gradeSectionFinal,
+        offense_type || null,
+        description || null,
+        sanction || null,
+        remarks || null,
+        incident_date || null,
+        status || null,
+        normEvidence,
+        req.params.id
+      ];
 
     const { rows } = await query(updateSQL, params);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
