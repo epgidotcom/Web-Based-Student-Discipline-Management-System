@@ -15,8 +15,11 @@ async function privilegedCount(){
 router.get('/', requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { rows } = await query(
-      `SELECT id, full_name AS "fullName", email, username, role, grade, created_at AS "createdAt"
-       FROM accounts ORDER BY created_at DESC`
+      `SELECT a.id, a.full_name AS "fullName", a.email, a.username, a.role,
+              a.grade, a.lrn, a.section, s.age AS age, a.created_at AS "createdAt"
+       FROM accounts a
+       LEFT JOIN students s ON a.id = s.account_id
+       ORDER BY a.created_at DESC`
     );
     res.json(rows);
   } catch (e) {
@@ -28,7 +31,7 @@ router.get('/', requireAuth, requireAdmin, async (_req, res) => {
 // Create account. If there are zero accounts, allow bootstrap without auth.
 router.post('/', async (req, res) => {
   try {
-    const { fullName, email, username, password, role, grade } = req.body;
+    const { fullName, email, username, password, role, grade, lrn, section, age } = req.body;
     if (!fullName || !email || !username || !password || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -39,24 +42,51 @@ router.post('/', async (req, res) => {
       // must be authenticated admin
       // We'll perform lightweight auth check manually to avoid double hash on bootstrap path
       return withAdmin(req, res, async () => {
+        // If creating a student, require lrn, section, and age
+        if (role === 'Student' && (!lrn || !section || (age === undefined || age === null))) {
+          return res.status(400).json({ error: 'Student accounts require LRN, section and age' });
+        }
+
         const hash = await bcrypt.hash(password, 12);
-        const { rows } = await query(
-          `INSERT INTO accounts (full_name, email, username, password_hash, role, grade)
-           VALUES ($1,$2,$3,$4,$5,$6)
-           RETURNING id, full_name AS "fullName", email, username, role, grade, created_at AS "createdAt"`,
-          [
-            fullName.trim(),
-            email.toLowerCase().trim(),
-            username.toLowerCase().trim(),
-            hash,
-            role,
-            role === 'Student' ? (grade || null) : null
-          ]
-        );
-        res.status(201).json(rows[0]);
+        await query('BEGIN');
+        try {
+          const { rows } = await query(
+            `INSERT INTO accounts (full_name, email, username, password_hash, role, grade, lrn, section)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+             RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
+            [
+              fullName.trim(),
+              email.toLowerCase().trim(),
+              username.toLowerCase().trim(),
+              hash,
+              role,
+              role === 'Student' ? (grade || null) : null,
+              role === 'Student' ? (lrn || null) : null,
+              role === 'Student' ? (section || null) : null
+            ]
+          );
+          const acct = rows[0];
+
+          if (role === 'Student') {
+            // Insert into students table 
+            await query(
+              `INSERT INTO students (account_id, full_name, lrn, section, grade, age, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+              [acct.id, fullName.trim(), lrn || null, section || null, grade || null, age || null, acct.createdAt]
+            );
+          }
+
+          await query('COMMIT');
+
+          const result = { ...acct, age: role === 'Student' ? (age || null) : null };
+          res.status(201).json(result);
+        } catch (err) {
+          await query('ROLLBACK');
+          throw err;
+        }
       });
     } else {
-      // Bootstrap first admin if role not Student
+
       if (role === 'Student') {
         return res.status(400).json({ error: 'First account must be Admin/Teacher' });
       }
@@ -64,10 +94,10 @@ router.post('/', async (req, res) => {
       const { rows } = await query(
         `INSERT INTO accounts (full_name, email, username, password_hash, role)
          VALUES ($1,$2,$3,$4,$5)
-         RETURNING id, full_name AS "fullName", email, username, role, grade, created_at AS "createdAt"`,
+         RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
         [fullName.trim(), email.toLowerCase().trim(), username.toLowerCase().trim(), hash, role]
       );
-      res.status(201).json({ ...rows[0], bootstrap: true });
+      res.status(201).json({ ...rows[0], age: null, bootstrap: true });
     }
   } catch (e) {
     if (e.code === '23505') {
@@ -81,7 +111,7 @@ router.post('/', async (req, res) => {
 // Update account (admin/teacher only)
 router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { fullName, email, username, role, grade, password } = req.body || {};
+    const { fullName, email, username, role, grade, lrn, section, age, password } = req.body || {};
     const existingQ = await query('SELECT * FROM accounts WHERE id = $1', [req.params.id]);
     if(!existingQ.rows.length) return res.status(404).json({ error: 'Not found' });
     const existing = existingQ.rows[0];
@@ -95,23 +125,78 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
     let password_hash = existing.password_hash;
     if(password){ password_hash = await bcrypt.hash(password, 12); }
 
-    const { rows } = await query(`UPDATE accounts
-      SET full_name = COALESCE($1, full_name),
-          email = COALESCE($2, email),
-          username = COALESCE($3, username),
-          role = COALESCE($4, role),
-          grade = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($5, grade) ELSE NULL END,
-          password_hash = $6
-      WHERE id = $7
-      RETURNING id, full_name AS "fullName", email, username, role, grade, created_at AS "createdAt"`,
-      [fullName ? fullName.trim() : null,
-       email ? email.toLowerCase().trim() : null,
-       username ? username.toLowerCase().trim() : null,
-       role || null,
-       grade || null,
-       password_hash,
-       req.params.id]);
-    res.json(rows[0]);
+    // Perform accounts update and student upsert/delete in a transaction for consistency
+    await query('BEGIN');
+    try {
+      await query(`UPDATE accounts
+        SET full_name = COALESCE($1, full_name),
+            email = COALESCE($2, email),
+            username = COALESCE($3, username),
+            role = COALESCE($4, role),
+            grade = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($5, grade) ELSE NULL END,
+            lrn = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($6, lrn) ELSE NULL END,
+            section = CASE WHEN COALESCE($4, role) = 'Student' THEN COALESCE($7, section) ELSE NULL END,
+            password_hash = $8
+        WHERE id = $9`,
+        [fullName ? fullName.trim() : null,
+         email ? email.toLowerCase().trim() : null,
+         username ? username.toLowerCase().trim() : null,
+         role || null,
+         grade || null,
+         lrn || null,
+         section || null,
+         password_hash,
+         req.params.id]);
+
+      // If resulting role is Student, upsert into students; otherwise remove students row
+      if ((role || existing.role) === 'Student') {
+        // require age when role is student and age provided is undefined only when trying to set to Student
+        if ((role && role === 'Student') && (age === undefined || age === null)) {
+          // if age not provided in this update but student already existed, we allow keeping existing age;
+          // if no students row exists and age missing, error
+          const sCheck = await query('SELECT 1 FROM students WHERE account_id = $1', [req.params.id]);
+          if (!sCheck.rows.length) {
+            await query('ROLLBACK');
+            return res.status(400).json({ error: 'Student accounts require age' });
+          }
+        }
+        await query(
+          `INSERT INTO students (account_id, full_name, lrn, section, grade, age)
+           VALUES ($1,$2,$3,$4,$5,$6)
+           ON CONFLICT (account_id) DO UPDATE
+             SET full_name = EXCLUDED.full_name,
+                 lrn = EXCLUDED.lrn,
+                 section = EXCLUDED.section,
+                 grade = EXCLUDED.grade,
+                 age = EXCLUDED.age`,
+          [req.params.id,
+           fullName ? fullName.trim() : existing.full_name,
+           lrn || null,
+           section || null,
+           ((role || existing.role) === 'Student') ? (grade || null) : null,
+           age || null]
+        );
+      } else {
+        // not a student anymore -> remove students entry
+        await query('DELETE FROM students WHERE account_id = $1', [req.params.id]);
+      }
+
+      // Return the combined account + student record
+      const { rows } = await query(
+        `SELECT a.id, a.full_name AS "fullName", a.email, a.username, a.role,
+                a.grade, a.lrn, a.section, s.age AS age, a.created_at AS "createdAt"
+         FROM accounts a
+         LEFT JOIN students s ON a.id = s.account_id
+         WHERE a.id = $1`,
+        [req.params.id]
+      );
+
+      await query('COMMIT');
+      res.json(rows[0]);
+    } catch (err) {
+      await query('ROLLBACK');
+      throw err;
+    }
   } catch(e){
     if(e.code === '23505') return res.status(409).json({ error: 'Email or username already exists' });
     console.error(e);
