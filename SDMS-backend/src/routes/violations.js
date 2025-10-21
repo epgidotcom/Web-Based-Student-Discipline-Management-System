@@ -62,7 +62,7 @@
       )`);
     }
 
-    clauses.push(`s.active = TRUE`);
+    clauses.push(`s.active = TRUE AND v.active = TRUE`);
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
   
     params.push(Math.min(Number(limit) || 200, 500));
