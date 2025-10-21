@@ -188,12 +188,12 @@
       const insertSQL = `
         INSERT INTO violations (
           student_id, student_name, grade_section,
-          offense_type, description, sanction,
+          offense_type, description, sanction, remarks,
           incident_date, status, evidence
         )
         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::date, CURRENT_DATE),COALESCE($8::violation_status_type,'Pending'),$9)
         RETURNING id, student_id, student_name, grade_section,
-                  offense_type, description, sanction, incident_date, status,
+                  offense_type, description, sanction, remarks, incident_date, status,
                   repeat_count_at_insert, evidence, created_at, updated_at`;
 
       const params = [
@@ -203,6 +203,7 @@
         offense_type.trim(),
         description.trim(),
         sanction || null,
+        remarks || null,
         incident_date || null,
         status || null,
         normEvidence
@@ -220,7 +221,7 @@
   // Update
   router.put('/:id', async (req, res) => {
     try {
-      const { student_id, grade_section, offense_type, description, sanction, incident_date, status, evidence } = req.body || {};
+      const { student_id, grade_section, offense_type, description, sanction, remarks, incident_date, status, evidence } = req.body || {};
 
       let student_name = null;
       let gradeSectionFinal = grade_section || null;
@@ -241,13 +242,14 @@
           offense_type  = COALESCE($4, offense_type),
           description   = COALESCE($5, description),
           sanction      = COALESCE($6, sanction),
-          incident_date = COALESCE($7::date, incident_date),
-          status        = COALESCE($8::violation_status_type, status),
-          evidence      = $9,
+          remarks       = COALESCE($7, remarks),
+          incident_date = COALESCE($8::date, incident_date),
+          status        = COALESCE($9::violation_status_type, status),
+          evidence      = $10,
           updated_at    = NOW()
-        WHERE id = $10
+        WHERE id = $11
         RETURNING id, student_id, student_name, grade_section,
-                  offense_type, description, sanction, incident_date, status,
+                  offense_type, description, sanction, remarks, incident_date, status,
                   repeat_count_at_insert, evidence, created_at, updated_at`;
 
       const params = [
@@ -257,6 +259,7 @@
         offense_type || null,
         description || null,
         sanction || null,
+        remarks || null,
         incident_date || null,
         status || null,
         normEvidence,
