@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - Dashboard</title>
+  <link rel="stylesheet" href="css/student.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Toggle button for mobile -->
+  <button class="sidebar-toggle" id="sidebarToggle">
+    <i class="fa fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html" class="active"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+
+  <!-- Backdrop for mobile -->
+  <div class="backdrop" id="sidebarBackdrop"></div>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Student Discipline Management System</h1>
+        <span class="subtitle">Student Dashboard</span>
+      </div>
+      <div class="profile">
+        <div class="name-grade">
+          <strong id="studentName">Juan Dela Cruz</strong>
+          <small id="studentSection">Grade 9 • Emerald</small>
+        </div>
+        <img src="images/sample_avatar.png"
+             onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
+             alt="Avatar" class="avatar"/>
+      </div>
+    </header>
+
+    <!-- Welcome Banner -->
+    <section class="welcome-banner">
+      <div class="welcome-text">
+        <h2>Welcome back, Juan!</h2>
+        <p>Keep track of your conduct and stay informed about your student discipline records.</p>
+      </div>
+      <div class="welcome-illustration">
+        <i class="fa-solid fa-user-graduate"></i>
+      </div>
+    </section>
+
+
+    <!-- Charts -->
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><h3>My Violations Over Time</h3></div>
+        <canvas id="lineChart" height="140"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Violation Breakdown</h3></div>
+        <canvas id="barChart" height="140"></canvas>
+      </div>
+    </section>
+
+    <!-- Violation History -->
+    <section class="panel">
+      <div class="panel-header"><h3>Violation History</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Remarks</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="violationRows">
+            <!-- Dynamically filled from backend -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- JS -->
+  <script>
+    let allViolations = [];
+    let lineChart, barChart;
+
+    // Load dashboard data from backend
+    async function loadDashboardData() {
+      try {
+        const res = await fetch('/api/dashboard/student'); // <-- replace with your endpoint
+        if (!res.ok) throw new Error('Failed to fetch dashboard data');
+        const data = await res.json();
+
+        // Expect structure: { student: {...}, violations: [...] }
+        if (data.student) {
+          document.getElementById("studentName").textContent = data.student.name || "—";
+          document.getElementById("studentSection").textContent = data.student.section || "—";
+        }
+
+        if (data.violations && Array.isArray(data.violations)) {
+          allViolations = data.violations;
+          renderTable(allViolations);
+          renderCharts(allViolations);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Unable to load dashboard data. Please try again later.");
+      }
+    }
+
+    // Render table
+    function renderTable(rows) {
+      const tbody = document.getElementById("violationRows");
+      tbody.innerHTML = "";
+      rows.forEach(v => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${v.date || '-'}</td>
+          <td>${v.type || '-'}</td>
+          <td>${v.remarks || '-'}</td>
+          <td><span class="status ${v.status?.toLowerCase() || ''}">${v.status || '-'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Render charts
+    function renderCharts(rows) {
+      if (lineChart) lineChart.destroy();
+      if (barChart) barChart.destroy();
+
+      const sorted = rows.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+      const labels = sorted.map(v => v.date);
+      const counts = sorted.map((_, i) => i + 1);
+
+      // Line chart
+      lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "Violations",
+            data: counts,
+            borderColor: "#e74c3c",
+            backgroundColor: "rgba(231, 76, 60, 0.3)",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+
+      // Bar chart
+      const byType = {};
+      rows.forEach(v => { if(v.type) byType[v.type] = (byType[v.type] || 0) + 1; });
+
+      barChart = new Chart(document.getElementById("barChart"), {
+        type: "bar",
+        data: {
+          labels: Object.keys(byType),
+          datasets: [{
+            label: "Count",
+            data: Object.values(byType),
+            backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+    }
+
+    // Sidebar toggle
+    const sidebar = document.querySelector(".sidebar");
+    const toggleBtn = document.getElementById("sidebarToggle");
+    toggleBtn.addEventListener("click", () => sidebar.classList.toggle("closed"));
+
+    // Init
+    loadDashboardData();
+  </script>
+
+  <script src="js/sidebar.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

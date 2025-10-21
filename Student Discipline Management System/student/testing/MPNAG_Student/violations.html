@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - My Violations</title>
+  <link rel="stylesheet" href="css/student.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Toggle button for mobile -->
+  <button class="sidebar-toggle" id="sidebarToggle">
+    <i class="fa fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo"/>
+    <a href="student_dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+    <a href="violations.html" class="active"><i class="fa fa-exclamation-triangle"></i> My Violations</a>
+    <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+    <a href="index.html" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</a>
+  </aside>
+
+  <!-- Backdrop for mobile -->
+  <div class="backdrop" id="sidebarBackdrop"></div>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Student Discipline Management System</h1>
+        <span class="subtitle">My Violations</span>
+      </div>
+
+      <!-- Profile Section -->
+      <div class="profile">
+        <div class="name-grade">
+          <strong id="studentName">Juan Dela Cruz</strong>
+          <small id="studentSection">Grade 9 • Emerald</small>
+        </div>
+        <img src="images/sample_avatar.png"
+             onerror="this.onerror=null;this.src='images/mpnag_logo.png';"
+             alt="Avatar" class="avatar"/>
+      </div>
+    </header>
+
+    <!-- Charts -->
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><h3>My Violations Over Time</h3></div>
+        <canvas id="lineChart" height="140"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Violation Breakdown</h3></div>
+        <canvas id="barChart" height="140"></canvas>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filters">
+      <div class="row">
+        <div class="field">
+          <label for="fromDate">From</label>
+          <input type="date" id="fromDate"/>
+        </div>
+        <div class="field">
+          <label for="toDate">To</label>
+          <input type="date" id="toDate"/>
+        </div>
+        <div class="field">
+          <label for="typeFilter">Type</label>
+          <select id="typeFilter">
+            <option value="All">All</option>
+          </select>
+        </div>
+        <button id="applyBtn" class="btn primary"><i class="fa fa-filter"></i> Apply</button>
+        <button id="resetBtn" class="btn"><i class="fa fa-rotate-left"></i> Reset</button>
+      </div>
+    </section>
+
+    <!-- Violations Table -->
+    <section class="panel">
+      <div class="panel-header"><h3>Violation History</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Remarks</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="violationRows">
+            <!-- Filled dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let allViolations = [];
+    let lineChart, barChart;
+
+    // Fetch violations from backend
+    async function loadViolations() {
+      try {
+        const res = await fetch('/api/violations/student'); // ← replace with your endpoint
+        if (!res.ok) throw new Error('Failed to load violations');
+        const data = await res.json();
+        allViolations = data || [];
+        populateTypeFilter(allViolations);
+        renderTable(allViolations);
+        renderCharts(allViolations);
+      } catch (err) {
+        console.error(err);
+        alert('Unable to load violations. Please try again later.');
+      }
+    }
+
+    // Populate Type Filter
+    function populateTypeFilter(rows) {
+      const types = [...new Set(rows.map(v => v.type))];
+      const select = document.getElementById("typeFilter");
+      types.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        select.appendChild(opt);
+      });
+    }
+
+    // Render Table
+    function renderTable(rows) {
+      const tbody = document.getElementById("violationRows");
+      tbody.innerHTML = "";
+      rows.forEach(v => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${v.date || '-'}</td>
+          <td>${v.type || '-'}</td>
+          <td>${v.remarks || '-'}</td>
+          <td><span class="status ${v.status?.toLowerCase() || ''}">${v.status || '-'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Render Charts
+    function renderCharts(rows) {
+      if (lineChart) lineChart.destroy();
+      if (barChart) barChart.destroy();
+
+      // Line chart (by date)
+      const sorted = rows.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+      const labels = sorted.map(v => v.date);
+      const counts = sorted.map((_, i) => i + 1);
+
+      lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "Violations",
+            data: counts,
+            borderColor: "#e74c3c",
+            backgroundColor: "rgba(231, 76, 60, 0.3)",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+
+      // Bar chart (by type)
+      const byType = {};
+      rows.forEach(v => { if(v.type) byType[v.type] = (byType[v.type] || 0) + 1; });
+
+      barChart = new Chart(document.getElementById("barChart"), {
+        type: "bar",
+        data: {
+          labels: Object.keys(byType),
+          datasets: [{
+            label: "Count",
+            data: Object.values(byType),
+            backgroundColor: ["#3498db","#9b59b6","#f1c40f","#e67e22","#e74c3c"]
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+    }
+
+    // Filter logic
+    function applyFilters() {
+      const from = document.getElementById("fromDate").value;
+      const to = document.getElementById("toDate").value;
+      const type = document.getElementById("typeFilter").value;
+
+      let filtered = allViolations.slice();
+      if (from) filtered = filtered.filter(v => v.date >= from);
+      if (to) filtered = filtered.filter(v => v.date <= to);
+      if (type !== "All") filtered = filtered.filter(v => v.type === type);
+
+      renderTable(filtered);
+      renderCharts(filtered);
+    }
+
+    function resetFilters() {
+      document.getElementById("fromDate").value = "";
+      document.getElementById("toDate").value = "";
+      document.getElementById("typeFilter").value = "All";
+      renderTable(allViolations);
+      renderCharts(allViolations);
+    }
+
+    // Event Listeners
+    document.getElementById("applyBtn").addEventListener("click", applyFilters);
+    document.getElementById("resetBtn").addEventListener("click", resetFilters);
+
+    // Sidebar toggle
+    const sidebar = document.querySelector(".sidebar");
+    const toggleBtn = document.getElementById("sidebarToggle");
+    toggleBtn.addEventListener("click", () => sidebar.classList.toggle("closed"));
+
+    // Initialize
+    loadViolations();
+  </script>
+
+  <script src="js/sidebar.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+/* === Base === */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  display: flex;
+  height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Sidebar (default: desktop visible) */
+.sidebar {
+  background-color: #43699c;
+  color: white;
+  width: 220px;
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  transition: left 0.3s ease;
+  z-index: 1000;
+  position: relative; /* overridden on mobile */
+}
+.sidebar img {
+  width: 80px;
+  margin-bottom: 15px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.sidebar a {
+  padding: 12px 20px;
+  text-decoration: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.3s;
+}
+.sidebar a:hover,
+.sidebar a.active {
+  background-color: #34517c;
+}
+
+/* Main content */
+.main {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: white;
+  padding: 10px 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 900;
+}
+.topbar h1 {
+  font-size: 20px;
+  margin: 0;
+  color: #43699c;
+}
+.logout-btn {
+  background-color: #d9534f;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.3s;
+}
+.logout-btn:hover {
+  background-color: #c9302c;
+}
+
+/* Widget container */
+.widget {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.widget h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #43699c;
+}
+
+
+/* === Mobile adjustments === */
+.menu-btn {
+  display: none; /* hidden on desktop */
+  background: #43699c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  font-size: 1rem;
+  cursor: pointer;
+  align-items: center;
+  gap: .5rem;
+}
+
+/* Backdrop for drawer */
+.backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 850;
+}
+.backdrop.show { display: block; }
+
+/* Ensure cards never cause sideways scroll */
+.kpi-grid, .charts-grid {
+  display: grid;
+  gap: 16px;
+}
+.kpi-grid   { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.charts-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) {
+  .kpi-grid   { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .charts-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* Mobile breakpoint */
+@media (max-width: 768px) {
+  /* off-canvas drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -220px; /* hidden */
+    height: 100dvh;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  }
+  .sidebar.open { left: 0; }
+  .sidebar a { padding: 14px 18px; }
+
+  .main { padding: 16px; }
+  .menu-btn { display: inline-flex; }
+  .topbar h1 { font-size: 18px; }
+
+  /* stack grids cleanly */
+  .kpi-grid   { grid-template-columns: 1fr; }
+  .charts-grid{ grid-template-columns: 1fr; }
+}
+
+
+/* === Solid square hamburger (like screenshot) === */
+.menu-btn{
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  width:40px;
+  height:40px;
+  background:#315ea8;   /* same blue as your brand */
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:18px;
+  cursor:pointer;
+}
+.menu-btn span{ display:none; }  /* hide text, icon only */
+.menu-btn i{ font-size:18px; line-height:1; }
+
+/* hover / focus states */
+.menu-btn:hover{ background:#274b87; }
+.menu-btn:focus-visible{
+  outline:3px solid #c7dbff;
+  outline-offset:2px;
+}
+
+/* spacing between hamburger and title */
+.menu-btn{
+  margin-right: 10px;  /* adjust this value (8–14px looks good) */
+}
+
+
+/* Hide hamburger on desktop; show on mobile/tablet */
+.menu-btn{ display:none !important; }            /* default: hidden */
+
+@media (max-width: 768px){                       /* show on phones (and small tablets if you like) */
+  .menu-btn{ display:inline-flex !important; }
+  .menu-btn span{ display:none; }                /* icon-only on mobile */
+}
+
+
+
+/* === Unified Sidebar Theme (matches screenshot) === */
+:root{
+  --sb-bg-1:#3d6398;
+  --sb-bg-2:#355a8a;
+  --sb-hover:rgba(255,255,255,.12);
+  --sb-active:rgba(0,0,0,.22);
+  --sb-text:#f7fbff;
+}
+
+/* container */
+.sidebar{
+  background: linear-gradient(180deg,var(--sb-bg-1),var(--sb-bg-2)) !important;
+  color: var(--sb-text) !important;
+  width: 220px;
+  padding-top: 16px !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* logo */
+.sidebar img{
+  width: 86px !important; height: 86px !important;
+  border-radius: 50% !important;
+  border: 3px solid rgba(255,255,255,.35) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25) !important;
+  display: block !important;
+  margin: 6px auto 10px !important;
+}
+
+/* links */
+.sidebar a{
+  margin: 4px 10px !important;
+  padding: 12px 14px !important;
+  border-radius: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  color: var(--sb-text) !important;
+  text-decoration: none !important;
+  font-weight: 600 !important;
+  letter-spacing: .2px !important;
+  opacity: .95 !important;
+}
+
+/* icons */
+.sidebar a i{
+  width: 20px !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  opacity: .95 !important;
+}
+
+/* hover/active */
+.sidebar a:hover{ background: var(--sb-hover) !important; }
+.sidebar a.active{
+  background: var(--sb-active) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05) !important;
+}
+
+/* optional divider support if you add <hr> */
+.sidebar hr{
+  height:1px; border:0; background:rgba(255,255,255,.15); margin:10px 12px;
+}
+
+/* Mobile drawer keeps same look */
+@media (max-width:768px){
+  .sidebar a{ padding:14px 16px !important; } /* comfy tap target */
+}
+
+/* ===== Current user chip (top-right) ===== */
+.user-area{ display:flex; align-items:center; margin-right:8px; }
+
+.user-chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 10px;
+  border-radius:9999px;                    /* pill */
+  background:#fff;
+  color:#3a629a;
+  border:1px solid rgba(0,0,0,.08);
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+  font-weight:700;
+  cursor:default;                          /* not clickable (for now) */
+}
+
+.user-avatar{
+  width:28px; height:28px;
+  border-radius:50%;
+  display:grid; place-items:center;
+  background:#3a629a; color:#fff;
+  font-size:12px; font-weight:800;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
+}
+
+/* Keep it tidy on small screens: hide the name, keep the avatar */
+@media (max-width: 768px){
+  .user-name{ display:none; }
+}
+
+/* ===== Sidebar footer logout (bottom-left) ===== */
+.sidebar{
+  display:flex;                 /* ensure we can push footer to bottom */
+  flex-direction:column;
+  min-height:100dvh;            /* full height; d = dynamic viewport */
+}
+
+.sidebar-footer{
+  margin-top:auto;              /* push to bottom */
+  padding:12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.logout-side{
+  width:100%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 14px;
+  border:0;
+  border-radius:10px;
+  background:#dc3545;
+  color:#fff;
+  font-weight:700;
+  cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.logout-side:hover{ background:#c9302c; }
+.logout-side:focus-visible{ outline:2px solid rgba(220,53,69,.35); outline-offset:2px; }
+
+/* ===== User chip in topbar (replaces old logout) ===== */
+.user-area{ display:flex; align-items:center; }
+.user-chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 10px;
+  border-radius:9999px;                   /* pill */
+  background:#fff;
+  color:#3a629a;
+  border:1px solid rgba(0,0,0,.08);
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+  font-weight:800;
+  cursor:default;                         /* not clickable (for now) */
+}
+.user-avatar{
+  width:28px; height:28px; border-radius:50%;
+  display:grid; place-items:center;
+  background:#3a629a; color:#fff;
+  font-size:12px; font-weight:800;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
+}
+/* Hide the name on small screens; keep the avatar */
+@media (max-width:768px){
+  .user-name{ display:none; }
+}
+
+.topbar .menu-btn + h1{ margin-left:10px; }

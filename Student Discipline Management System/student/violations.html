@@ -60,7 +60,9 @@
   </main>
   <script type="module">
     import { api, getStudentId } from './js/api.js';
-    let violations = [];
+  // `violations` is an array when data was fetched successfully, `[]` when there are none,
+  // and `null` when the fetch failed (connection/server error).
+  let violations = [];
     let lineChart, barChart;
 
     // Load student profile and show name/grade in the page header
@@ -120,14 +122,20 @@
         renderCharts(violations);
       } catch (e){
         console.error(e);
-        const tbody = document.getElementById('violationRows');
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#e74c3c;">Failed to load violations. Using empty list.</td></tr>`;
+        // Distinguish 'no violations' (empty array) vs 'fetch failed' (null)
+        violations = null;
+        renderTable(null);
+        renderCharts(null);
       }
     }
 
     function renderTable(rows){
       const tbody=document.getElementById('violationRows');
       tbody.innerHTML='';
+      if (rows === null) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Violation data unavailable (could not connect to server)</td></tr>';
+        return;
+      }
       rows.forEach(v=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${v.date}</td><td>${v.type}</td><td>${v.remarks}</td><td><span class="status ${v.status.toLowerCase()}">${v.status}</span></td>`;tbody.appendChild(tr);});
       if(!rows.length){
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No violations found</td></tr>';
@@ -137,10 +145,16 @@
     function renderCharts(rows){
       if(lineChart) lineChart.destroy();
       if(barChart) barChart.destroy();
+      if (rows === null || !rows.length) {
+        // Render empty clean charts (no gridlines/labels) to keep layout stable when data is unavailable
+        lineChart=new Chart(document.getElementById('lineChart'),{type:'line',data:{labels:[],datasets:[{label:'Violations',data:[],borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}}}});
+        barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:[],datasets:[{label:'Count',data:[],backgroundColor:[]}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}}}});
+        return;
+      }
       const labels=rows.map(v=>v.date);const counts=rows.map((_,i)=>i+1);
-      lineChart=new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true}});
+  lineChart=new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}}}});
       const byType={};rows.forEach(v=>{byType[v.type]=(byType[v.type]||0)+1});
-      barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},options:{plugins:{legend:{display:false}},responsive:true}});
+  barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}} }}});
     }
 
     function applyFilters(){

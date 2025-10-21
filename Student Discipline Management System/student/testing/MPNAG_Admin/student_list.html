@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDMS - Student List</title>
+
+  <!-- Global + Page CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/student_list.css">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- Sidebar (drawer on mobile) -->
+<nav class="sidebar" id="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html" class="active"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+  <a href="create_account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+
+  <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Backdrop for drawer -->
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-head">
+      <h3>Student List</h3>
+
+      <button id="addStudentBtn" class="add-btn">
+        <i class="fa fa-plus"></i> Add Student
+      </button>
+    </div>
+
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchStudent()">
+      <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
+    </div>
+
+    <!-- Wrap table to avoid page-wide horizontal scroll on phones -->
+    <div class="table-wrap">
+      <table id="studentTable">
+        <thead>
+          <tr>
+            <th>LRN</th>
+            <th>Full Name</th>
+            <th>Age</th>
+            <th>Grade</th>
+            <th>Section</th>
+            <th>Added Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- rows injected by JS -->
+          <tr>
+            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td><!-- updated colspan -->
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+<!-- Add/Edit Student Modal -->
+<div id="studentModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Add Student</h2>
+      <span class="close-btn" id="closeStudentModalBtn">&times;</span>
+    </div>
+
+    <form id="studentForm">
+      <input type="hidden" id="editIndex">
+
+      <div class="photo-uploader" id="photoUploader">
+        <div class="head">
+          <img id="photoPreview" class="avatar--lg is-hidden" alt="Student photo preview">
+          <div>
+            <strong>Student Photo</strong>
+            <div class="photo-actions is-hidden" id="photoActions">
+              <button type="button" class="btn" id="photoChange"><i class="fa fa-camera"></i> Change</button>
+              <button type="button" class="btn danger" id="photoRemove"><i class="fa fa-trash"></i> Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="drop" id="photoDrop">
+          <i class="fa fa-camera"></i>
+          <p>Drag & drop or choose an image (JPG/PNG, max ~2MB). We’ll auto-resize.</p>
+          <button type="button" class="btn" id="photoChoose">Choose file</button>
+          <input type="file" id="photoInput" accept="image/*" class="is-hidden">
+        </div>
+      </div>
+
+      <label>LRN:</label>
+      <input type="text" id="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number" required>
+
+      <label>First Name:</label>
+      <input type="text" id="firstName" required>
+
+      <label>Middle Name:</label>
+      <input type="text" id="middleName">
+
+      <label>Last Name:</label>
+      <input type="text" id="lastName" required>
+
+      <label>Age:</label>
+      <input type="number" id="age" min="1" placeholder="in years" required>
+
+      <!-- Address removed -->
+
+      <label>Grade:</label>
+      <select id="grade" required>
+        <option value="">-- Select Grade --</option>
+        <option value="7">Grade 7</option>
+        <option value="8">Grade 8</option>
+        <option value="9">Grade 9</option>
+        <option value="10">Grade 10</option>
+        <option value="11">Grade 11</option>
+        <option value="12">Grade 12</option>
+      </select>
+
+      <label>Section:</label>
+      <input type="text" id="section" placeholder="e.g. A" required>
+
+      <label>Parent's Contact Number:</label>
+      <input type="text" id="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
+
+      <button type="submit" class="save-btn">Save</button>
+    </form>
+  </div>
+</div>
+
+<!-- View Student Modal -->
+<div id="viewModal" class="modal">
+  <div class="modal-content student-modal">
+    <div class="modal-header">
+      <h2>Student Details</h2>
+      <span class="close-btn">&times;</span>
+    </div>
+
+    <div class="student-info">
+      <div class="student-avatar">
+        <img id="viewAvatar" class="avatar--lg is-hidden" alt="Student photo">
+        <div id="viewInitials" class="avatar--fallback is-hidden"></div>
+      </div>
+
+      <div class="student-details">
+        <div class="detail-row">
+          <span class="label">LRN</span>
+          <span class="value" id="viewLRN"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Name</span>
+          <span class="value" id="viewName"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Age</span>
+          <span class="value" id="viewAge"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Grade</span>
+          <span class="value" id="viewGrade"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Section</span>
+          <span class="value" id="viewSection"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Parent’s Contact</span>
+          <span class="value" id="viewParent"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Page scripts -->
+<script src="js/main.js" defer></script>
+<script src="js/student_list.js" defer></script>
+
+<!-- Inline page logic (self-contained) -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  /* ===== Drawer fallback (guarded) ===== */
+  var sidebar  = document.getElementById('sidebar');
+  var menuBtn  = document.querySelector('.menu-btn');
+  var backdrop = document.getElementById('backdrop'); // may not exist
+
+  if (menuBtn && sidebar && !menuBtn.dataset.bound) {
+    function setOpen(open){
+      sidebar.classList.toggle('open', open);
+      if (backdrop) backdrop.classList.toggle('show', open);
+      document.body.style.overflow = open ? 'hidden' : '';
+      menuBtn.setAttribute('aria-expanded', String(open));
+    }
+    function toggle(){ setOpen(!sidebar.classList.contains('open')); }
+    menuBtn.addEventListener('click', toggle);
+    if (backdrop) backdrop.addEventListener('click', function(){ setOpen(false); });
+    window.addEventListener('keydown', function(e){ if(e.key === 'Escape') setOpen(false); });
+    window.addEventListener('resize', function(){ if (window.innerWidth >= 769) setOpen(false); });
+    menuBtn.dataset.bound = '1';
+  }
+});
+</script>
+</body>
+</html>

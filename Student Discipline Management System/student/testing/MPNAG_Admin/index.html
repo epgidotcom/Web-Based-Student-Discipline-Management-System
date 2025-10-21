@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MPNAG - Student Discipline Management System</title>
+
+  <!-- Global and Page-Specific CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/login.css">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+
+<body>
+  <div class="login-container">
+    <img src="images/mpnag_logo.png" alt="School Logo" class="logo" />
+    <h2>MPNAG - Student Discipline Management System</h2>
+
+    <!-- Error Message Placeholder -->
+    <p class="error-message" id="errorMessage"></p>
+
+    <form id="loginForm" novalidate>
+      <div class="input-group">
+        <i class="fa fa-user icon"></i>
+        <input
+          type="text"
+          id="username"
+          placeholder="Username or Email"
+          required
+          autocomplete="username"
+        />
+      </div>
+
+      <div class="input-group">
+        <i class="fa fa-lock icon"></i>
+        <input
+          type="password"
+          id="password"
+          placeholder="Password"
+          required
+          autocomplete="current-password"
+        />
+      </div>
+
+      <div class="form-actions">
+        <!-- reCAPTCHA v2 Checkbox -->
+        <div class="g-recaptcha"
+            data-sitekey="6Le4W-IrAAAAAGUIgmONHNhnHGI8Q97lQVaIA5mU"></div>
+
+        <!-- Hidden token (optional) -->
+        <input type="hidden" id="captchaToken" value="">
+
+        <button type="submit" class="btn-login" id="loginBtn">
+          Login Now <i class="fa fa-sign-in-alt"></i>
+        </button>
+      </div>
+
+      <!-- reCAPTCHA API -->
+      <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+      <a href="forgot_password.html" class="forgot-password">Forgot Your Password?</a>
+    </form>
+  </div>
+
+  <!-- Global + Page-Specific JS -->
+  <script src="js/main.js" defer></script>
+  <script src="js/login.js" defer></script>
+</body>
+</html>

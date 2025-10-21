@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDMS - Calendar</title>
+
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/calendar.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <style>
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px }
+    .calendar-actions { display: flex; gap: 10px; align-items: center }
+    .btn { border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer }
+    .btn-primary { background: #43699c; color: #fff }
+    .btn-primary:hover { background: #34517c }
+    .btn-danger { background: #e74c3c; color: #fff }
+    .btn-danger:hover { background: #c0392b }
+    .picker { border: 1px solid #d1d5db; padding: 8px 10px; border-radius: 6px; background: #fff }
+    #calendar { background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,.06); min-height: 640px }
+
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; z-index: 1000 }
+    .modal.open { display: flex; align-items: center; justify-content: center }
+    .modal-content { background: #fff; width: 560px; max-width: calc(100% - 24px); border-radius: 10px; padding: 16px 18px }
+    .modal-content h2 { margin: 0 0 10px }
+    .modal-content label { display: block; margin: 8px 0 6px; font-weight: 600 }
+    .modal-content input, .modal-content select, .modal-content textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+    }
+    .modal-actions { display: flex; gap: 10px; margin-top: 12px }
+    .close-btn { float: right; font-size: 22px; cursor: pointer; color: #666 }
+    .close-btn:hover { color: #e74c3c }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+    @media (max-width:560px) { .row-2 { grid-template-columns: 1fr } }
+    .is-hidden { display: none !important }
+  </style>
+</head>
+<body>
+  
+
+<div class="sidebar">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="calendar.html" class="active"><i class="fa fa-calendar"></i> Calendar</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Message</a>
+  <a href="create_account.html"><i class="fa fa-user-plus"></i> Create Account</a>
+
+        <div class="sidebar-footer">
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
+  </div>
+</div>
+
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+  <section class="page-header">
+    <h2>School Calendar</h2>
+    <div class="calendar-actions">
+      <button id="addEventBtn" class="btn btn-primary"><i class="fa fa-plus"></i> Add Event</button>
+
+      <!-- View picker -->
+      <select id="viewPicker" class="picker">
+        <option value="dayGridMonth">Month</option>
+        <option value="timeGridWeek">Week</option>
+        <option value="listWeek">List (Week)</option>
+      </select>
+
+      <!-- Type filter -->
+      <select id="typeFilter" class="picker">
+        <option value="all">All types</option>
+        <option value="event">School Event</option>
+        <option value="exam">Exam</option>
+        <option value="violation">Violation</option>
+      </select>
+
+      <!-- ✅ Year picker -->
+      <select id="yearPicker" class="picker"></select>
+    </div>
+  </section>
+
+  <div id="calendar"></div>
+</div>
+
+<!-- Add/Edit Event Modal -->
+<div id="eventModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" id="closeEventModal">&times;</span>
+    <h2 id="eventModalTitle">Add Event</h2>
+    <form id="eventForm">
+      <input type="hidden" id="eventId">
+
+      <label>Title</label>
+      <input type="text" id="eventTitle" required>
+
+      <label>Type</label>
+      <select id="eventType" required>
+        <option value="event">School Event</option>
+        <option value="exam">Exam</option>
+        <option value="violation">Violation</option>
+      </select>
+
+      <div class="row-2">
+        <div>
+          <label>Start</label>
+          <input type="datetime-local" id="eventStart" required>
+        </div>
+        <div>
+          <label>End</label>
+          <input type="datetime-local" id="eventEnd">
+        </div>
+      </div>
+
+      <label>Description</label>
+      <textarea id="eventDesc" rows="3" placeholder="Optional…"></textarea>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" id="deleteEventBtn" class="btn btn-danger is-hidden">
+          <i class="fa fa-trash"></i> Delete
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- FullCalendar -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<!-- Page JS -->
+<script src="js/main.js" defer></script>
+<script src="js/calendar.js"></script>
+</body>
+</html>

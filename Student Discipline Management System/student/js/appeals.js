@@ -26,8 +26,9 @@ let violationsCatalog = [];
 
 async function loadViolationsCatalog(){
   try {
-    // prefer local copy shipped with student bundle
-    const res = await fetch('js/school_violations.json', { cache: 'no-store' });
+  // prefer local copy shipped with student bundle
+  // use import.meta.url so the path resolves relative to this module file in production
+  const res = await fetch(new URL('./school_violations.json', import.meta.url).href, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to load violations catalog');
     const payload = await res.json();
     const categories = payload?.school_policy?.categories || [];
