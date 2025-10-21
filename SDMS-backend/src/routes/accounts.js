@@ -53,17 +53,14 @@ router.post('/', async (req, res) => {
         try {
           const { rows } = await query(
             `INSERT INTO accounts (full_name, email, username, password_hash)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+             VALUES ($1,$2,$3,$4)
              RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
             [
               fullName.trim(),
               email.toLowerCase().trim(),
               username.toLowerCase().trim(),
               hash,
-              role,
-              role === 'Student' ? (grade || null) : null,
-              role === 'Student' ? (lrn || null) : null,
-              role === 'Student' ? (section || null) : null
+              role
             ]
           );
           const acct = rows[0];
