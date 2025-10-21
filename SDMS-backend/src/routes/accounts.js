@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
         await query('BEGIN');
         try {
           const { rows } = await query(
-            `INSERT INTO accounts (full_name, email, username, password_hash)
+            `INSERT INTO accounts (full_name, email, username, password_hash, role)
              VALUES ($1,$2,$3,$4)
              RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
             [
