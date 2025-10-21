@@ -640,15 +640,14 @@
       return;
     }
 
-    const payload = {
+ const payload = {
   student_id: studentId,
   grade_section: gradeSectionField?.value?.trim() || null,
-  offense_type: violationTypeField?.value || null,
-  description: violationTypeField?.value || null, // use same value for description
+  violationType: violationTypeField?.value || null, 
   sanction: sanctionField?.value || null,
   incident_date: incidentDateField?.value || null,
   evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
-  };
+};
 
     try {
       const editIndex = editIndexField?.value === '' ? null : Number(editIndexField.value);
