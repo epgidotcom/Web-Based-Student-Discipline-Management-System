@@ -16,9 +16,9 @@ router.get('/', requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { rows } = await query(
       `SELECT a.id, a.full_name AS "fullName", a.email, a.username, a.role,
-              a.grade, a.lrn, a.section, s.age AS age, a.created_at AS "createdAt"
+              s.grade, s.lrn, s.section, s.age AS age, a.created_at AS "createdAt"
        FROM accounts a
-       LEFT JOIN students s ON a.id = s.account_id
+       LEFT JOIN students s ON a.id = s.id
        ORDER BY a.created_at DESC`
     );
     res.json(rows);
