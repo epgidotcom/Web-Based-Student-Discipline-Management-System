@@ -140,6 +140,30 @@ body {
 .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
 .table tbody tr.is-selected{background:#f1f5f9}
 
+/* Violation picker styles */
+.violation-picker{position:relative; display:flex; gap:8px; align-items:center}
+.violation-picker input[type="text"], .violation-picker input[type="search"]{
+  flex:1; min-width:0; /* important for flexbox */
+  padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; /* keep single-line */
+}
+.violation-picker #violationToggle{flex:0 0 44px; height:44px; display:grid; place-items:center; border-radius:10px}
+.violation-dropdown{position:absolute; top:calc(100% + 8px); right:0; left:0; z-index:1200; background:#fff; border:1px solid #e5e7eb; box-shadow:var(--shadow); border-radius:12px; max-height:320px; overflow:auto}
+.violation-dropdown[hidden]{display:none}
+.violation-search{padding:8px}
+.violation-search input{width:100%; padding:8px 10px; border-radius:8px; border:1px solid #edf2f7}
+.violation-list{list-style:none; margin:0; padding:8px; display:block}
+.violation-list .violation-cat{font-weight:700; padding:8px 10px; color:var(--muted); background:#fbfdff; border-radius:6px}
+.violation-item{padding:8px 10px; cursor:pointer; border-radius:6px; margin:6px 0; display:block}
+.violation-item:hover, .violation-item:focus{background:#eef3ff; outline:none}
+.violation-item .desc{color:var(--muted); font-size:13px}
+.violation-list .empty{padding:12px; text-align:center; color:var(--muted)}
+
+/* Ensure long selected violation text is visible: allow horizontal scroll inside the input when needed */
+.violation-picker input[type="text"]{overflow-x:auto}
+.violation-picker input[type="text"]::-webkit-scrollbar{height:8px}
+.violation-picker input[type="text"]::-webkit-scrollbar-thumb{background:#e5e7eb; border-radius:4px}
+
 .conversation-shell{padding:0; overflow:hidden}
 .conversation-layout{display:grid; grid-template-columns:260px 1fr; min-height:460px}
 .conversation-sidebar{background:#f7f9fc; border-right:1px solid #e5e7eb; display:flex; flex-direction:column}
