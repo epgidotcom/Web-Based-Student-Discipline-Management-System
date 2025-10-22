@@ -103,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
       id: row.id,
       studentId: row.student_id,
       studentName: row.student_name || buildStudentName(student),
+      description: (row.description ?? row.violation_description ?? row.details ?? row.violation ?? row.offense_type ?? '').toString().trim(),
       type: row.offense_type || 'Violation',
       status: row.status || 'Pending',
       date: row.incident_date || row.created_at || new Date().toISOString().slice(0, 10),
@@ -235,6 +236,23 @@ document.addEventListener("DOMContentLoaded", () => {
     return [...map.entries()].map(([grade, count]) => ({ grade, count })).sort((a, b) => a.grade - b.grade);
   }
 
+  // Violation category mapping used for the Top Types chart — only these categories are counted
+  const VIOLATION_CATEGORIES = [
+    'Classroom Misconduct',
+    'Dress Code Violation',
+    'Tardiness',
+    'Cutting Classes',
+  ];
+
+  function toCategory(v) {
+    const s = (v?.description || v?.type || '').toString().toLowerCase().trim();
+    if (s.includes('classroom')) return 'Classroom Misconduct';
+    if (s.includes('dress')) return 'Dress Code Violation';
+    if (s.includes('tardi')) return 'Tardiness';
+    if (s.includes('cut') || s.includes('absent without')) return 'Cutting Classes';
+    return null; // anything else won’t be counted
+  }
+
   function initFilters() {
     if (!els.filterGrade || !els.filterSection || !els.filterType) return;
     els.filterGrade.innerHTML = '<option value=\"\">All</option>';
@@ -317,6 +335,37 @@ document.addEventListener("DOMContentLoaded", () => {
     return offenders;
   }
 
+  // New helper: compute unique students with >=3 violations in the 90-day window ending at `filters.to` (or today)
+  function computeRepeatOffenders90d(violationsList, filters) {
+    if (!Array.isArray(violationsList) || !violationsList.length) return 0;
+    const to = filters?.to ? new Date(filters.to) : new Date();
+    const toUTC = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+    const fromUTC = toUTC - 90 * 24 * 60 * 60 * 1000;
+    const gradeSel = (filters?.grade && filters.grade !== 'All') ? String(filters.grade).trim() : null;
+    const sectionSel = (filters?.section && filters.section !== 'All') ? String(filters.section).trim() : null;
+  const violSel = (filters?.violation && filters.violation !== 'All') ? String(filters.violation).trim() : null;
+  const violSelLower = violSel ? violSel.toLowerCase() : null;
+    const toUtcMs = (d) => {
+      const dt = toDate(d);
+      if (!isValidDate(dt)) return NaN;
+      return Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    };
+    const inScope = violationsList.filter((v) => {
+      const t = toUtcMs(v.incident_date || v.date || v.createdAt || v.createdAt);
+      if (Number.isNaN(t) || t < fromUTC || t > toUTC) return false;
+      if (gradeSel && String(v.grade)?.trim() !== gradeSel) return false;
+      if (sectionSel && String(v.section)?.trim() !== sectionSel) return false;
+      if (violSelLower) {
+        const vt = (v.violation_type ?? v.type ?? v.description ?? '')?.trim().toLowerCase();
+        if (vt !== violSelLower) return false;
+      }
+      return v.studentId ?? v.student_id ?? null;
+    });
+    const counts = new Map();
+    for (const v of inScope) counts.set(String(v.studentId ?? v.student_id), (counts.get(String(v.studentId ?? v.student_id)) ?? 0) + 1);
+    return [...counts.values()].filter((n) => n >= 3).length;
+  }
+
   function computeOpenCases(list) {
     return list.filter((v) => /pending|ongoing|open/i.test(v.status || '')).length;
   }
@@ -330,12 +379,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const totalStudents = totalStudentCount || students.length;
     const violations30 = violationStats?.last30 ?? computeViolationsLastNDays(violations, 30);
     const openCases = violationStats?.open_cases ?? computeOpenCases(violations);
-    const repeatOffenders = violationStats?.repeat_offenders_90 ?? computeRepeatOffenders(violations);
+    // compute repeat offenders respecting current filters and 90-day window ending at the 'To' filter (or today)
+    const currentFilters = {
+      to: els.dateTo?.value || null,
+      grade: els.filterGrade?.value || null,
+      section: els.filterSection?.value || null,
+      violation: els.filterType?.value || null,
+    };
+    const repeatCount = computeRepeatOffenders90d(violations, currentFilters);
 
     animateCount(metricEls.totalStudents, totalStudents);
     animateCount(metricEls.violations30, violations30);
     animateCount(metricEls.openCases, openCases);
-    animateCount(metricEls.repeatOffenders, repeatOffenders);
+    // animate the KPI like the others
+    animateCount(metricEls.repeatOffenders, repeatCount);
   }
 
   let chartTrend;
@@ -419,9 +476,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderTopTypes(list) {
-    const agg = countByType(list).slice(0, 5);
-    const labels = agg.map((a) => a.type);
-    const values = agg.map((a) => a.count);
+    // init counts with zero for all 4
+    const counts = Object.fromEntries(VIOLATION_CATEGORIES.map((c) => [c, 0]));
+    for (const it of list) {
+      const cat = toCategory(it);
+      if (cat && Object.prototype.hasOwnProperty.call(counts, cat)) counts[cat] += 1;
+    }
+    const labels = VIOLATION_CATEGORIES;
+    const values = labels.map((l) => counts[l]);
     const hasData = values.some((v) => v > 0);
     els.emptyTypes?.classList.toggle('hidden', hasData);
 

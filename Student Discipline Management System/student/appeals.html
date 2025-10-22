@@ -46,7 +46,14 @@
       <form id="appealForm" class="appeal-form">
         <div class="field">
           <label for="violationText">Violation</label>
-          <input type="text" id="violationText" placeholder="Enter the violation you want to appeal" required />
+          <div class="violation-picker">
+            <input type="text" id="violationText" placeholder="Enter the violation you want to appeal" required />
+            <button type="button" id="violationToggle" class="btn" aria-expanded="false" aria-haspopup="listbox" title="Choose from policy violations">▾</button>
+            <div id="violationDropdown" class="violation-dropdown" role="listbox" aria-label="School violation list" hidden>
+              <div class="violation-search"><input id="violationSearch" type="search" placeholder="Search violations..." /></div>
+              <ul id="violationList" class="violation-list"></ul>
+            </div>
+          </div>
         </div>
         <div class="field">
           <label for="appealReason">Reason / Explanation</label>
@@ -85,6 +92,41 @@
   
 
   <script type="module" src="js/appeals.js"></script>
+  <script type="module">
+    import { api, getStudentId } from './js/api.js';
+    async function loadStudentProfile(){
+      try {
+        const authUser = window.SDMSAuth?.getUser?.() || null;
+        const nameEl = document.getElementById('studentName');
+        const sectionEl = document.getElementById('studentSection');
+        const avatar = document.getElementById('studentAvatar');
+        if (authUser) {
+          const fullName = [authUser.first_name, authUser.middle_name, authUser.last_name].filter(Boolean).join(' ').trim() || authUser.full_name || authUser.name || 'Student';
+          nameEl.textContent = fullName;
+          sectionEl.textContent = authUser.grade ? `Grade ${authUser.grade}${authUser.section ? ' • Section ' + authUser.section : ''}` : (authUser.section ? `Section ${authUser.section}`: '');
+          if (authUser.photo_url) avatar.src = authUser.photo_url;
+          return;
+        }
+      } catch (e) {
+        console.warn('authUser read failed', e);
+      }
+
+      const sid = getStudentId() || null;
+      if (!sid) return;
+      try {
+        const profile = await api(`/students/${encodeURIComponent(sid)}`);
+        if(!profile) return;
+        const nameEl = document.getElementById('studentName');
+        const sectionEl = document.getElementById('studentSection');
+        const avatar = document.getElementById('studentAvatar');
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || profile.full_name || 'Student';
+        nameEl.textContent = fullName;
+        sectionEl.textContent = profile.grade ? `Grade ${profile.grade}${profile.section ? ' • Section ' + profile.section : ''}` : (profile.section ? `Section ${profile.section}`: '');
+        if(profile.photo_url) avatar.src = profile.photo_url;
+      } catch(e){ console.warn('Failed to load student profile', e); }
+    }
+    loadStudentProfile();
+  </script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>

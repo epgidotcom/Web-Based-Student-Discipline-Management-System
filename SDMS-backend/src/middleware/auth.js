@@ -4,6 +4,7 @@ import { query } from '../db.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const TOKEN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
+//TEST ONLY remove comment in production
 export function signToken(account){
   return jwt.sign({
     sub: account.id,
@@ -41,3 +42,63 @@ export function requireAdmin(req, res, next){
   }
   next();
 }
+
+// Non-blocking attempt to resolve user from Authorization header.
+// Returns the user row object or null if token missing/invalid.
+export async function tryGetUser(req){
+  try {
+    const hdr = req.headers.authorization || '';
+    const m = hdr.match(/^Bearer (.+)$/i);
+    if(!m) return null;
+    let payload;
+    try {
+      payload = jwt.verify(m[1], JWT_SECRET);
+    } catch(e){
+      return null;
+    }
+    const { rows } = await query('SELECT id, full_name, email, username, role, grade FROM accounts WHERE id = $1', [payload.sub]);
+    if(!rows.length) return null;
+    return rows[0];
+  } catch (e) {
+    console.warn('tryGetUser failed', e);
+    return null;
+  }
+}
+//TEST ONLY remove comment in production END
+
+//TEST ONLY REMOVE THIS IN PRODUCTION
+// export function signToken(account) {
+//   // Return a placeholder token or success message
+//   return 'mock-token-success';
+// }
+
+// export async function requireAuth(req, res, next) {
+//   // Skip token checks — automatically authenticate
+//   req.user = { 
+//     id: 1,
+//     full_name: 'Demo User',
+//     email: 'demo@example.com',
+//     username: 'demo',
+//     role: 'Admin',
+//     grade: 'N/A'
+//   };
+//   next(); // Continue the request
+// }
+
+// export function requireAdmin(req, res, next) {
+//   // Always allow
+//   next();
+// }
+
+// export async function tryGetUser(req) {
+//   // Always return a mock user
+//   return {
+//     id: 1,
+//     full_name: 'Demo User',
+//     email: 'demo@example.com',
+//     username: 'demo',
+//     role: 'Admin',
+//     grade: 'N/A'
+//   };
+// }
+//TEST ONLY REMOVE THIS IN PRODUCTION END

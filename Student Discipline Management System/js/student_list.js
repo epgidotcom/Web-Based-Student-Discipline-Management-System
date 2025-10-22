@@ -1,6 +1,6 @@
 (() => {
-  const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
-  const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
+  const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '';
+  const API_ROOT = `${API_BASE.replace(/\/+$/, '')}/api`;
 
   let students = [];
 
@@ -23,7 +23,6 @@
   const viewLRN = document.getElementById('viewLRN');
   const viewName = document.getElementById('viewName');
   const viewAge = document.getElementById('viewAge');
-  const viewBirthdate = document.getElementById('viewBirthdate');
   const viewGrade = document.getElementById('viewGrade');
   const viewSection = document.getElementById('viewSection');
   const viewParent = document.getElementById('viewParent');
@@ -112,14 +111,36 @@
     if (body !== undefined) {
       init.body = typeof body === 'string' ? body : JSON.stringify(body);
     }
-    const res = await fetch(`${API_ROOT}${path}`, init);
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Request failed (${res.status})`);
+
+    // Primary attempt: use configured API_ROOT (relative or absolute).
+    try {
+      const res = await fetch(`${API_ROOT}${path}`, init);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Request failed (${res.status})`);
+      }
+      if (res.status === 204) return null;
+      const ct = res.headers.get('content-type') || '';
+      return ct.includes('application/json') ? res.json() : res.text();
+    } catch (err) {
+      // If the primary fetch failed (network error or CORS/asset server), attempt a local backend fallback
+      // This is a development convenience when the frontend is served from a static server (eg. Live Server)
+      try {
+        const fallbackHost = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || 'http://localhost:3000';
+        const fallbackRoot = `${fallbackHost.replace(/\/+$/, '')}/api`;
+        const res2 = await fetch(`${fallbackRoot}${path}`, init);
+        if (!res2.ok) {
+          const text = await res2.text();
+          throw new Error(text || `Fallback request failed (${res2.status})`);
+        }
+        if (res2.status === 204) return null;
+        const ct2 = res2.headers.get('content-type') || '';
+        return ct2.includes('application/json') ? res2.json() : res2.text();
+      } catch (err2) {
+        // Surface the original error for debugging
+        throw err;
+      }
     }
-    if (res.status === 204) return null;
-    const ct = res.headers.get('content-type') || '';
-    return ct.includes('application/json') ? res.json() : res.text();
   }
 
   const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
@@ -148,7 +169,6 @@
       firstName: row.first_name || '',
       middleName: row.middle_name || '',
       lastName: row.last_name || '',
-      birthdate: row.birthdate ? String(row.birthdate).slice(0,10) : '',
       age: (() => {
         if (row.age == null) return null;
         const parsed = Number(row.age);
@@ -181,31 +201,85 @@
 
     source.forEach((s, i) => {
       const row = document.createElement('tr');
-      const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
+
+      // LRN cell
+      const lrnCell = document.createElement('td');
+      lrnCell.textContent = s.lrn || '';
+      row.appendChild(lrnCell);
+
+      // Name cell with avatar
+      const nameCell = document.createElement('td');
+      const nameWrap = document.createElement('div');
+      nameWrap.className = 'name-cell';
+      const fullName = `${s.firstName} ${s.middleName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
       const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
-      const avatar = photo
-        ? `<img class="avatar" src="${photo}" alt="${fullName}">`
-        : `<div class="avatar avatar--fallback">${initialsFromName(fullName)}</div>`;
+      if (photo) {
+        const img = document.createElement('img');
+        img.className = 'avatar';
+        img.src = photo;
+        img.alt = fullName;
+        nameWrap.appendChild(img);
+      } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'avatar avatar--fallback';
+        fallback.textContent = initialsFromName(fullName);
+        nameWrap.appendChild(fallback);
+      }
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'student-name';
+      nameSpan.textContent = fullName;
+      nameWrap.appendChild(nameSpan);
+      nameCell.appendChild(nameWrap);
+      row.appendChild(nameCell);
 
-      row.innerHTML = `
-        <td>${s.lrn}</td>
-        <td>
-          <div class="name-cell">
-            ${avatar}
-            <span class="student-name">${fullName}</span>
-          </div>
-        </td>
-        <td>${age !== '' && age != null ? `${age}` : ''}</td>
-        <td>${s.grade || ''}</td>
-        <td>${s.section || ''}</td>
-        <td>${formatDate(s.createdAt)}</td>
-        <td>
-          <button class="action-btn" onclick="viewStudent(${i})" title="View"><i class="fa fa-eye"></i></button>
-          <button class="action-btn edit-btn" onclick="editStudent(${i})" title="Edit"><i class="fa fa-edit"></i></button>
-          <button class="action-btn delete-btn" onclick="deleteStudent(${i})" title="Delete"><i class="fa fa-trash"></i></button>
-        </td>
-      `;
+      // Age
+      const ageCell = document.createElement('td');
+      ageCell.textContent = (age !== '' && age != null) ? String(age) : '';
+      row.appendChild(ageCell);
+
+      // Grade
+      const gradeCell = document.createElement('td');
+      gradeCell.textContent = s.grade || '';
+      row.appendChild(gradeCell);
+
+      // Section
+      const sectionCell = document.createElement('td');
+      sectionCell.textContent = s.section || '';
+      row.appendChild(sectionCell);
+
+      // Added Date
+      const dateCell = document.createElement('td');
+      dateCell.textContent = formatDate(s.createdAt) || '';
+      row.appendChild(dateCell);
+
+      // Actions cell
+      const actionsCell = document.createElement('td');
+      actionsCell.className = 'actions-cell';
+
+      const viewBtn = document.createElement('button');
+      viewBtn.className = 'action-btn';
+      viewBtn.title = 'View';
+      viewBtn.innerHTML = '<i class="fa fa-eye"></i>';
+      viewBtn.addEventListener('click', () => openView(i));
+      actionsCell.appendChild(viewBtn);
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'action-btn edit-btn';
+      editBtn.title = 'Edit';
+      editBtn.innerHTML = '<i class="fa fa-edit"></i>';
+      editBtn.addEventListener('click', () => openEdit(i));
+      actionsCell.appendChild(editBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'action-btn delete-btn';
+      delBtn.title = 'Delete';
+      delBtn.innerHTML = '<i class="fa fa-trash"></i>';
+      delBtn.addEventListener('click', () => removeStudent(i));
+      actionsCell.appendChild(delBtn);
+
+      row.appendChild(actionsCell);
+
       studentTable.appendChild(row);
     });
   }
@@ -294,7 +368,6 @@
     viewLRN.textContent = s.lrn;
     viewName.textContent = fullName;
     viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
-    viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
     viewGrade.textContent = s.grade || '—';
     viewSection.textContent = s.section || '—';
     viewParent.textContent = s.parentContact || '—';
@@ -434,12 +507,151 @@
   }
 
   function searchStudent(){
-    const input = document.getElementById('searchInput')?.value.toLowerCase() || '';
-    document.querySelectorAll('#studentTable tbody tr').forEach(row => {
-      const text = row.innerText.toLowerCase();
-      row.style.display = text.includes(input) ? '' : 'none';
-    });
+    (async () => {
+      const raw = document.getElementById('searchInput')?.value || '';
+      const input = raw.toString().trim();
+      if (!input) {
+        // nothing -> show all currently loaded rows
+        document.querySelectorAll('#studentTable tbody tr').forEach(row => { row.style.display = ''; });
+        return;
+      }
+
+      // Heuristic: treat as LRN when input contains digits and has no whitespace
+      const looksLikeLRN = /\d/.test(input) && !/\s/.test(input);
+      if (looksLikeLRN) {
+        try {
+          const data = await api(`/students?lrn=${encodeURIComponent(input)}`);
+          const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+          if (!rows.length) {
+            // show empty placeholder
+            studentTable.innerHTML = '';
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="7" style="text-align:center;color:#6b7280;">No records found.</td>';
+            studentTable.appendChild(row);
+            return;
+          }
+          // Render returned canonical rows
+          const normalized = rows.map(normalizeStudent);
+          renderTable(normalized);
+          return;
+        } catch (err) {
+          console.error('[students] LRN search failed', err);
+          // fall back to client-side filter below
+        }
+      }
+
+      // Default: client-side text filter on currently rendered rows
+      const q = input.toLowerCase();
+      document.querySelectorAll('#studentTable tbody tr').forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    })();
   }
+
+  (function(){
+    function normalize(v){
+      return (v || '').toString().trim();
+    }
+
+    function getGradeFromRow(row){
+      if (row.dataset && row.dataset.grade) return normalize(row.dataset.grade);
+      try {
+        var cell = row.cells && row.cells[3];
+        if (cell) return normalize(cell.textContent || cell.innerText);
+      } catch(e){}
+      return '';
+    }
+
+    function getSectionFromRow(row){
+      if (row.dataset && row.dataset.section) return normalize(row.dataset.section);
+      var sectionCell = row.querySelector && row.querySelector('[data-col="section"]');
+      if (sectionCell) return normalize(sectionCell.textContent || sectionCell.innerText);
+      return '';
+    }
+
+    function updateStudentsSummary(visibleCount){
+      var summaryEl = document.getElementById('studentsPageSummary');
+      var table = document.getElementById('studentTable');
+      var total = 0;
+      if (table) {
+        // derive total from non-placeholder rows
+        var tbody = table.tBodies[0];
+        if (tbody) {
+          total = Array.from(tbody.rows).filter(function(r){
+            return !(r.cells.length === 1 && r.cells[0].hasAttribute('colspan'));
+          }).length;
+        }
+      }
+      if (summaryEl) summaryEl.textContent = 'Showing ' + visibleCount + ' of ' + total;
+    }
+
+    function applyDropdownFilters(){
+      var selSection = normalize(document.getElementById('filterSection') && document.getElementById('filterSection').value);
+      var selGrade  = normalize(document.getElementById('filterGrade') && document.getElementById('filterGrade').value);
+
+      var table = document.getElementById('studentTable');
+      if (!table) return;
+      var tbody = table.tBodies[0];
+      if (!tbody) return;
+
+      var rows = Array.from(tbody.rows);
+      var visibleCount = 0;
+      var placeholder = null;
+
+      rows.forEach(function(row){
+        if (row.cells.length === 1 && row.cells[0].hasAttribute('colspan')) {
+          placeholder = row;
+          row.style.display = 'none';
+          return;
+        }
+
+        var rowGrade = getGradeFromRow(row);
+        var rowSection = getSectionFromRow(row);
+
+        var matchesGrade = true;
+        var matchesSection = true;
+
+        if (selGrade) {
+          matchesGrade = (rowGrade === selGrade || rowGrade === ('grade ' + selGrade));
+        }
+        if (selSection) {
+          matchesSection = (rowSection === selSection);
+        }
+
+        var keep = matchesGrade && matchesSection;
+        row.style.display = keep ? '' : 'none';
+        if (keep) visibleCount++;
+      });
+
+      if (visibleCount === 0 && placeholder) {
+        placeholder.style.display = '';
+      }
+
+      updateStudentsSummary(visibleCount);
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      var filterSection = document.getElementById('filterSection');
+      var filterGrade  = document.getElementById('filterGrade');
+
+      if (filterSection) filterSection.addEventListener('change', applyDropdownFilters);
+      if (filterGrade)  filterGrade.addEventListener('change', applyDropdownFilters);
+
+      // ensure summary reflects initial state
+      // compute initial visible rows count
+      (function initSummary(){
+        var table = document.getElementById('studentTable');
+        if (!table) return;
+        var tbody = table.tBodies[0];
+        if (!tbody) return;
+        var rows = Array.from(tbody.rows).filter(function(r){
+          return !(r.cells.length === 1 && r.cells[0].hasAttribute('colspan'));
+        });
+        updateStudentsSummary(rows.length);
+      })();
+    });
+  })();
 
   addStudentBtn?.addEventListener('click', openCreateModal);
   closeBtns.forEach(btn => btn.addEventListener('click', closeModals));
@@ -449,6 +661,93 @@
   });
 
   fetchData(1);
+
+  // Listen for cross-tab notifications that a new student account was created.
+  // We use localStorage 'sdms:student_created' as a fallback and BroadcastChannel when available.
+  // storage event for older / fallback method
+  try {
+    window.addEventListener('storage', (e) => {
+      if (!e.key) return;
+      if (e.key === 'sdms:student_created_data') {
+        try {
+          const obj = JSON.parse(localStorage.getItem('sdms:student_created_data')) || e.newValue && JSON.parse(e.newValue);
+          const payload = obj && obj.payload;
+          if (payload) {
+            // Try to fetch canonical student row from server by LRN to avoid pagination/sorting issues.
+            // Only fall back to inserting the provided payload if canonical lookup fails.
+            (async () => {
+              try {
+                if (payload && payload.lrn) {
+                  const data = await api(`/students?lrn=${encodeURIComponent(payload.lrn)}`);
+                  const canon = Array.isArray(data) && data.length ? data[0] : null;
+                  if (canon) {
+                    const row = normalizeStudent(canon);
+                    students.unshift(row);
+                    renderTable(students.slice(0, PAGE_LIMIT));
+                    try { refreshCurrentPage(1); } catch(e){}
+                    return;
+                  }
+                }
+              } catch (e) {
+                // ignore and fall back to direct payload insert below
+              }
+
+              // Canonical lookup failed; normalize and insert the payload as a best-effort fallback.
+              const row = normalizeStudent({
+                id: payload.id,
+                lrn: payload.lrn,
+                first_name: payload.first_name || payload.full_name || '',
+                middle_name: payload.middle_name || null,
+                last_name: payload.last_name || '',
+                age: payload.age ?? null,
+                grade: payload.grade || '',
+                section: payload.section || '',
+                parent_contact: payload.parent_contact || null,
+                created_at: payload.created_at || new Date().toISOString()
+              });
+              students.unshift(row);
+              renderTable(students.slice(0, PAGE_LIMIT));
+              try { refreshCurrentPage(1); } catch(e){}
+            })();
+            return;
+          }
+        } catch (err) {
+          // fallback to full refresh
+        }
+        refreshCurrentPage(1);
+      }
+    });
+  } catch (e) {}
+
+  try {
+    if (window.BroadcastChannel) {
+      const bc = new BroadcastChannel('sdms_events');
+      bc.addEventListener('message', (ev) => {
+        try {
+          if (ev.data && ev.data.type === 'student-created' && ev.data.payload) {
+            const payload = ev.data.payload;
+            const row = normalizeStudent({
+              id: payload.id,
+              lrn: payload.lrn,
+              first_name: payload.first_name || payload.full_name || '',
+              middle_name: payload.middle_name || null,
+              last_name: payload.last_name || '',
+              age: payload.age ?? null,
+              grade: payload.grade || '',
+              section: payload.section || '',
+              parent_contact: payload.parent_contact || null,
+              created_at: payload.created_at || new Date().toISOString()
+            });
+            students.unshift(row);
+            renderTable(students.slice(0, PAGE_LIMIT));
+            try { refreshCurrentPage(1); } catch(e){}
+            return;
+          }
+        } catch(e){}
+        refreshCurrentPage(1);
+      });
+    }
+  } catch (e) {}
 
   window.viewStudent = openView;
   window.editStudent = openEdit;

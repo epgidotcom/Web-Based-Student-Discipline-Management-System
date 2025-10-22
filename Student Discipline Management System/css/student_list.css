@@ -368,10 +368,49 @@ table tr:hover {
 .photo-actions .btn.danger { background: #e74c3c; color:#fff; border-color: transparent; }
 .is-hidden { display: none !important; }
 
+/* FILTERS */
+.dropdown-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+}
 
+/* Individual dropdowns */
+.dropdown-filters .filter-select {
+  height: 38px; 
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fff;
+  font-size: 14px;
+  color: #333;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='10'><polygon points='0,0 14,0 7,8' fill='%23666'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+  padding-right: 28px;
+}
 
+.dropdown-filters .filter-select:hover {
+  border-color: #3498db;
+}
 
+.dropdown-filters .filter-select:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 4px rgba(52, 152, 219, 0.3);
+}
 
+.dropdown-filters .filter-select {
+  vertical-align: middle;
+}
 
-
-
+#filterStrand, #filterGrade {
+  width: 150px;
+}

@@ -585,3 +585,39 @@ tr[data-status="Resolved"] {
 tr[data-status="Appealed"] {
   background-color: #fff7e6;
 }
+/* === Previous Offense Cards === */
+.previous-offense-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.offense-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.offense-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 4px;
+}
+
+.offense-body div {
+  font-size: 13px;
+  color: #374151;
+  margin: 3px 0;
+}
+
+/* scrollable modal content */
+#viewModal .modal-content {
+  max-height: 85vh;      
+  overflow-y: auto;       
+}

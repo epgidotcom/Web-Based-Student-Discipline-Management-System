@@ -1,4 +1,4 @@
-(() => {
+;(() => {
   const API_BASE = window.SDMS_CONFIG?.API_BASE || '';
   const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
 
@@ -232,9 +232,9 @@
   const studentNameField = document.getElementById('studentName');
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
-  const descriptionField = document.getElementById('description');
   const violationTypeField = document.getElementById('violationType');
   const sanctionField = document.getElementById('sanction');
+  const remarksField = document.getElementById('remarks');
 
   const pastOffenseWrap = document.getElementById('pastOffenseWrap');
   const pastOffenseList = document.getElementById('pastOffenseList');
@@ -256,7 +256,6 @@
   const viewPastOffense = document.getElementById('viewPastOffense');
   const viewIncidentDate = document.getElementById('viewIncidentDate');
   const viewAddedDate = document.getElementById('viewAddedDate');
-  const viewDescription = document.getElementById('viewDescription');
   const viewViolationType = document.getElementById('viewViolationType');
   const viewSanction = document.getElementById('viewSanction');
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
@@ -416,8 +415,7 @@
         <td>${v.student_name || '—'}</td>
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
-        <td>${v.offense_type || '—'}</td>
-        <td>${v.description || '—'}</td>
+        <td>${v.violation_type || '—'}</td>
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
@@ -551,9 +549,9 @@
     studentNameField.value = '';
     gradeSectionField.value = '';
     incidentDateField.value = '';
-    descriptionField.value = '';
     violationTypeField.value = '';
     sanctionField.value = '';
+    remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
     resetEvidence();
     displayPastOffensesFor(null);
@@ -579,9 +577,9 @@
     }
 
     incidentDateField.value = item.incident_date ? String(item.incident_date).slice(0, 10) : '';
-    descriptionField.value = item.description || '';
     violationTypeField.value = item.offense_type || '';
     sanctionField.value = item.sanction || '';
+    remarksField.value = item.remarks || '';
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     evidenceState = files.slice(0, 3);
@@ -591,25 +589,70 @@
     openModal(violationModal);
   }
 
-  function showViewModal(index) {
-    const item = violations[index];
-    if (!item) return;
-    viewStudent.textContent = item.student_name || '—';
-    viewGradeSection.textContent = item.grade_section || '—';
-    viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
-    viewAddedDate.textContent = formatDate(item.created_at) || '—';
-    viewDescription.textContent = item.description || '—';
-    viewViolationType.textContent = item.offense_type || '—';
-    viewSanction.textContent = item.sanction || '—';
+    function showViewModal(index) {
+      const item = violations[index];
+      if (!item) return;
 
-    const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
-    if (history.length) {
-      viewPastOffenseRow.classList.remove('is-hidden');
-      viewPastOffense.textContent = `${history.length} earlier case${history.length > 1 ? 's' : ''}`;
-    } else {
-      viewPastOffenseRow.classList.add('is-hidden');
-      viewPastOffense.textContent = '';
-    }
+      // === Current Offense Details ===
+      viewStudent.textContent = item.student_name || '—';
+      viewGradeSection.textContent = item.grade_section || '—';
+      viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
+      viewAddedDate.textContent = formatDate(item.created_at) || '—';
+      violationTypeField.value =  item.offense_type || '—';
+      viewSanction.textContent = item.sanction || '—';
+      remarksField.textContent = item.remarks || '-';
+      // === All Offense Cards ===
+      const allWrap = document.getElementById('viewAllOffensesWrap');
+      const allContainer = document.getElementById('viewAllOffenses');
+      allContainer.innerHTML = '';
+
+      const allOffenses = violations
+        .filter(v => v.student_id === item.student_id)
+        .sort((a, b) => new Date(a.incident_date) - new Date(b.incident_date));
+
+      if (allOffenses.length) {
+        allWrap.classList.remove('is-hidden');
+
+        // ensure one-time badge styles exist
+        if (!document.getElementById('sdms-status-badge-style')) {
+          const style = document.createElement('style');
+          style.id = 'sdms-status-badge-style';
+          style.textContent = `
+            .status-badge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:600; }
+            .status-pending  { background:#FEF3C7; color:#92400E; }   /* amber */
+            .status-approved { background:#DCFCE7; color:#166534; }   /* green */
+            .status-rejected { background:#FEE2E2; color:#991B1B; }   /* red */
+          `;
+          document.head.appendChild(style);
+        }
+
+        allOffenses.forEach((off, i) => {
+          const card = document.createElement('div');
+          card.className = 'offense-card';
+
+          // derive normalized status + badge class; default to 'pending'
+          const rawStatus = (off.status || 'pending').toString().trim().toLowerCase();
+          const statusNorm = ['approved', 'rejected', 'pending'].includes(rawStatus) ? rawStatus : 'pending';
+          const badgeClass = `status-badge status-${statusNorm}`;
+          const statusLabel = statusNorm.charAt(0).toUpperCase() + statusNorm.slice(1);
+
+          card.innerHTML = `
+            <div class="offense-header">
+              <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
+            </div>
+            <div class="offense-body">
+              <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
+              <div><strong>Description:</strong> ${off.description || '—'}</div>
+              <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
+              <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
+              <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
+            </div>
+          `;
+          allContainer.appendChild(card);
+        });
+      } else {
+        allWrap.classList.add('is-hidden');
+      }
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     if (files.length) {
@@ -651,8 +694,8 @@
       student_id: studentId,
       grade_section: gradeSectionField?.value?.trim() || null,
       offense_type: violationTypeField?.value || null,
-      description: descriptionField?.value?.trim() || null,
       sanction: sanctionField?.value || null,
+      remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
       evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
     };
@@ -760,7 +803,6 @@
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
-      const description = row.cells[4]?.textContent.toLowerCase() || '';
       const rowText = row.innerText.toLowerCase();
 
       const matchStrand = !strand || gradeSection.includes(strand);
@@ -822,6 +864,7 @@
         ${filterText?.value ? 'Search: ' + filterText.value : 'No text filter'}
       </div>
     `;
+
     table.parentNode.insertBefore(header, table);
     __printHeaderEl = header;
 
@@ -855,6 +898,67 @@
     window.onafterprint = cleanupPrintArtifacts;
   }
 
+   // === NEW: Download (CSV) of the currently filtered/visible rows ===
+  function downloadFilteredReport() {
+    const table = document.getElementById('violationTable');
+    if (!table) return;
+
+    const strand = (filterStrand?.value || 'All Strands');
+    const vtype  = (filterViolationType?.value || 'All Violations');
+    const txt    = (filterText?.value || 'No text filter');
+
+    // headers (exclude the last "Actions" column)
+    const ths = Array.from(table.querySelectorAll('thead th'));
+    const headers = ths.slice(0, ths.length - 1).map(th => th.textContent.trim());
+
+    // visible rows only (respect filters + CSS display)
+    const bodyRows = Array.from(table.tBodies?.[0]?.rows || []).filter(r => {
+      if (r.dataset?.placeholder === 'empty') return false;
+      const disp = (r.style.display || '').trim();
+      const cssDisp = getComputedStyle(r).display;
+      return disp !== 'none' && cssDisp !== 'none';
+    });
+
+    const rows = bodyRows.map(tr => {
+      const cells = Array.from(tr.cells);
+      const wanted = cells.slice(0, Math.max(0, cells.length - 1)); // drop Actions col
+      return wanted.map(td => (td.textContent || '').trim());
+    });
+
+    // CSV helpers
+    const esc = (s) => {
+      const v = String(s ?? '').replace(/\r?\n/g, ' ').replace(/"/g, '""');
+      return /[",\n]/.test(v) ? `"${v}"` : v;
+    };
+
+    // Metadata (Excel-friendly)
+    const meta = [
+      ['Student Violation Report'],
+      ['Generated on', new Date().toLocaleString()],
+      ['Filters', `Strand: ${strand} | Violation: ${vtype} | Search: ${txt}`],
+      []
+    ];
+
+    const csvLines = []
+      .concat(meta.map(arr => arr.map(esc).join(',')))
+      .concat([headers.map(esc).join(',')])
+      .concat(rows.map(r => r.map(esc).join(',')));
+
+    const csv = '\uFEFF' + csvLines.join('\r\n'); // BOM for Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.href = url;
+    a.download = `Violation_Report_${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // inject minimal runtime CSS to ensure modals are always on top
   function ensureModalZStack() {
     if (document.getElementById('sdms-modal-zfix')) return;
     const s = document.createElement('style');
@@ -956,15 +1060,22 @@
     applyFilterBtn?.addEventListener('click', applyFilters);
     filterStrand?.addEventListener('change', applyFilters);
     filterViolationType?.addEventListener('change', applyFilters);
-    filterText?.addEventListener('input', applyFilters);
-    printReportBtn?.addEventListener('click', printFilteredReport);
-  }
+      filterText?.addEventListener('input', applyFilters); // <-- fixed typo here
+
+    if (printReportBtn) {
+      printReportBtn.textContent = 'Download Report';
+      printReportBtn.title = 'Download the filtered rows as CSV';
+      // avoid duplicate handlers when bindEvents runs more than once
+      printReportBtn.removeEventListener?.('click', printFilteredReport);
+      printReportBtn.removeEventListener?.('click', downloadFilteredReport);
+      printReportBtn.addEventListener('click', downloadFilteredReport);
+      }
+    }
 
   async function init() {
     ensureModalZStack();
     bindEvents();
 
-    // also bind once page is fully loaded (covers dynamic DOM changes)
     window.addEventListener('load', bindEvents, { once: true });
 
     await Promise.all([loadStudents(), fetchData(1)]);

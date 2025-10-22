@@ -64,6 +64,28 @@
     <div class="search-container">
       <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchStudent()">
       <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
+
+      <!-- Dropdown filters (strand + grade)-->
+      <div class="dropdown-filters" id="dropdownFilters">
+        <select id="filterSection" class="filter-select" aria-label="Filter by strand">
+          <option value="">All Strands</option>
+          <option value="ABM">ABM</option>
+          <option value="HUMSS">HUMSS</option>
+          <option value="STEM">STEM</option>
+          <option value="GAS">GAS</option>
+          <option value="TVL">TVL</option>
+        </select>
+
+        <select id="filterGrade" class="filter-select" aria-label="Filter by grade">
+          <option value="">All Grades</option>
+          <option value="7">Grade 7</option>
+          <option value="8">Grade 8</option>
+          <option value="9">Grade 9</option>
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
+        </select>
+      </div>
     </div>
 
     <!-- Wrap table to avoid page-wide horizontal scroll on phones -->
@@ -83,7 +105,7 @@
         <tbody>
           <!-- rows injected by JS -->
           <tr>
-            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td><!-- updated colspan -->
+            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td>
           </tr>
         </tbody>
       </table>
@@ -93,6 +115,8 @@
       <div class="page-summary" id="studentsPageSummary" aria-live="polite">Showing 0 of 0</div>
       <nav class="pagination" id="studentsPagination" aria-label="Student list pagination"></nav>
     </div>
+  </div>
+</div>
 
 <!-- Add/Edit Student Modal -->
 <div id="studentModal" class="modal">
@@ -103,7 +127,7 @@
     </div>
 
     <form id="studentForm">
-  <input type="hidden" id="editIndex" name="editIndex">
+      <input type="hidden" id="editIndex" name="editIndex">
 
       <div class="photo-uploader" id="photoUploader">
         <div class="head">
@@ -126,22 +150,22 @@
       </div>
 
       <label>LRN:</label>
-  <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
+      <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
 
       <label>First Name:</label>
-  <input type="text" id="firstName" name="firstName" required>
+      <input type="text" id="firstName" name="firstName" required>
 
       <label>Middle Name:</label>
-  <input type="text" id="middleName" name="middleName">
+      <input type="text" id="middleName" name="middleName">
 
       <label>Last Name:</label>
-  <input type="text" id="lastName" name="lastName" required>
-  <label>Age:</label>
-  <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
+      <input type="text" id="lastName" name="lastName" required>
 
+      <label>Age:</label>
+      <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
 
       <label>Grade:</label>
-  <select id="grade" name="grade" required>
+      <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
         <option value="7">Grade 7</option>
         <option value="8">Grade 8</option>
@@ -152,10 +176,10 @@
       </select>
 
       <label>Section:</label>
-  <input type="text" id="section" name="section" placeholder="e.g. A" required>
+      <input type="text" id="section" name="section" placeholder="e.g. A" required>
 
       <label>Parent's Contact Number:</label>
-  <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
+      <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
 
       <button type="submit" class="save-btn">Save</button>
     </form>
@@ -189,6 +213,7 @@
           <span class="label">Age</span>
           <span class="value" id="viewAge"></span>
         </div>
+        <!-- 🧹 Birthdate row removed -->
         <div class="detail-row">
           <span class="label">Grade</span>
           <span class="value" id="viewGrade"></span>
@@ -205,7 +230,6 @@
     </div>
   </div>
 </div>
-
 
 <!-- Page scripts -->
 <script src="js/config.js" defer></script>
@@ -248,6 +272,3 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 </body>
 </html>
-
-
-
