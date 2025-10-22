@@ -603,7 +603,7 @@
       viewGradeSection.textContent = item.grade_section || '—';
       viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
       viewAddedDate.textContent = formatDate(item.created_at) || '—';
-      violationTypeField.value =  item.offense_type || '—';
+      violationTypeField.value =  item.description || '—';
       viewSanction.textContent = item.sanction || '—';
       remarksField.textContent = item.remarks || '-';
       // === All Offense Cards ===
@@ -646,7 +646,7 @@
               <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
             </div>
             <div class="offense-body">
-              <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
+              <div><strong>Violation Type:</strong> ${off.description || '—'}</div>
               <div><strong>Description:</strong> ${off.description || '—'}</div>
               <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
               <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
