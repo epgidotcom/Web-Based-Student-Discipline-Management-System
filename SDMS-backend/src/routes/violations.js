@@ -37,7 +37,6 @@ function normalizeEvidence(raw) {
 // === List with optional filters (student_id, q)
 router.get('/', async (req, res) => {
   try {
-<<<<<<< HEAD
     // Accept both snake_case and camelCase query parameter names
     const rawQuery = req.query || {};
     const student_id = rawQuery.student_id || rawQuery.studentId || rawQuery.studentId || null;
@@ -67,15 +66,6 @@ router.get('/', async (req, res) => {
         params.push(student_id);
         clauses.push(`v.student_id = $${params.length}`);
       }
-=======
-    const { student_id, q, limit = 200 } = req.query;
-    const clauses = [];
-    const params = [];
-
-    if (student_id) {
-      params.push(student_id);
-      clauses.push(`v.student_id = $${params.length}`);
->>>>>>> 791f371cdc73df7d46c10e7b15b370d15b620a27
     }
     if (q) {
       params.push(`%${q.toLowerCase()}%`);
@@ -97,7 +87,8 @@ router.get('/', async (req, res) => {
         v.student_name,
         v.grade_section,
         v.description AS violation_type,
-        v.sanction,
+        v.description, -- added original description here
+        v.sanction, 
         v.incident_date,
         v.status,
         v.repeat_count_at_insert,
