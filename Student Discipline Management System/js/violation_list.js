@@ -603,7 +603,7 @@
       viewGradeSection.textContent = item.grade_section || '—';
       viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
       viewAddedDate.textContent = formatDate(item.created_at) || '—';
-      viewViolationType.value =  item.description || '—';
+      viewViolationType.textContent =  item.description || '—';
       viewSanction.textContent = item.sanction || '—';
       remarksField.textContent = item.remarks || '-';
       // === All Offense Cards ===
