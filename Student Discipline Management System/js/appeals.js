@@ -12,12 +12,14 @@
       new URL('js/api.js', window.location.origin + '/').href,
       new URL('Student Discipline Management System/js/api.js', window.location.origin + '/').href
     ];
+    console.debug('[appeals] tryImportApi candidates:', candidates);
     for (let i = 0; i < candidates.length; i++) {
       const url = candidates[i];
       try {
         const mod = await import(/* webpackIgnore: true */ url);
         if (mod && mod.api) { api = mod.api; return; }
       } catch (e) {
+        console.debug('[appeals] import failed for', url, e && e.message);
         // try next
       }
     }
@@ -45,6 +47,191 @@
   const appealForm = document.getElementById('appealForm');
   const violationInput = document.getElementById('violationText');
   const reasonInput = document.getElementById('appealReason');
+
+  // ADMIN MODE: if the admin table exists on this page, run admin-only UI and API logic
+  if (document.getElementById('appealsTable')) {
+    (function () {
+      const PRIVILEGE_ROLES = ['Admin', 'Teacher'];
+      // check role if available
+      if (typeof window.SDMSAuth === 'object' && typeof window.SDMSAuth.requireRole === 'function') {
+        const allowed = window.SDMSAuth.requireRole(PRIVILEGE_ROLES);
+        if (!allowed) return;
+      }
+
+      const tableBody = document.querySelector('#appealsTable tbody');
+      const searchInput = document.getElementById('searchInput');
+      const searchButton = document.getElementById('searchButton');
+
+      const modal = document.getElementById('appealModal');
+      const modalClose = document.getElementById('appealModalClose');
+      const modalStudentName = document.getElementById('modalStudentName');
+      const modalLRN = document.getElementById('modalLRN');
+      const modalSection = document.getElementById('modalSection');
+      const modalViolation = document.getElementById('modalViolation');
+      const modalReason = document.getElementById('modalReason');
+      const modalStatus = document.getElementById('modalStatus');
+      const modalSubmitted = document.getElementById('modalSubmitted');
+      const modalDecision = document.getElementById('modalDecision');
+      const decisionRow = document.getElementById('decisionRow');
+
+      const approveBtn = document.getElementById('modalApprove');
+      const rejectBtn = document.getElementById('modalReject');
+      const backToPendingBtn = document.getElementById('modalBackToPending');
+
+      const adminState = { appeals: [], filtered: [], selected: null };
+
+      function getApiBaseFromMeta() {
+        const meta = document.querySelector('meta[name="sdms-api-base"]');
+        return (meta && meta.content) || (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
+      }
+
+      const ADMIN_API_ORIGIN = getApiBaseFromMeta().replace(/\/\/+$/, '');
+      const ADMIN_API_ROOT = (window.API_BASE || (ADMIN_API_ORIGIN ? ADMIN_API_ORIGIN + '/api' : API_ROOT)).replace(/\/\/+$/, '');
+
+      // Diagnostic logging to help debug deployed path / auth issues
+      try {
+        console.debug('[admin appeals] ADMIN_API_ORIGIN=', ADMIN_API_ORIGIN, 'ADMIN_API_ROOT=', ADMIN_API_ROOT, 'fallback API_ROOT=', API_ROOT);
+        const tokenPresent = !!((window.SDMSAuth && typeof window.SDMSAuth.getToken === 'function') && window.SDMSAuth.getToken());
+        console.debug('[admin appeals] auth token present?', tokenPresent);
+      } catch (e) {
+        console.debug('[admin appeals] diagnostics failed', e && e.message);
+      }
+
+      function authHeaders() {
+        const token = (window.SDMSAuth && typeof window.SDMSAuth.getToken === 'function') ? window.SDMSAuth.getToken() : null;
+        return token ? { Authorization: 'Bearer ' + token } : {};
+      }
+
+      async function adminApi(path, options = {}) {
+        const init = { method: options.method || 'GET', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(), options.headers || {}) };
+        if (options.body !== undefined) init.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+        const fullUrl = ADMIN_API_ROOT + path;
+        try { console.debug('[admin appeals] fetch', init.method, fullUrl, 'hasAuth=', !!(init.headers && init.headers.Authorization)); } catch (e) {}
+        const res = await fetch(fullUrl, init);
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || ('Request failed (' + res.status + ')'));
+        }
+        if (res.status === 204) return null;
+        const ct = res.headers.get('content-type') || '';
+        return ct.indexOf('application/json') !== -1 ? res.json() : res.text();
+      }
+
+      function formatDate(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+      }
+
+      function renderTable(list) {
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+        if (!list || !list.length) {
+          const row = document.createElement('tr');
+          row.dataset.placeholder = 'empty';
+          row.innerHTML = '<td colspan="8">No appeals found.</td>';
+          tableBody.appendChild(row);
+          return;
+        }
+        list.forEach(function (appeal) {
+          const row = document.createElement('tr');
+          const statusClass = (appeal.status || '').toLowerCase();
+          const createdDate = formatDate(appeal.createdAt);
+          const truncatedReason = appeal.reason && appeal.reason.length > 80 ? appeal.reason.slice(0, 77) + '...' : (appeal.reason || '—');
+          row.innerHTML = '\n            <td>' + (appeal.lrn || '—') + '</td>\n            <td>' + (createdDate || '—') + '</td>\n            <td>' + (appeal.studentName || '—') + '</td>\n            <td>' + (appeal.section || '—') + '</td>\n            <td>' + (appeal.violation || '—') + '</td>\n            <td>' + truncatedReason + '</td>\n            <td><span class="status ' + statusClass + '">' + (appeal.status || 'Pending') + '</span></td>\n            <td>\n              <button class="action-btn view" data-action="view" data-id="' + appeal.id + '" title="View"><i class="fa fa-eye"></i></button>\n              <button class="action-btn delete" data-action="delete" data-id="' + appeal.id + '" title="Delete"><i class="fa fa-trash"></i></button>\n            </td>';
+          tableBody.appendChild(row);
+        });
+      }
+
+      function applyFilter() {
+        const query = (searchInput && searchInput.value ? searchInput.value.trim().toLowerCase() : '');
+        if (!query) {
+          adminState.filtered = adminState.appeals.slice();
+        } else {
+          adminState.filtered = adminState.appeals.filter(function (appeal) {
+            return [appeal.lrn, appeal.studentName, appeal.section, appeal.violation, appeal.reason, appeal.status].map(function (v) { return (v || '').toString().toLowerCase(); }).some(function (text) { return text.indexOf(query) !== -1; });
+          });
+        }
+        renderTable(adminState.filtered);
+      }
+
+      function openModal(appeal) {
+        adminState.selected = appeal;
+        if (!modal || !appeal) return;
+        modalStudentName.textContent = appeal.studentName || '—';
+        modalLRN.textContent = appeal.lrn || '—';
+        modalSection.textContent = appeal.section || '—';
+        modalViolation.textContent = appeal.violation || '—';
+        modalReason.textContent = appeal.reason || '—';
+        modalStatus.textContent = appeal.status || 'Pending';
+        modalSubmitted.textContent = formatDate(appeal.createdAt) || '—';
+        if (appeal.decisionNotes) { modalDecision.textContent = appeal.decisionNotes; decisionRow.style.display = ''; } else { modalDecision.textContent = ''; decisionRow.style.display = 'none'; }
+        const status = (appeal.status || '').toLowerCase();
+        backToPendingBtn.style.display = status === 'pending' ? 'none' : '';
+        modal.classList.add('is-open');
+      }
+
+      function closeModal() { adminState.selected = null; modal && modal.classList.remove('is-open'); }
+
+      async function loadAppeals() {
+        try {
+          const data = await adminApi('/appeals');
+          adminState.appeals = Array.isArray(data) ? data : [];
+          applyFilter();
+        } catch (err) {
+          console.error('[admin appeals] load failed', err);
+          var row = document.createElement('tr'); row.innerHTML = '<td colspan="8" style="text-align:center;color:#e11d48;">Failed to load appeals.</td>'; tableBody.innerHTML = ''; tableBody.appendChild(row);
+        }
+      }
+
+      async function updateSelectedStatus(nextStatus) {
+        if (!adminState.selected) return;
+        try {
+          const updated = await adminApi('/appeals/' + encodeURIComponent(adminState.selected.id), { method: 'PATCH', body: { status: nextStatus } });
+          adminState.appeals = adminState.appeals.map(function (item) { return item.id === updated.id ? updated : item; });
+          applyFilter();
+          const latest = adminState.appeals.find(function (item) { return item.id === updated.id; });
+          if (latest) openModal(latest);
+        } catch (err) { console.error('[admin appeals] status update failed', err); alert(err && err.message ? err.message : 'Failed to update appeal status.'); }
+      }
+
+      async function deleteAppeal(id) {
+        if (!confirm('Delete this appeal? This action cannot be undone.')) return;
+        try {
+          await adminApi('/appeals/' + encodeURIComponent(id), { method: 'DELETE' });
+          adminState.appeals = adminState.appeals.filter(function (appeal) { return appeal.id !== id; });
+          applyFilter();
+          if (adminState.selected && adminState.selected.id === id) closeModal();
+        } catch (err) { console.error('[admin appeals] delete failed', err); alert(err && err.message ? err.message : 'Failed to delete appeal.'); }
+      }
+
+      tableBody && tableBody.addEventListener('click', function (event) {
+        var btn = event.target.closest && event.target.closest('button[data-action]');
+        if (!btn) return;
+        var action = btn.dataset.action, id = btn.dataset.id;
+        if (!action || !id) return;
+        var appeal = adminState.appeals.find(function (item) { return item.id === id; });
+        if (action === 'view' && appeal) openModal(appeal);
+        else if (action === 'delete') deleteAppeal(id);
+      });
+
+      modalClose && modalClose.addEventListener('click', closeModal);
+      modal && modal.addEventListener('click', function (event) { if (event.target === modal) closeModal(); });
+      approveBtn && approveBtn.addEventListener('click', function () { updateSelectedStatus('Approved'); });
+      rejectBtn && rejectBtn.addEventListener('click', function () { updateSelectedStatus('Rejected'); });
+      backToPendingBtn && backToPendingBtn.addEventListener('click', function () { updateSelectedStatus('Pending'); });
+
+      searchInput && searchInput.addEventListener('keyup', applyFilter);
+      searchButton && searchButton.addEventListener('click', applyFilter);
+
+      window.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeModal(); });
+
+      loadAppeals();
+    })();
+    // stop further (student) initialization on admin page
+    return;
+  }
 
 // Violation picker elements
 const violationToggle = document.getElementById('violationToggle');
