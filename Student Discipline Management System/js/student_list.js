@@ -564,9 +564,11 @@
     }
 
     function getSectionFromRow(row){
-      if (row.dataset && row.dataset.section) return normalize(row.dataset.section);
-      var sectionCell = row.querySelector && row.querySelector('[data-col="section"]');
-      if (sectionCell) return normalize(sectionCell.textContent || sectionCell.innerText);
+      if (row.dataset && row.dataset.grade) return normalize(row.dataset.grade);
+      try {
+        var cell = row.cells && row.cells[4];
+        if (cell) return normalize(cell.textContent || cell.innerText);
+      } catch(e){}
       return '';
     }
 
@@ -753,4 +755,5 @@
   window.editStudent = openEdit;
   window.deleteStudent = removeStudent;
   window.searchStudent = searchStudent;
+
 })();
