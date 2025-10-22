@@ -415,7 +415,7 @@
         <td>${v.student_name || '—'}</td>
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
-        <td>${v.offense_type || '—'}</td>
+        <td>${v.violation_type || '—'}</td>
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
