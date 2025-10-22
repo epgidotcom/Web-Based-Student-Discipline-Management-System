@@ -18,6 +18,30 @@ const router = Router();
 
 // List students (paginated)
 router.get('/', async (req, res) => {
+  // Support quick lookup by LRN (used by frontend to find newly-created student)
+  const lrnQuery = req.query.lrn;
+  if (lrnQuery) {
+    try {
+      try {
+        const { rows } = await query(
+          `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students where lrn = $1 limit 1`,
+          [lrnQuery]
+        );
+        if (rows.length === 0) return res.json([]);
+        return res.json(rows);
+      } catch (err) {
+        if (!isMissingColumnError(err, 'age')) throw err;
+        const { rows } = await query(
+          `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 limit 1`,
+          [lrnQuery]
+        );
+        if (rows.length === 0) return res.json([]);
+        return res.json([{ ...rows[0], age: null }]);
+      }
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
   const pageRaw = Number.parseInt(req.query.page, 10);
   const limitRaw = Number.parseInt(req.query.limit, 10);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
