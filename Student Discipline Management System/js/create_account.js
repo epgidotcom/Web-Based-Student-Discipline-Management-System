@@ -52,18 +52,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const hasAccess = allowedRoles.includes(role);
 
   //TEST ONLY remove comment in prod
-  if (!hasAccess) {
-    console.warn('[Accounts] Restricted area — no authenticated admin/teacher detected. Showing read-only view.');
-    if (msg) {
-      msg.textContent = 'Please log in as an Administrator or Teacher to manage accounts.';
-      msg.classList.add('warn');
-    }
-    form?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      alert('Please log in as an Administrator or Teacher to submit changes.');
-    });
-    return;
-  }
+  // if (!hasAccess) {
+  //   console.warn('[Accounts] Restricted area — no authenticated admin/teacher detected. Showing read-only view.');
+  //   if (msg) {
+  //     msg.textContent = 'Please log in as an Administrator or Teacher to manage accounts.';
+  //     msg.classList.add('warn');
+  //   }
+  //   form?.addEventListener('submit', (event) => {
+  //     event.preventDefault();
+  //     alert('Please log in as an Administrator or Teacher to submit changes.');
+  //   });
+  //   return;
+  // }
   //TEST ONLY remove comment in prod END
 
   async function loadAccounts(){
