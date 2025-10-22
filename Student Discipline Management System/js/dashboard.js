@@ -335,6 +335,37 @@ document.addEventListener("DOMContentLoaded", () => {
     return offenders;
   }
 
+  // New helper: compute unique students with >=3 violations in the 90-day window ending at `filters.to` (or today)
+  function computeRepeatOffenders90d(violationsList, filters) {
+    if (!Array.isArray(violationsList) || !violationsList.length) return 0;
+    const to = filters?.to ? new Date(filters.to) : new Date();
+    const toUTC = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+    const fromUTC = toUTC - 90 * 24 * 60 * 60 * 1000;
+    const gradeSel = (filters?.grade && filters.grade !== 'All') ? String(filters.grade).trim() : null;
+    const sectionSel = (filters?.section && filters.section !== 'All') ? String(filters.section).trim() : null;
+  const violSel = (filters?.violation && filters.violation !== 'All') ? String(filters.violation).trim() : null;
+  const violSelLower = violSel ? violSel.toLowerCase() : null;
+    const toUtcMs = (d) => {
+      const dt = toDate(d);
+      if (!isValidDate(dt)) return NaN;
+      return Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    };
+    const inScope = violationsList.filter((v) => {
+      const t = toUtcMs(v.incident_date || v.date || v.createdAt || v.createdAt);
+      if (Number.isNaN(t) || t < fromUTC || t > toUTC) return false;
+      if (gradeSel && String(v.grade)?.trim() !== gradeSel) return false;
+      if (sectionSel && String(v.section)?.trim() !== sectionSel) return false;
+      if (violSelLower) {
+        const vt = (v.violation_type ?? v.type ?? v.description ?? '')?.trim().toLowerCase();
+        if (vt !== violSelLower) return false;
+      }
+      return v.studentId ?? v.student_id ?? null;
+    });
+    const counts = new Map();
+    for (const v of inScope) counts.set(String(v.studentId ?? v.student_id), (counts.get(String(v.studentId ?? v.student_id)) ?? 0) + 1);
+    return [...counts.values()].filter((n) => n >= 3).length;
+  }
+
   function computeOpenCases(list) {
     return list.filter((v) => /pending|ongoing|open/i.test(v.status || '')).length;
   }
@@ -348,12 +379,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const totalStudents = totalStudentCount || students.length;
     const violations30 = violationStats?.last30 ?? computeViolationsLastNDays(violations, 30);
     const openCases = violationStats?.open_cases ?? computeOpenCases(violations);
-    const repeatOffenders = violationStats?.repeat_offenders_90 ?? computeRepeatOffenders(violations);
+    // compute repeat offenders respecting current filters and 90-day window ending at the 'To' filter (or today)
+    const currentFilters = {
+      to: els.dateTo?.value || null,
+      grade: els.filterGrade?.value || null,
+      section: els.filterSection?.value || null,
+      violation: els.filterType?.value || null,
+    };
+    const repeatCount = computeRepeatOffenders90d(violations, currentFilters);
 
     animateCount(metricEls.totalStudents, totalStudents);
     animateCount(metricEls.violations30, violations30);
     animateCount(metricEls.openCases, openCases);
-    animateCount(metricEls.repeatOffenders, repeatOffenders);
+    // animate the KPI like the others
+    animateCount(metricEls.repeatOffenders, repeatCount);
   }
 
   let chartTrend;
@@ -434,47 +473,6 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       chartTrend,
     );
-  }
-
-  function updateTopTypesChart(records) {
-    // Previously grouped by `violation_type` which produced "N/A" labels.
-    // Now group by `violation_description` and skip records without a valid description.
-    const counts = {};
-    records.forEach(r => {
-      // Use the human-readable description field
-      const desc = (r.violation_description || '').trim();
-      // Skip entries with no description to avoid "N/A" placeholder labels
-      if (!desc) return;
-      counts[desc] = (counts[desc] || 0) + 1;
-    });
-
-    // Convert counts to sorted arrays (top items first)
-    const entries = Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8); // keep top N (preserve original behavior if it limited items)
-
-    const labels = entries.map(e => e[0]);
-    const values = entries.map(e => e[1]);
-
-    // Update the existing Chart.js instance (chartTopTypes) exactly as before
-    if (typeof chartTopTypes !== 'undefined' && chartTopTypes) {
-      chartTopTypes.data.labels = labels;
-      chartTopTypes.data.datasets[0].data = values;
-      chartTopTypes.update();
-    }
-
-    // Maintain the existing empty-state behavior
-    const emptyEl = document.getElementById('emptyTypes');
-    if (emptyEl) {
-      emptyEl.classList.toggle('hidden', entries.length > 0);
-    }
-
-    // Update hint (if original code did so)
-    const hintEl = document.getElementById('typesHint');
-    if (hintEl) {
-      const total = values.reduce((s, v) => s + v, 0);
-      hintEl.textContent = total > 0 ? `${total} total` : '';
-    }
   }
 
   function renderTopTypes(list) {
