@@ -421,9 +421,10 @@
         <td>${v.sanction || '—'}</td>
         <td>${formatDate(v.created_at)}</td>
         <td>
-          <button class="action-btn" data-action="view" data-index="${idx}" title="View"><i class="fa fa-eye"></i></button>
-          <button class="action-btn edit-btn" data-action="edit" data-index="${idx}" title="Edit"><i class="fa fa-edit"></i></button>
-          <button class="action-btn delete-btn" data-action="delete" data-index="${idx}" title="Delete"><i class="fa fa-trash"></i></button>
+         <button class="action-btn" data-action="view" data-index="${idx}" title="View"><i class="fa fa-eye"></i></button>
+         <button class="action-btn edit-btn" data-action="edit" data-index="${idx}" title="Edit"><i class="fa fa-edit"></i></button>
+         <button class="action-btn resolve-btn" data-action="resolve" data-index="${idx}" title="Resolve"><i class="fa fa-check"></i></button>
+         <button class="action-btn delete-btn" data-action="delete" data-index="${idx}" title="Delete"><i class="fa fa-trash"></i></button>
         </td>
       `;
       row.dataset.incident = v.incident_date ? String(v.incident_date) : '';
@@ -738,6 +739,29 @@
     }
   }
 
+  async function handleResolve(index) {
+  const item = violations[index];
+  if (!item) return;
+
+  // Determine next status (optional: cycle)
+  const nextStatus = item.status === 'Pending' ? 'Resolved' :
+                     item.status === 'Resolved' ? 'Appealed' : 'Pending';
+
+  if (!confirm(`Change status to ${nextStatus}?`)) return;
+
+  try {
+    const res = await api(`/violations/${item.id}/status`, {
+      method: 'PATCH',
+      body: { status: nextStatus }
+    });
+    alert(res.message || `Status updated to ${nextStatus}`);
+    await refreshCurrentPage(); // refresh list
+  } catch (err) {
+    console.error('[violations] resolve failed', err);
+    alert(err.message || 'Failed to update status.');
+  }
+}
+
   // === Existing global search ===
   function filterTable() {
     const query = searchInput?.value?.toLowerCase() || '';
@@ -989,6 +1013,7 @@
       if (action === 'view') showViewModal(index);
       else if (action === 'edit') prepareEditModal(index);
       else if (action === 'delete') removeViolation(index);
+      else if (action === 'resolve') handleResolve(index);
     });
 
     // LRN lookup
