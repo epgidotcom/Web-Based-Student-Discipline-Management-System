@@ -92,6 +92,24 @@
   
 
   <script type="module" src="js/appeals.js"></script>
+  <script type="module">
+    import { api, getStudentId } from './js/api.js';
+    async function loadStudentProfile(){
+      const sid = getStudentId() || 'me';
+      try {
+        const profile = await api(`/students/${encodeURIComponent(sid)}`);
+        if(!profile) return;
+        const nameEl = document.getElementById('studentName');
+        const sectionEl = document.getElementById('studentSection');
+        const avatar = document.getElementById('studentAvatar');
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || profile.full_name || 'Student';
+        nameEl.textContent = fullName;
+        sectionEl.textContent = profile.grade ? `Grade ${profile.grade}${profile.section ? ' • Section ' + profile.section : ''}` : (profile.section ? `Section ${profile.section}`: '');
+        if(profile.photo_url) avatar.src = profile.photo_url;
+      } catch(e){ console.warn('Failed to load student profile', e); }
+    }
+    loadStudentProfile();
+  </script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>

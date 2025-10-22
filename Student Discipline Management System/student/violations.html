@@ -181,14 +181,89 @@
       if(barChart) barChart.destroy();
       if (rows === null || !rows.length) {
         // Render empty clean charts (no gridlines/labels) to keep layout stable when data is unavailable
-        lineChart=new Chart(document.getElementById('lineChart'),{type:'line',data:{labels:[],datasets:[{label:'Violations',data:[],borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}}}});
-        barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:[],datasets:[{label:'Count',data:[],backgroundColor:[]}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}}}});
+        lineChart = new Chart(document.getElementById('lineChart'), {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Violations',
+              data: [],
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231,76,60,0.3)',
+              fill: true,
+              tension: 0.3
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            responsive: true,
+            scales: {
+              x: { grid: { display: false }, ticks: { display: false } },
+              y: { grid: { display: false }, ticks: { display: false } }
+            }
+          }
+        });
+        barChart = new Chart(document.getElementById('barChart'), {
+          type: 'bar',
+          data: {
+            labels: [],
+            datasets: [{ label: 'Count', data: [], backgroundColor: [] }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            responsive: true,
+            scales: {
+              x: { grid: { display: false }, ticks: { display: false } },
+              y: { grid: { display: false }, ticks: { display: false } }
+            }
+          }
+        });
         return;
       }
       const labels=rows.map(v=>v.date);const counts=rows.map((_,i)=>i+1);
-  lineChart=new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}}}});
-      const byType={};rows.forEach(v=>{byType[v.type]=(byType[v.type]||0)+1});
-  barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},options:{plugins:{legend:{display:false}},responsive:true,scales:{ x:{grid:{display:false},ticks:{display:false}}, y:{grid:{display:false},ticks:{display:false}} }}});
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Violations',
+        data: counts,
+        borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231,76,60,0.3)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      responsive: true,
+      scales: {
+        x: { grid: { display: false }, ticks: { display: false } },
+        y: { grid: { display: false }, ticks: { display: false } }
+      }
+    }
+  });
+      const byType = {};
+      rows.forEach(v => { byType[v.type] = (byType[v.type] || 0) + 1 });
+  barChart = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(byType),
+      datasets: [{
+        label: 'Count',
+        data: Object.values(byType),
+        backgroundColor: ['#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c']
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      responsive: true,
+      scales: {
+        x: { grid: { display: false }, ticks: { display: false } },
+        y: { grid: { display: false }, ticks: { display: false } }
+      }
+    }
+  });
     }
 
     function applyFilters(){
