@@ -66,14 +66,25 @@ router.post('/', async (req, res) => {
           const acct = rows[0];
 
           if (role === 'Student') {
-            // Insert into students table 
-            await query(
-              `INSERT INTO students (id, full_name, lrn, section, grade, grade_level, age, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-              [acct.id, fullName.trim(), lrn || null, section || null, grade || null, grade || null, age || null, acct.createdAt]
-            );
+                        // Insert into students table using account_id key (some schemas use account_id as the FK)
+            // We avoid relying on legacy columns like grade_level/created_at and insert the common set.
+            try {
+              await query(
+                `INSERT INTO students (account_id, full_name, lrn, section, grade, age)
+                 VALUES ($1,$2,$3,$4,$5,$6)`,
+                [acct.id, fullName.trim(), lrn || null, section || null, grade || null, age || null]
+              );
+            } catch (innerErr) {
+              // If the schema uses id instead of account_id or different columns, attempt fallback
+              // to a more permissive insert to avoid failing account creation in mixed-schema setups.
+              console.warn('Student insert fallback, original error:', innerErr?.message || innerErr);
+              await query(
+                `INSERT INTO students (id, full_name, lrn, section, grade, age)
+                 VALUES ($1,$2,$3,$4,$5,$6)`,
+                [acct.id, fullName.trim(), lrn || null, section || null, grade || null, age || null]
+              );
+            }
           }
-
           await query('COMMIT');
 
           const result = { ...acct, age: role === 'Student' ? (age || null) : null };
