@@ -588,29 +588,70 @@
     openModal(violationModal);
   }
 
-  function showViewModal(index) {
-    const item = violations[index];
-    if (!item) return;
-    viewStudent.textContent = item.student_name || '—';
-    viewGradeSection.textContent = item.grade_section || '—';
-    viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
-    viewAddedDate.textContent = formatDate(item.created_at) || '—';
-    violationTypeField.value = item.description || item.offense_type || '';
-    viewSanction.textContent = item.sanction || '—';
-    
-    const remarksRow = document.createElement('div');
-    remarksRow.classList.add('detail-row');
-    remarksRow.innerHTML = `<span class="label">Remarks</span><span class="value multiline">${item.remarks || '—'}</span>`;
-    document.querySelector('.violation-body').appendChild(remarksRow);
+    function showViewModal(index) {
+      const item = violations[index];
+      if (!item) return;
 
-    const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
-    if (history.length) {
-      viewPastOffenseRow.classList.remove('is-hidden');
-      viewPastOffense.textContent = `${history.length} earlier case${history.length > 1 ? 's' : ''}`;
-    } else {
-      viewPastOffenseRow.classList.add('is-hidden');
-      viewPastOffense.textContent = '';
-    }
+      // === Current Offense Details ===
+      viewStudent.textContent = item.student_name || '—';
+      viewGradeSection.textContent = item.grade_section || '—';
+      viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
+      viewAddedDate.textContent = formatDate(item.created_at) || '—';
+      violationTypeField.value =  item.offense_type || '—';
+      viewSanction.textContent = item.sanction || '—';
+      remarksField.textContent = item.remarks || '-';
+      // === All Offense Cards ===
+      const allWrap = document.getElementById('viewAllOffensesWrap');
+      const allContainer = document.getElementById('viewAllOffenses');
+      allContainer.innerHTML = '';
+
+      const allOffenses = violations
+        .filter(v => v.student_id === item.student_id)
+        .sort((a, b) => new Date(a.incident_date) - new Date(b.incident_date));
+
+      if (allOffenses.length) {
+        allWrap.classList.remove('is-hidden');
+
+        // ensure one-time badge styles exist
+        if (!document.getElementById('sdms-status-badge-style')) {
+          const style = document.createElement('style');
+          style.id = 'sdms-status-badge-style';
+          style.textContent = `
+            .status-badge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:600; }
+            .status-pending  { background:#FEF3C7; color:#92400E; }   /* amber */
+            .status-approved { background:#DCFCE7; color:#166534; }   /* green */
+            .status-rejected { background:#FEE2E2; color:#991B1B; }   /* red */
+          `;
+          document.head.appendChild(style);
+        }
+
+        allOffenses.forEach((off, i) => {
+          const card = document.createElement('div');
+          card.className = 'offense-card';
+
+          // derive normalized status + badge class; default to 'pending'
+          const rawStatus = (off.status || 'pending').toString().trim().toLowerCase();
+          const statusNorm = ['approved', 'rejected', 'pending'].includes(rawStatus) ? rawStatus : 'pending';
+          const badgeClass = `status-badge status-${statusNorm}`;
+          const statusLabel = statusNorm.charAt(0).toUpperCase() + statusNorm.slice(1);
+
+          card.innerHTML = `
+            <div class="offense-header">
+              <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
+            </div>
+            <div class="offense-body">
+              <div><strong>Violation Type:</strong> ${off.offense_type || '—'}</div>
+              <div><strong>Description:</strong> ${off.description || '—'}</div>
+              <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
+              <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
+              <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
+            </div>
+          `;
+          allContainer.appendChild(card);
+        });
+      } else {
+        allWrap.classList.add('is-hidden');
+      }
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     if (files.length) {
@@ -652,7 +693,6 @@
       student_id: studentId,
       grade_section: gradeSectionField?.value?.trim() || null,
       offense_type: violationTypeField?.value || null,
-      description: descriptionField?.value?.trim() || null,
       sanction: sanctionField?.value || null,
       remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
@@ -739,7 +779,6 @@
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
-      const description = row.cells[4]?.textContent.toLowerCase() || '';
       const rowText = row.innerText.toLowerCase();
 
       const matchStrand = !strand || gradeSection.includes(strand);
@@ -835,7 +874,7 @@
     window.onafterprint = cleanupPrintArtifacts;
   }
 
-  // === NEW: Download (CSV) of the currently filtered/visible rows ===
+   // === NEW: Download (CSV) of the currently filtered/visible rows ===
   function downloadFilteredReport() {
     const table = document.getElementById('violationTable');
     if (!table) return;
@@ -994,21 +1033,20 @@
 
     // filter + print
     applyFilterBtn?.addEventListener('click', applyFilters);
-  filterStrand?.addEventListener('change', applyFilters);
-  filterViolationType?.addEventListener('change', applyFilters);
-  filterText?.addEventListener('input', applyFilters); // <-- fixed typo here
+    filterStrand?.addEventListener('change', applyFilters);
+    filterViolationType?.addEventListener('change', applyFilters);
+      filterText?.addEventListener('input', applyFilters); // <-- fixed typo here
 
-if (printReportBtn) {
-  printReportBtn.textContent = 'Download Report';
-  printReportBtn.title = 'Download the filtered rows as CSV';
-  // avoid duplicate handlers when bindEvents runs more than once
-  printReportBtn.removeEventListener?.('click', printFilteredReport);
-  printReportBtn.removeEventListener?.('click', downloadFilteredReport);
-  printReportBtn.addEventListener('click', downloadFilteredReport);
-  }
+    if (printReportBtn) {
+      printReportBtn.textContent = 'Download Report';
+      printReportBtn.title = 'Download the filtered rows as CSV';
+      // avoid duplicate handlers when bindEvents runs more than once
+      printReportBtn.removeEventListener?.('click', printFilteredReport);
+      printReportBtn.removeEventListener?.('click', downloadFilteredReport);
+      printReportBtn.addEventListener('click', downloadFilteredReport);
+      }
+    }
 
-  }
-  
   async function init() {
     ensureModalZStack();
     bindEvents();

@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("accountForm");
   const tableBody = document.querySelector('#accountsTable tbody');
   const msg = document.getElementById('accountMsg');
-  const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || '';
+  const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '';
 
   const gradeField = document.getElementById("grade");
   const sectionGroup = document.getElementById("sectionGroup");
@@ -93,7 +93,8 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${acc.email || ''}</td>
         <td>${acc.role || ''}</td>
         <td>${acc.age ?? ''}</td>
-        <td>${acc.role === 'Student' ? ((acc.grade || '') + (acc.section ? (' / ' + acc.section) : '') + (acc.lrn ? (' / ' + acc.lrn) : '')) : ''}</td>
+        <td>${acc.grade || ''}</td>
+        <td>${acc.role === 'Student' ? ((acc.section ? acc.section : '') + (acc.lrn ? (' / ' + acc.lrn) : '')) : ''}</td>
         <td>
           <button class="action-btn delete-btn" data-id="${acc.id}" title="Delete"><i class="fa fa-trash"></i></button>
         </td>
@@ -158,7 +159,24 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(newUser)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const created = await res.json();
+      // Prefer the canonical student row returned by the server when present
+      const studentPayload = created && created.student ? created.student : null;
       await loadAccounts();
+      // Notify other pages (student list) that a new student was created so they can refresh
+      try {
+        const key = 'sdms:student_created_data';
+        // include the student row if present; otherwise include minimal account info
+        const payload = studentPayload ? studentPayload : { id: created.id, full_name: created.fullName, grade: created.grade, section: created.section, lrn: created.lrn, age: created.age };
+        localStorage.setItem(key, JSON.stringify({ ts: Date.now(), payload }));
+        if (window.BroadcastChannel) {
+          const bc = new BroadcastChannel('sdms_events');
+          bc.postMessage({ type: 'student-created', payload });
+          bc.close();
+        }
+      } catch (e) {
+        // ignore
+      }
       alert(`${role} account created successfully!`);
       form.reset();
       gradeGroup.style.display = "none";
