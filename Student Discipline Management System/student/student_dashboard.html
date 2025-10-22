@@ -30,10 +30,12 @@
       </div>
       <div class="profile">
         <div class="name-grade">
-          <strong>Student</strong>
-          <small>Grade idk • Section idk</small>
+          <strong id="studentName">Student</strong>
+          <small id="studentMeta">Grade idk • Section idk</small>
+          <!-- account selector shown when multiple linked accounts exist -->
+          <select id="studentSelector" style="display:none;margin-top:6px;"></select>
         </div>
-  <img src="../images/mpnag_logo.png" alt="Avatar" class="avatar"/>
+        <img id="studentAvatar" src="../images/mpnag_logo.png" alt="Avatar" class="avatar"/>
       </div>
     </header>
     <!-- Welcome banner (populated with production data when available) -->
@@ -88,8 +90,10 @@
     import { api, getStudentId } from './js/api.js';
     let violations = [];
     let lineChart, barChart;
+    let currentStudentId = null;
 
     // Populate profile area (name and grade/section) using student profile endpoint
+    // Accept optional studentId so caller can request a specific linked account.
     async function loadProfile(studentId){
       try {
         if (!studentId) return null;
@@ -102,23 +106,47 @@
       }
     }
 
+    // Update profile area and (if available) render an account selector when multiple
+    // linked accounts are present on the profile or the auth user object.
     function updateProfileUI(profile){
       if (!profile) return;
       try {
-        const nameEl = document.querySelector('.name-grade strong');
-        const metaEl = document.querySelector('.name-grade small');
-        const avatarEl = document.querySelector('.profile .avatar');
-        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim();
-        if (nameEl) nameEl.textContent = fullName || (profile.full_name || 'Student');
+        const nameEl = document.getElementById('studentName');
+        const metaEl = document.getElementById('studentMeta');
+        const avatarEl = document.getElementById('studentAvatar');
+        const selector = document.getElementById('studentSelector');
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || (profile.full_name || 'Student');
+        if (nameEl) nameEl.textContent = fullName;
         if (metaEl) metaEl.textContent = `${profile.grade ? 'Grade ' + profile.grade : ''}${profile.grade && profile.section ? ' • ' : ''}${profile.section || ''}`;
         if (avatarEl && profile.photo_url) avatarEl.src = profile.photo_url;
 
-        // Welcome banner (production-ready: populated from profile)
+        // If the profile contains linked_accounts (array of accounts), populate selector
+        const linked = Array.isArray(profile.linked_accounts) && profile.linked_accounts.length ? profile.linked_accounts : (profile.accounts || null);
+        if (!selector) return;
+        if (linked && linked.length > 1) {
+          selector.innerHTML = '';
+          linked.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id || a.student_id || a.lrn || a.account_id || a.id;
+            opt.textContent = a.displayName || ( (a.first_name || a.full_name) ? `${(a.first_name||a.full_name)}${a.last_name ? ' ' + a.last_name : ''}` : (a.lrn || a.id) );
+            selector.appendChild(opt);
+          });
+          selector.value = currentStudentId || selector.options[0].value;
+          selector.style.display = '';
+          selector.onchange = () => {
+            currentStudentId = selector.value;
+            loadData(currentStudentId);
+          };
+        } else {
+          selector.style.display = 'none';
+        }
+
+        // Welcome banner text update (re-use existing banner elements)
         const banner = document.getElementById('welcomeBanner');
         const welcomeTitle = document.getElementById('welcomeTitle');
         const welcomeSubtitle = document.getElementById('welcomeSubtitle');
         const welcomeIllustration = document.getElementById('welcomeIllustration');
-        if (welcomeTitle) welcomeTitle.textContent = `Welcome back, ${fullName || profile.full_name || 'Student'}`;
+        if (welcomeTitle) welcomeTitle.textContent = `Welcome back, ${fullName}`;
         if (welcomeSubtitle) welcomeSubtitle.textContent = profile.welcome_message || `You have ${profile.pending_appeals || 0} pending appeal(s).`;
         const welcomeIcon = document.getElementById('welcomeIcon');
         if (welcomeIllustration && profile.banner_image_url) {
@@ -127,13 +155,16 @@
           welcomeIllustration.style.display = '';
           if (welcomeIcon) welcomeIcon.style.display = 'none';
         } else {
-          // no image — show the decorative icon like production
           if (welcomeIllustration) welcomeIllustration.style.display = 'none';
           if (welcomeIcon) welcomeIcon.style.display = '';
         }
-  // banner is visible by default; we just replace text when profile loads
-  if (banner) banner.style.display = '';
+        if (banner) banner.style.display = '';
       } catch (e){ console.warn('updateProfileUI error', e); }
+    }
+
+    // Helper that reads auth user object for linked accounts (if available)
+    function getAuthUser() {
+      return window.SDMSAuth && typeof window.SDMSAuth.getUser === 'function' ? window.SDMSAuth.getUser() : null;
     }
 
     function updateCards(){
@@ -236,14 +267,25 @@
     }
 
     async function loadData(){
-      const studentId = getStudentId();
+      // allow caller to pass specific student id (from selector). default to getStudentId() or 'me'
+      const studentId = arguments.length ? arguments[0] : getStudentId();
+      currentStudentId = studentId || currentStudentId || 'me';
       // load profile first to replace hardcoded name/grade
-      const profile = await loadProfile(studentId || 'me');
-      updateProfileUI(profile);
+      let profile = null;
+      try {
+        profile = await loadProfile(currentStudentId || 'me');
+      } catch (e) { profile = null; }
+      // if auth user exposes linked accounts, merge minimally for selector population
+      const authUser = getAuthUser();
+      if (authUser && authUser.linked_accounts && Array.isArray(authUser.linked_accounts) && authUser.linked_accounts.length) {
+        profile = profile || {};
+        profile.linked_accounts = authUser.linked_accounts;
+      }
+      updateProfileUI(profile || (authUser || {}));
 
       try {
         // use snake_case query name expected by backend; server also enforces student scoping
-        const data = await api(`/violations?student_id=${encodeURIComponent(studentId||'me')}`);
+        const data = await api(`/violations?student_id=${encodeURIComponent(currentStudentId||'me')}`);
         violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({
           date: (v.date || v.created_at || '').slice(0,10),
             type: v.type || v.violation_type || v.offense || 'Unknown',
@@ -260,7 +302,8 @@
       renderTable();
       renderCharts();
     }
-    loadData();
+    // initial load; pick any explicitly-provided student id (getStudentId) or default to 'me'
+    loadData(getStudentId() || 'me');
   </script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>

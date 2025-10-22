@@ -64,6 +64,7 @@
   // and `null` when the fetch failed (connection/server error).
   let violations = [];
     let lineChart, barChart;
+    let currentStudentId = null;
 
     // Load student profile and show name/grade in the page header
     async function loadProfile(studentId){
@@ -84,6 +85,7 @@
         if (!titleEl) return;
         // avoid duplicating if run multiple times
         let meta = document.getElementById('studentProfileMeta');
+        let selector = document.getElementById('studentSelector');
         if (!meta) {
           meta = document.createElement('div');
           meta.id = 'studentProfileMeta';
@@ -91,25 +93,57 @@
           meta.style.fontSize = '0.95rem';
           titleEl.appendChild(meta);
         }
+        if (!selector) {
+          selector = document.createElement('select');
+          selector.id = 'studentSelector';
+          selector.style.display = 'none';
+          selector.style.marginTop = '6px';
+          titleEl.appendChild(selector);
+        }
         const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || (profile.full_name || 'Student');
         const grade = profile.grade ? `Grade ${profile.grade}` : '';
         const section = profile.section ? `Section ${profile.section}` : '';
         meta.innerHTML = `<strong style="display:block">${fullName}</strong><small style="color:var(--muted, #666)">${grade}${grade && section ? ' • ' : ''}${section}</small>`;
+
+        // Populate selector if linked accounts are present
+        const linked = Array.isArray(profile.linked_accounts) && profile.linked_accounts.length ? profile.linked_accounts : (profile.accounts || null);
+        if (linked && linked.length > 1) {
+          selector.innerHTML = '';
+          linked.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id || a.student_id || a.lrn || a.account_id || a.id;
+            opt.textContent = a.displayName || ( (a.first_name||a.full_name) ? `${(a.first_name||a.full_name)}${a.last_name ? ' ' + a.last_name : ''}` : (a.lrn || a.id) );
+            selector.appendChild(opt);
+          });
+          selector.value = currentStudentId || selector.options[0].value;
+          selector.style.display = '';
+          selector.onchange = () => {
+            currentStudentId = selector.value;
+            loadViolations(currentStudentId);
+          };
+        } else {
+          selector.style.display = 'none';
+        }
       } catch (e) { console.warn('updateProfileUI error', e); }
     }
 
     async function loadViolations(){
-      const studentId = getStudentId();
+      // allow selector to control student id; fall back to getStudentId()
+      const studentId = currentStudentId || getStudentId();
+      currentStudentId = studentId || currentStudentId || 'me';
       // load profile (best-effort) and update UI
       try {
-        const profile = await loadProfile(studentId || 'me');
+        const profile = await loadProfile(currentStudentId || 'me');
+        // if auth user provides linked accounts merge minimally
+        const authUser = window.SDMSAuth && typeof window.SDMSAuth.getUser === 'function' ? window.SDMSAuth.getUser() : null;
+        if (authUser && authUser.linked_accounts) { profile.linked_accounts = authUser.linked_accounts; }
         updateProfileUI(profile);
       } catch (e) {
         // continue even if profile fails
       }
       try {
         // Prefer a dedicated endpoint if available; fallback to generic with query.
-        const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
+        const data = await api(`/violations?studentId=${encodeURIComponent(currentStudentId||'me')}`);
         // Normalize expected shape
         violations = (Array.isArray(data) ? data : data.rows || [])
           .map(v => ({
@@ -175,8 +209,9 @@
     }
     document.getElementById('applyBtn').addEventListener('click',applyFilters);
     document.getElementById('resetBtn').addEventListener('click',resetFilters);
+    // initial load (selector will be populated if profile or auth user supplies linked accounts)
     loadViolations();
-  </script>
+   </script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>
