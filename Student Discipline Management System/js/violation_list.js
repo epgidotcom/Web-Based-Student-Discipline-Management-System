@@ -417,7 +417,7 @@
         <td>${formatDate(v.incident_date)}</td>
         <td>${v.violation_type || '—'}</td>
         <td>${pastOffense}</td>
-        <td>${totalViolations}</td> <!-- 🆕 Added new column -->
+        <td>${totalViolations}</td> 
         <td>${v.sanction || '—'}</td>
         <td>${formatDate(v.created_at)}</td>
         <td>
@@ -515,7 +515,7 @@
 
   async function loadStudents() {
     try {
-      const params = new URLSearchParams({ page: '1', limit: '1000' });
+      const params = new URLSearchParams({ page: '1', limit: '100' });
       const payload = await api(`/students?${params.toString()}`);
       const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
       students = data;
