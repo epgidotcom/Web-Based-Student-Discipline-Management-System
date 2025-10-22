@@ -1,20 +1,50 @@
-import { api } from './api.js';
+(async function () {
+  // Acquire an `api` helper at runtime. We avoid a static `import` so this file can be loaded
+  // as a classic script (admin page) or as a module (student page). Resolve import paths
+  // relative to the current script to handle different include locations.
+  let api = window.api || null;
+  const scriptSrc = (document.currentScript && document.currentScript.src) || window.location.href;
+  const scriptBase = scriptSrc.substring(0, scriptSrc.lastIndexOf('/') + 1);
 
-const API_ORIGIN = (window.SDMS_CONFIG?.API_BASE || 'https://sdms-backend.onrender.com').replace(/\/+$/, '');
-const API_ROOT = (window.API_BASE || `${API_ORIGIN}/api`).replace(/\/+$/, '');
-const APPEALS_BASE = `${API_ROOT}/appeals`;
+  async function tryImportApi() {
+    const candidates = [
+      new URL('api.js', scriptBase).href,
+      new URL('js/api.js', window.location.origin + '/').href,
+      new URL('Student Discipline Management System/js/api.js', window.location.origin + '/').href
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+      const url = candidates[i];
+      try {
+        const mod = await import(/* webpackIgnore: true */ url);
+        if (mod && mod.api) { api = mod.api; return; }
+      } catch (e) {
+        // try next
+      }
+    }
+  }
 
-const state = {
-  appeals: [],
-  selectedAppealId: null,
-  messages: [],
-  loadingMessages: false
-};
+  try {
+    if (!api) await tryImportApi();
+  } catch (e) {
+    console.warn('[appeals] dynamic import of api failed, falling back to window.api', e);
+    api = window.api || null;
+  }
 
-const appealRows = document.getElementById('appealRows');
-const appealForm = document.getElementById('appealForm');
-const violationInput = document.getElementById('violationText');
-const reasonInput = document.getElementById('appealReason');
+  const API_ORIGIN = ((window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || 'https://sdms-backend.onrender.com').replace(/\/+$/, '');
+  const API_ROOT = (window.API_BASE || (API_ORIGIN + '/api')).replace(/\/+$/, '');
+  const APPEALS_BASE = API_ROOT + '/appeals';
+
+  const state = {
+    appeals: [],
+    selectedAppealId: null,
+    messages: [],
+    loadingMessages: false
+  };
+
+  const appealRows = document.getElementById('appealRows');
+  const appealForm = document.getElementById('appealForm');
+  const violationInput = document.getElementById('violationText');
+  const reasonInput = document.getElementById('appealReason');
 
 // Violation picker elements
 const violationToggle = document.getElementById('violationToggle');
@@ -23,13 +53,43 @@ const violationListEl = document.getElementById('violationList');
 const violationSearch = document.getElementById('violationSearch');
 
 let violationsCatalog = [];
+// Resolve asset URLs in a way that works for both module and classic script contexts
+function assetUrl(path) {
+  // Try several plausible locations for the asset without referencing import.meta (invalid in classic scripts)
+  var candidates = [];
+  var cs = document.currentScript && document.currentScript.src;
+  if (cs) {
+    candidates.push(new URL(path, cs).href);
+  }
+  // relative to page
+  candidates.push(new URL(path, window.location.href).href);
+  // common JS folder fallbacks
+  candidates.push(window.location.origin + '/js/' + path.replace(/^\/+/, ''));
+  candidates.push(window.location.origin + '/Student Discipline Management System/js/' + path.replace(/^\/+/, ''));
+
+  return candidates[0]; // we will attempt fetches in loadViolationsCatalog using these candidates sequentially
+}
 
 async function loadViolationsCatalog(){
   try {
-  // prefer local copy shipped with student bundle
-  // use import.meta.url so the path resolves relative to this module file in production
-  const res = await fetch(new URL('./school_violations.json', import.meta.url).href, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load violations catalog');
+    // try candidate URLs until one succeeds
+    var candidates = [];
+    var cs = document.currentScript && document.currentScript.src;
+    if (cs) candidates.push(new URL('./school_violations.json', cs).href);
+    candidates.push(new URL('./school_violations.json', window.location.href).href);
+    candidates.push(window.location.origin + '/js/school_violations.json');
+    candidates.push(window.location.origin + '/Student Discipline Management System/js/school_violations.json');
+
+    var res = null;
+    for (var i = 0; i < candidates.length; i++) {
+      try {
+        res = await fetch(candidates[i], { cache: 'no-store' });
+        if (res.ok) break;
+      } catch (e) {
+        res = null;
+      }
+    }
+    if (!res || !res.ok) throw new Error('Failed to load violations catalog');
     const payload = await res.json();
     const categories = payload?.school_policy?.categories || [];
     // flatten into id + description entries
