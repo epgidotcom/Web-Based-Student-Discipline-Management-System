@@ -142,8 +142,9 @@
         // continue even if profile fails
       }
       try {
-        // Prefer a dedicated endpoint if available; fallback to generic with query.
-        const data = await api(`/violations?studentId=${encodeURIComponent(currentStudentId||'me')}`);
+  // Request violations scoped to the logged-in student (use LRN/student_id from getStudentId)
+  // The backend expects `student_id` (snake_case) to enforce proper filtering.
+  const data = await api(`/violations?student_id=${encodeURIComponent(currentStudentId||'me')}`);
         // Normalize expected shape
         violations = (Array.isArray(data) ? data : data.rows || [])
           .map(v => ({
