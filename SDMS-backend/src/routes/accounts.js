@@ -52,18 +52,15 @@ router.post('/', async (req, res) => {
         await query('BEGIN');
         try {
           const { rows } = await query(
-            `INSERT INTO accounts (full_name, email, username, password_hash, role, grade, lrn, section)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            `INSERT INTO accounts (full_name, email, username, password_hash, role)
+             VALUES ($1,$2,$3,$4,$5)
              RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
             [
               fullName.trim(),
               email.toLowerCase().trim(),
               username.toLowerCase().trim(),
               hash,
-              role,
-              role === 'Student' ? (grade || null) : null,
-              role === 'Student' ? (lrn || null) : null,
-              role === 'Student' ? (section || null) : null
+              role
             ]
           );
           const acct = rows[0];
@@ -71,9 +68,9 @@ router.post('/', async (req, res) => {
           if (role === 'Student') {
             // Insert into students table 
             await query(
-              `INSERT INTO students (account_id, full_name, lrn, section, grade, age, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-              [acct.id, fullName.trim(), lrn || null, section || null, grade || null, age || null, acct.createdAt]
+              `INSERT INTO students (id, full_name, lrn, section, grade, grade_level, age, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+              [acct.id, fullName.trim(), lrn || null, section || null, grade || null, grade || null, age || null, acct.createdAt]
             );
           }
 
@@ -95,7 +92,7 @@ router.post('/', async (req, res) => {
       const { rows } = await query(
         `INSERT INTO accounts (full_name, email, username, password_hash, role)
          VALUES ($1,$2,$3,$4,$5)
-         RETURNING id, full_name AS "fullName", email, username, role, grade, lrn, section, created_at AS "createdAt"`,
+         RETURNING id, full_name AS "fullName", email, username, role, created_at AS "createdAt"`,
         [fullName.trim(), email.toLowerCase().trim(), username.toLowerCase().trim(), hash, role]
       );
       res.status(201).json({ ...rows[0], age: null, bootstrap: true });
