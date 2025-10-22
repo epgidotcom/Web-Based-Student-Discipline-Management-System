@@ -419,12 +419,17 @@
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
+        <td>
+        <span class="status-badge ${v.status ? v.status.toLowerCase() : 'pending'}">
+        ${v.status || 'Pending'}
+        </span>
+        </td>
         <td>${formatDate(v.created_at)}</td>
         <td>
-         <button class="action-btn" data-action="view" data-index="${idx}" title="View"><i class="fa fa-eye"></i></button>
-         <button class="action-btn edit-btn" data-action="edit" data-index="${idx}" title="Edit"><i class="fa fa-edit"></i></button>
-         <button class="action-btn resolve-btn" data-action="resolve" data-index="${idx}" title="Resolve"><i class="fa fa-check"></i></button>
-         <button class="action-btn delete-btn" data-action="delete" data-index="${idx}" title="Delete"><i class="fa fa-trash"></i></button>
+        <button class="action-btn" data-action="view" data-index="${idx}" title="View"><i class="fa fa-eye"></i></button>
+        <button class="action-btn edit-btn" data-action="edit" data-index="${idx}" title="Edit"><i class="fa fa-edit"></i></button>
+        <button class="action-btn resolve-btn" data-action="resolve" data-index="${idx}" title="Resolve"><i class="fa fa-check"></i></button>
+        <button class="action-btn delete-btn" data-action="delete" data-index="${idx}" title="Delete"><i class="fa fa-trash"></i></button>
         </td>
       `;
       row.dataset.incident = v.incident_date ? String(v.incident_date) : '';
