@@ -4,6 +4,7 @@ import { query } from '../db.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const TOKEN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
+//TEST ONLY remove comment in production
 export function signToken(account){
   return jwt.sign({
     sub: account.id,
@@ -63,3 +64,41 @@ export async function tryGetUser(req){
     return null;
   }
 }
+//TEST ONLY remove comment in production END
+
+//TEST ONLY REMOVE THIS IN PRODUCTION
+// export function signToken(account) {
+//   // Return a placeholder token or success message
+//   return 'mock-token-success';
+// }
+
+// export async function requireAuth(req, res, next) {
+//   // Skip token checks — automatically authenticate
+//   req.user = { 
+//     id: 1,
+//     full_name: 'Demo User',
+//     email: 'demo@example.com',
+//     username: 'demo',
+//     role: 'Admin',
+//     grade: 'N/A'
+//   };
+//   next(); // Continue the request
+// }
+
+// export function requireAdmin(req, res, next) {
+//   // Always allow
+//   next();
+// }
+
+// export async function tryGetUser(req) {
+//   // Always return a mock user
+//   return {
+//     id: 1,
+//     full_name: 'Demo User',
+//     email: 'demo@example.com',
+//     username: 'demo',
+//     role: 'Admin',
+//     grade: 'N/A'
+//   };
+// }
+//TEST ONLY REMOVE THIS IN PRODUCTION END

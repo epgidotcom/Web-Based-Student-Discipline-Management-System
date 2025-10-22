@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const allowedRoles = ['admin', 'teacher'];
   const hasAccess = allowedRoles.includes(role);
 
+  //TEST ONLY remove comment in prod
   if (!hasAccess) {
     console.warn('[Accounts] Restricted area — no authenticated admin/teacher detected. Showing read-only view.');
     if (msg) {
@@ -63,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     return;
   }
-
+  //TEST ONLY remove comment in prod END
 
   async function loadAccounts(){
     try{

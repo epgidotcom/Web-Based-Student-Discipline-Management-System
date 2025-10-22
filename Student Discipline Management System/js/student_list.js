@@ -179,6 +179,8 @@
 
     source.forEach((s, i) => {
       const row = document.createElement('tr');
+      if (s.section) row.dataset.section = s.section;
+      
       const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
       const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
@@ -431,22 +433,20 @@
   }
 
   function searchStudent(){
-    const input = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    const input = document.getElementById('searchInput')?.value || '';
     document.querySelectorAll('#studentTable tbody tr').forEach(row => {
-      const text = row.innerText.toLowerCase();
+      const text = row.innerText;
       row.style.display = text.includes(input) ? '' : 'none';
     });
   }
 
   (function(){
     function normalize(v){
-      return (v || '').toString().trim().toLowerCase();
+      return (v || '').toString().trim();
     }
 
     function getGradeFromRow(row){
-      // prefer data-grade attribute
       if (row.dataset && row.dataset.grade) return normalize(row.dataset.grade);
-      // fallback to Grade column (index 3)
       try {
         var cell = row.cells && row.cells[3];
         if (cell) return normalize(cell.textContent || cell.innerText);
@@ -454,13 +454,10 @@
       return '';
     }
 
-    function getStrandFromRow(row){
-      // prefer data-strand attribute
-      if (row.dataset && row.dataset.strand) return normalize(row.dataset.strand);
-      // optional fallback: try to find a cell marked for strand (data-col="strand")
-      var strandCell = row.querySelector && row.querySelector('[data-col="strand"]');
-      if (strandCell) return normalize(strandCell.textContent || strandCell.innerText);
-      // if no strand info is present, return empty -> will be treated as non-matching when a strand filter is active
+    function getSectionFromRow(row){
+      if (row.dataset && row.dataset.section) return normalize(row.dataset.section);
+      var sectionCell = row.querySelector && row.querySelector('[data-col="section"]');
+      if (sectionCell) return normalize(sectionCell.textContent || sectionCell.innerText);
       return '';
     }
 
@@ -481,7 +478,7 @@
     }
 
     function applyDropdownFilters(){
-      var selStrand = normalize(document.getElementById('filterStrand') && document.getElementById('filterStrand').value);
+      var selSection = normalize(document.getElementById('filterSection') && document.getElementById('filterSection').value);
       var selGrade  = normalize(document.getElementById('filterGrade') && document.getElementById('filterGrade').value);
 
       var table = document.getElementById('studentTable');
@@ -501,20 +498,19 @@
         }
 
         var rowGrade = getGradeFromRow(row);
-        var rowStrand = getStrandFromRow(row);
+        var rowSection = getSectionFromRow(row);
 
         var matchesGrade = true;
-        var matchesStrand = true;
+        var matchesSection = true;
 
         if (selGrade) {
           matchesGrade = (rowGrade === selGrade || rowGrade === ('grade ' + selGrade));
         }
-        if (selStrand) {
-          // require exact match on strand; rows without strand info will not match
-          matchesStrand = (rowStrand === selStrand);
+        if (selSection) {
+          matchesSection = (rowSection === selSection);
         }
 
-        var keep = matchesGrade && matchesStrand;
+        var keep = matchesGrade && matchesSection;
         row.style.display = keep ? '' : 'none';
         if (keep) visibleCount++;
       });
@@ -527,10 +523,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', function(){
-      var filterStrand = document.getElementById('filterStrand');
+      var filterSection = document.getElementById('filterSection');
       var filterGrade  = document.getElementById('filterGrade');
 
-      if (filterStrand) filterStrand.addEventListener('change', applyDropdownFilters);
+      if (filterSection) filterSection.addEventListener('change', applyDropdownFilters);
       if (filterGrade)  filterGrade.addEventListener('change', applyDropdownFilters);
 
       // ensure summary reflects initial state
