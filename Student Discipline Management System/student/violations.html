@@ -68,14 +68,38 @@
 
     // Load student profile and show name/grade in the page header
     async function loadProfile(studentId){
-      try {
-        if (!studentId) return null;
-        const profile = await api(`/students/${encodeURIComponent(studentId)}`);
-        return profile;
-      } catch (e) {
-        console.warn('Failed to load student profile', e);
-        return null;
-      }
+          try {
+            // Prefer client-side auth user when available (less error-prone than numeric DB id)
+            const authUser = window.SDMSAuth && typeof window.SDMSAuth.getUser === 'function' ? window.SDMSAuth.getUser() : null;
+            if (authUser) return authUser;
+
+            if (!studentId) return null;
+
+            // Try fetching by id first. Some tokens contain numeric DB id, others contain LRN which
+            // won't match the DB id column. If fetch returns 404, fallback to listing students
+            // and match by `lrn` or `id`.
+            try {
+              const profile = await api(`/students/${encodeURIComponent(studentId)}`);
+              return profile;
+            } catch (err) {
+              // If not found, attempt a best-effort lookup by LRN against the students list
+              if (err && /404/.test(err.message || '')) {
+                try {
+                  const list = await api(`/students?page=1&limit=500`);
+                  const rows = Array.isArray(list?.data) ? list.data : (Array.isArray(list) ? list : []);
+                  const found = rows.find(r => String(r.lrn) === String(studentId) || String(r.id) === String(studentId));
+                  if (found) return found;
+                } catch (ee) {
+                  // swallow — we'll log below
+                }
+              }
+              console.warn('Failed to load student profile', err);
+              return null;
+            }
+          } catch (e) {
+            console.warn('Failed to load student profile', e);
+            return null;
+          }
     }
 
     function updateProfileUI(profile){
