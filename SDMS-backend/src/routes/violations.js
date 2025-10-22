@@ -91,6 +91,7 @@ router.get('/', async (req, res) => {
         v.sanction, 
         v.incident_date,
         v.status,
+        v.remarks,
         v.repeat_count_at_insert,
         v.evidence,
         v.created_at,
@@ -155,7 +156,7 @@ router.get('/stats', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { rows } = await query(
-      'SELECT id, student_id, student_name, grade_section, description AS violation_type, sanction, incident_date, status, repeat_count_at_insert, evidence, created_at, updated_at FROM violations WHERE id = $1',
+      'SELECT id, student_id, student_name, grade_section, description AS violation_type, sanction, remarks, incident_date, status, repeat_count_at_insert, evidence, created_at, updated_at FROM violations WHERE id = $1',
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
@@ -170,9 +171,9 @@ router.get('/:id', async (req, res) => {
 // === CREATE violation
 router.post('/', async (req, res) => {
   try {
-    const { student_id, grade_section, violationType, sanction, incident_date, status, evidence } = req.body || {};
+    const { student_id, grade_section, offense_type, sanction, remarks, incident_date, status, evidence } = req.body || {};
     if (!student_id) return res.status(400).json({ error: 'student_id required' });
-    if (!violationType || !violationType.trim()) return res.status(400).json({ error: 'violationType required' });
+    //if (!violationType || !violationType.trim()) return res.status(400).json({ error: 'violationType required' });
 
     const student = await fetchStudent(student_id);
     if (!student) return res.status(400).json({ error: 'Student not found' });
@@ -184,28 +185,28 @@ router.post('/', async (req, res) => {
 
       const insertSQL = `
         INSERT INTO violations (
-          student_id, student_name, grade_section,
-          offense_type, description, sanction, remarks,
-          incident_date, status, evidence
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::date, CURRENT_DATE),COALESCE($8::violation_status_type,'Pending'),$9)
-        RETURNING id, student_id, student_name, grade_section,
-                  offense_type, description, sanction, remarks, incident_date, status,
-                  repeat_count_at_insert, evidence, created_at, updated_at`;
+      student_id, student_name, grade_section,
+      offense_type, description, sanction, remarks,
+      incident_date, status, evidence
+       )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),COALESCE($9::violation_status_type,'Pending'),$10)
+      RETURNING id, student_id, student_name, grade_section,
+            offense_type, description, sanction, remarks, incident_date, status,
+            repeat_count_at_insert, evidence, created_at, updated_at`;
 
       const params = [
         student_id,
         student_name,
         gradeSectionFinal,
+        "NA",
         offense_type.trim(),
-        description.trim(),
         sanction || null,
         remarks || null,
         incident_date || null,
         status || null,
         normEvidence
       ];
-
+      // console.log(insertSQL, params);
     const { rows } = await query(insertSQL, params);
     const row = rows[0];
     row.repeat_count = row.repeat_count_at_insert;
