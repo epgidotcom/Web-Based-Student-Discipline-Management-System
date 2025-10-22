@@ -81,7 +81,26 @@
   <script type="module">
     import { api, getStudentId } from './js/api.js';
     async function loadStudentProfile(){
-      const sid = getStudentId() || 'me';
+      // Prefer the client-side auth user object where available (avoids /students/me mismatch)
+      try {
+        const authUser = window.SDMSAuth?.getUser?.() || null;
+        const nameEl = document.getElementById('studentName');
+        const sectionEl = document.getElementById('studentSection');
+        const avatar = document.getElementById('studentAvatar');
+        if (authUser) {
+          const fullName = [authUser.first_name, authUser.middle_name, authUser.last_name].filter(Boolean).join(' ').trim() || authUser.full_name || authUser.name || 'Student';
+          nameEl.textContent = fullName;
+          sectionEl.textContent = authUser.grade ? `Grade ${authUser.grade}${authUser.section ? ' • Section ' + authUser.section : ''}` : (authUser.section ? `Section ${authUser.section}`: '');
+          if (authUser.photo_url) avatar.src = authUser.photo_url;
+          return; // done
+        }
+      } catch (e) {
+        console.warn('authUser read failed', e);
+      }
+
+      // Fallback to fetching profile by student id (if auth contains a token with id)
+      const sid = getStudentId() || null;
+      if (!sid) return; // nothing to do
       try {
         const profile = await api(`/students/${encodeURIComponent(sid)}`);
         if(!profile) return;
