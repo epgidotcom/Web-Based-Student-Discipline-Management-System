@@ -206,7 +206,7 @@ router.post('/', async (req, res) => {
         status || null,
         normEvidence
       ];
-      console.log(insertSQL, params);
+      // console.log(insertSQL, params);
     const { rows } = await query(insertSQL, params);
     const row = rows[0];
     row.repeat_count = row.repeat_count_at_insert;
