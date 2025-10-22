@@ -457,3 +457,5 @@ appealRows?.addEventListener('click', handleAppealRowClick);
 appealForm?.addEventListener('submit', submitAppeal);
 messageForm?.addEventListener('submit', submitMessage);
 
+})();
+
