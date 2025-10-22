@@ -266,13 +266,38 @@ router.post('/', async (req, res) => {
         req.params.id
       ];
 
-    const { rows } = await query(updateSQL, params);
+      const { rows } = await query(updateSQL, params);
+      if (!rows.length) return res.status(404).json({ error: 'Not found' });
+      const row = rows[0];
+      row.repeat_count = row.repeat_count_at_insert;
+      res.json(row);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  // === PATCH violation status (Resolve/Appeal)
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!status) return res.status(400).json({ error: 'status required' });
+
+    const allowed = ['Pending', 'Resolved', 'Appealed'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Allowed: ${allowed.join(', ')}` });
+    }
+
+    const { rows } = await query(
+      `UPDATE violations 
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, student_name, grade_section, status, updated_at`,
+      [status, req.params.id]
+    );
+
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    const row = rows[0];
-    row.repeat_count = row.repeat_count_at_insert;
-    res.json(row);
+    res.json({ message: `Violation status updated to ${status}`, violation: rows[0] });
   } catch (e) {
-    console.error('Error updating violation:', e);
+    console.error('Error updating violation status:', e);
     res.status(500).json({ error: e.message });
   }
 });

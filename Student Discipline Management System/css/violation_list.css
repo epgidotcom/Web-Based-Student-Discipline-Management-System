@@ -569,6 +569,22 @@ select option {
   white-space: normal;
 }
 
+.resolve-btn {
+  background-color: #16a34a;
+  color: white;
+}
+
+.resolve-btn:hover {
+  background-color: #15803d;
+}
+
+tr[data-status="Resolved"] {
+  background-color: #e6f4ea;
+}
+
+tr[data-status="Appealed"] {
+  background-color: #fff7e6;
+}
 /* === Previous Offense Cards === */
 .previous-offense-list {
   display: flex;

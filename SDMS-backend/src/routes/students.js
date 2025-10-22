@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
   const pageRaw = Number.parseInt(req.query.page, 10);
   const limitRaw = Number.parseInt(req.query.limit, 10);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
-  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100;
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 100;
   const offset = (page - 1) * limit;
 
   const selectWithAge = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
