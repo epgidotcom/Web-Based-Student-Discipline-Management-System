@@ -621,3 +621,28 @@ tr[data-status="Appealed"] {
   max-height: 85vh;      
   overflow-y: auto;       
 }
+
+/* === Status Badge Styles === */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-badge.pending {
+  background-color: #facc15;  /* yellow */
+  color: #000;
+}
+
+.status-badge.resolved {
+  background-color: #16a34a;  /* green */
+  color: #fff;
+}
+
+.status-badge.appealed {
+  background-color: #f97316;  /* orange */
+  color: #fff;
+}
