@@ -568,3 +568,20 @@ select option {
 #violationTable td:nth-child(5):hover {
   white-space: normal;
 }
+
+.resolve-btn {
+  background-color: #16a34a;
+  color: white;
+}
+
+.resolve-btn:hover {
+  background-color: #15803d;
+}
+
+tr[data-status="Resolved"] {
+  background-color: #e6f4ea;
+}
+
+tr[data-status="Appealed"] {
+  background-color: #fff7e6;
+}
