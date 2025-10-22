@@ -139,7 +139,7 @@
           const statusClass = (appeal.status || '').toLowerCase();
           const createdDate = formatDate(appeal.createdAt);
           const truncatedReason = appeal.reason && appeal.reason.length > 80 ? appeal.reason.slice(0, 77) + '...' : (appeal.reason || '—');
-          row.innerHTML = '\n            <td>' + (appeal.lrn || '—') + '</td>\n            <td>' + (createdDate || '—') + '</td>\n            <td>' + (appeal.studentName || '—') + '</td>\n            <td>' + (appeal.section || '—') + '</td>\n            <td>' + (appeal.violation || '—') + '</td>\n            <td>' + truncatedReason + '</td>\n            <td><span class="status ' + statusClass + '">' + (appeal.status || 'Pending') + '</span></td>\n            <td>\n              <button class="action-btn view" data-action="view" data-id="' + appeal.id + '" title="View"><i class="fa fa-eye"></i></button>\n              <button class="action-btn delete" data-action="delete" data-id="' + appeal.id + '" title="Delete"><i class="fa fa-trash"></i></button>\n            </td>';
+          row.innerHTML = '\n            <td>' + (appeal.lrn || '—') + '</td>\n            <td>' + (createdDate || '—') + '</td>\n            <td>' + (appeal.studentName || '—') + '</td>\n            <td>' + (appeal.section || '—') + '</td>\n            <td>' + (appeal.violation || '—') + '</td>\n            <td>' + truncatedReason + '</td>\n            <td><span class="status ' + statusClass + '">' + (appeal.status || 'Pending') + '</span></td>\n            <td>\n              <button class="action-btn view" data-action="view" data-id="' + appeal.id + '" title="View"><i class="fa fa-eye"></i></button>\n              <button class="action-btn edit" data-action="edit" data-id="' + appeal.id + '" title="Change status"><i class="fa fa-edit"></i></button>\n              <button class="action-btn delete" data-action="delete" data-id="' + appeal.id + '" title="Delete"><i class="fa fa-trash"></i></button>\n            </td>';
           tableBody.appendChild(row);
         });
       }
@@ -212,8 +212,9 @@
         var action = btn.dataset.action, id = btn.dataset.id;
         if (!action || !id) return;
         var appeal = adminState.appeals.find(function (item) { return item.id === id; });
-        if (action === 'view' && appeal) openModal(appeal);
-        else if (action === 'delete') deleteAppeal(id);
+  if (action === 'view' && appeal) openModal(appeal);
+  else if (action === 'edit' && appeal) openModal(appeal);
+  else if (action === 'delete') deleteAppeal(id);
       });
 
       modalClose && modalClose.addEventListener('click', closeModal);
