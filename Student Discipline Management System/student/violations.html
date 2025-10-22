@@ -60,14 +60,115 @@
   </main>
   <script type="module">
     import { api, getStudentId } from './js/api.js';
-    let violations = [];
+  // `violations` is an array when data was fetched successfully, `[]` when there are none,
+  // and `null` when the fetch failed (connection/server error).
+  let violations = [];
     let lineChart, barChart;
+    let currentStudentId = null;
+
+    // Load student profile and show name/grade in the page header
+    async function loadProfile(studentId){
+          try {
+            // Prefer client-side auth user when available (less error-prone than numeric DB id)
+            const authUser = window.SDMSAuth && typeof window.SDMSAuth.getUser === 'function' ? window.SDMSAuth.getUser() : null;
+            if (authUser) return authUser;
+
+            if (!studentId) return null;
+
+            // Try fetching by id first. Some tokens contain numeric DB id, others contain LRN which
+            // won't match the DB id column. If fetch returns 404, fallback to listing students
+            // and match by `lrn` or `id`.
+            try {
+              const profile = await api(`/students/${encodeURIComponent(studentId)}`);
+              return profile;
+            } catch (err) {
+              // If not found, attempt a best-effort lookup by LRN against the students list
+              if (err && /404/.test(err.message || '')) {
+                try {
+                  const list = await api(`/students?page=1&limit=500`);
+                  const rows = Array.isArray(list?.data) ? list.data : (Array.isArray(list) ? list : []);
+                  const found = rows.find(r => String(r.lrn) === String(studentId) || String(r.id) === String(studentId));
+                  if (found) return found;
+                } catch (ee) {
+                  // swallow — we'll log below
+                }
+              }
+              console.warn('Failed to load student profile', err);
+              return null;
+            }
+          } catch (e) {
+            console.warn('Failed to load student profile', e);
+            return null;
+          }
+    }
+
+    function updateProfileUI(profile){
+      if (!profile) return;
+      try {
+        const titleEl = document.querySelector('.title');
+        if (!titleEl) return;
+        // avoid duplicating if run multiple times
+        let meta = document.getElementById('studentProfileMeta');
+        let selector = document.getElementById('studentSelector');
+        if (!meta) {
+          meta = document.createElement('div');
+          meta.id = 'studentProfileMeta';
+          meta.style.marginTop = '6px';
+          meta.style.fontSize = '0.95rem';
+          titleEl.appendChild(meta);
+        }
+        if (!selector) {
+          selector = document.createElement('select');
+          selector.id = 'studentSelector';
+          selector.style.display = 'none';
+          selector.style.marginTop = '6px';
+          titleEl.appendChild(selector);
+        }
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || (profile.full_name || 'Student');
+        const grade = profile.grade ? `Grade ${profile.grade}` : '';
+        const section = profile.section ? `Section ${profile.section}` : '';
+        meta.innerHTML = `<strong style="display:block">${fullName}</strong><small style="color:var(--muted, #666)">${grade}${grade && section ? ' • ' : ''}${section}</small>`;
+
+        // Populate selector if linked accounts are present
+        const linked = Array.isArray(profile.linked_accounts) && profile.linked_accounts.length ? profile.linked_accounts : (profile.accounts || null);
+        if (linked && linked.length > 1) {
+          selector.innerHTML = '';
+          linked.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id || a.student_id || a.lrn || a.account_id || a.id;
+            opt.textContent = a.displayName || ( (a.first_name||a.full_name) ? `${(a.first_name||a.full_name)}${a.last_name ? ' ' + a.last_name : ''}` : (a.lrn || a.id) );
+            selector.appendChild(opt);
+          });
+          selector.value = currentStudentId || selector.options[0].value;
+          selector.style.display = '';
+          selector.onchange = () => {
+            currentStudentId = selector.value;
+            loadViolations(currentStudentId);
+          };
+        } else {
+          selector.style.display = 'none';
+        }
+      } catch (e) { console.warn('updateProfileUI error', e); }
+    }
 
     async function loadViolations(){
-      const studentId = getStudentId();
+      // allow selector to control student id; fall back to getStudentId()
+      const studentId = currentStudentId || getStudentId();
+      currentStudentId = studentId || currentStudentId || 'me';
+      // load profile (best-effort) and update UI
       try {
-        // Prefer a dedicated endpoint if available; fallback to generic with query.
-        const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
+        const profile = await loadProfile(currentStudentId || 'me');
+        // if auth user provides linked accounts merge minimally
+        const authUser = window.SDMSAuth && typeof window.SDMSAuth.getUser === 'function' ? window.SDMSAuth.getUser() : null;
+        if (authUser && authUser.linked_accounts) { profile.linked_accounts = authUser.linked_accounts; }
+        updateProfileUI(profile);
+      } catch (e) {
+        // continue even if profile fails
+      }
+      try {
+  // Request violations scoped to the logged-in student (use LRN/student_id from getStudentId)
+  // The backend expects `student_id` (snake_case) to enforce proper filtering.
+  const data = await api(`/violations?student_id=${encodeURIComponent(currentStudentId||'me')}`);
         // Normalize expected shape
         violations = (Array.isArray(data) ? data : data.rows || [])
           .map(v => ({
@@ -80,14 +181,20 @@
         renderCharts(violations);
       } catch (e){
         console.error(e);
-        const tbody = document.getElementById('violationRows');
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#e74c3c;">Failed to load violations. Using empty list.</td></tr>`;
+        // Distinguish 'no violations' (empty array) vs 'fetch failed' (null)
+        violations = null;
+        renderTable(null);
+        renderCharts(null);
       }
     }
 
     function renderTable(rows){
       const tbody=document.getElementById('violationRows');
       tbody.innerHTML='';
+      if (rows === null) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Violation data unavailable (could not connect to server)</td></tr>';
+        return;
+      }
       rows.forEach(v=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${v.date}</td><td>${v.type}</td><td>${v.remarks}</td><td><span class="status ${v.status.toLowerCase()}">${v.status}</span></td>`;tbody.appendChild(tr);});
       if(!rows.length){
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No violations found</td></tr>';
@@ -97,10 +204,91 @@
     function renderCharts(rows){
       if(lineChart) lineChart.destroy();
       if(barChart) barChart.destroy();
+      if (rows === null || !rows.length) {
+        // Render empty clean charts (no gridlines/labels) to keep layout stable when data is unavailable
+        lineChart = new Chart(document.getElementById('lineChart'), {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Violations',
+              data: [],
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231,76,60,0.3)',
+              fill: true,
+              tension: 0.3
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            responsive: true,
+            scales: {
+              x: { grid: { display: false }, ticks: { display: false } },
+              y: { grid: { display: false }, ticks: { display: false } }
+            }
+          }
+        });
+        barChart = new Chart(document.getElementById('barChart'), {
+          type: 'bar',
+          data: {
+            labels: [],
+            datasets: [{ label: 'Count', data: [], backgroundColor: [] }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            responsive: true,
+            scales: {
+              x: { grid: { display: false }, ticks: { display: false } },
+              y: { grid: { display: false }, ticks: { display: false } }
+            }
+          }
+        });
+        return;
+      }
       const labels=rows.map(v=>v.date);const counts=rows.map((_,i)=>i+1);
-      lineChart=new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true}});
-      const byType={};rows.forEach(v=>{byType[v.type]=(byType[v.type]||0)+1});
-      barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},options:{plugins:{legend:{display:false}},responsive:true}});
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Violations',
+        data: counts,
+        borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231,76,60,0.3)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      responsive: true,
+      scales: {
+        x: { grid: { display: false }, ticks: { display: false } },
+        y: { grid: { display: false }, ticks: { display: false } }
+      }
+    }
+  });
+      const byType = {};
+      rows.forEach(v => { byType[v.type] = (byType[v.type] || 0) + 1 });
+  barChart = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(byType),
+      datasets: [{
+        label: 'Count',
+        data: Object.values(byType),
+        backgroundColor: ['#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c']
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      responsive: true,
+      scales: {
+        x: { grid: { display: false }, ticks: { display: false } },
+        y: { grid: { display: false }, ticks: { display: false } }
+      }
+    }
+  });
     }
 
     function applyFilters(){
@@ -121,8 +309,9 @@
     }
     document.getElementById('applyBtn').addEventListener('click',applyFilters);
     document.getElementById('resetBtn').addEventListener('click',resetFilters);
+    // initial load (selector will be populated if profile or auth user supplies linked accounts)
     loadViolations();
-  </script>
+   </script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>

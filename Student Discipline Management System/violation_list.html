@@ -134,10 +134,9 @@
             <th>Grade & Section</th>
             <th>Incident Date</th>
             <th>Violation Type</th>
-            <th>Violation Description</th>
             <th>Past Offense</th>
-            <!-- Hidden column for Previous Offenses -->
-            <th style="display: none;">Previous Offenses</th>
+            <!-- Hidden column for All Offenses -->
+            <th style="display: none;">All Offenses</th>
             <th>Total Offenses</th>
             <th>Sanction</th>
             <th>Date Added</th>
@@ -177,15 +176,13 @@
       <label>Incident Date:</label>
       <input type="date" id="incidentDate" required>
 
-      <label>Violation Description:</label>
-      <textarea id="description" rows="3" placeholder="Describe the violation..." required></textarea>
-
       <label>Violation Type:</label>
       <select id="violationType" required>
-        <option value="" disabled selected>Select type</option>
-        <option value="First Offense">First Offense</option>
-        <option value="Second Offense">Second Offense</option>
-        <option value="Third Offense">Third Offense</option>
+      <option value="" disabled selected>Select type</option>
+      <option value="Classroom Misconduct">Classroom Misconduct</option>
+      <option value="Tardiness">Tardiness</option>
+      <option value="Cutting Classes">Cutting Classes</option>
+      <option value="Dress Code">Dress Code</option>
       </select>
 
       <label>Sanction:</label>
@@ -197,6 +194,9 @@
         <option value="Suspension">Suspension</option>
         <option value="Expulsion">Expulsion</option>
       </select>
+
+      <label>Remarks / Details:</label>
+      <textarea id="remarks" rows="3" placeholder="Add additional notes or details (optional)"></textarea>
 
       <div class="evidence-uploader" id="evidenceUploader">
         <div class="head"><strong>Evidence (optional)</strong></div>
@@ -231,14 +231,18 @@
       <div class="detail-row"><span class="label">Grade & Section</span><span class="value" id="viewGradeSection"></span></div>
       <div class="detail-row"><span class="label">Incident Date</span><span class="value" id="viewIncidentDate"></span></div>
       <div class="detail-row"><span class="label">Added Date</span><span class="value" id="viewAddedDate"></span></div>
-      <div class="detail-row"><span class="label">Violation Description</span><span class="value multiline" id="viewDescription"></span></div>
       <div class="detail-row"><span class="label">Violation Type</span><span class="value" id="viewViolationType"></span></div>
       <div id="viewPastOffenseRow" class="detail-row is-hidden">
-        <span class="label">Previous Offenses</span>
+        <span class="label">Past Offenses</span>
         <span class="value multiline" id="viewPastOffense"></span>
       </div>
 
       <div class="detail-row"><span class="label">Sanction</span><span class="value" id="viewSanction"></span></div>
+
+      <div id="viewAllOffensesWrap" class="is-hidden">
+        <h3 style="margin-top:10px;margin-bottom:6px;">All Offenses</h3>
+        <div id="viewAllOffenses" class="all-offense-list"></div>
+      </div>
 
       <div id="viewEvidenceWrap" class="is-hidden evidence-section">
         <strong>Evidence:</strong>

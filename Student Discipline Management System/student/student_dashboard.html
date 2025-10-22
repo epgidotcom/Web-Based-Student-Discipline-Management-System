@@ -30,18 +30,48 @@
       </div>
       <div class="profile">
         <div class="name-grade">
-          <strong>Juan Dela Cruz</strong>
-          <small>Grade 9 • Section Emerald</small>
+          <strong id="studentName">Student</strong>
+          <small id="studentMeta">Grade idk • Section idk</small>
+          <!-- account selector shown when multiple linked accounts exist -->
+          <select id="studentSelector" style="display:none;margin-top:6px;"></select>
         </div>
-  <img src="../images/mpnag_logo.png" alt="Avatar" class="avatar"/>
+        <img id="studentAvatar" src="../images/mpnag_logo.png" alt="Avatar" class="avatar"/>
       </div>
     </header>
+    <!-- Welcome banner (populated with production data when available) -->
+    <div class="welcome-banner" id="welcomeBanner">
+      <div class="welcome-text">
+        <h2 id="welcomeTitle">Welcome back, Student!</h2>
+        <p id="welcomeSubtitle">Keep track of your conduct and stay informed about your student discipline records.</p>
+      </div>
+      <div class="welcome-illustration">
+        <!-- Production uses a decorative icon when no image is provided -->
+        <i id="welcomeIcon" class="fa fa-user-graduate" aria-hidden="true"></i>
+        <img id="welcomeIllustration" src="" alt="" style="display:none;"/>
+      </div>
+    </div>
     <section class="cards">
-      <div class="card"><i class="fa fa-exclamation-circle"></i><h2 id="totalViolations">0</h2><p>Total Violations</p></div>
-      <div class="card"><i class="fa fa-folder-open"></i><h2 id="openCases">0</h2><p>Open Cases</p></div>
-      <div class="card"><i class="fa fa-calendar"></i><h2 id="lastViolation">—</h2><p>Last Violation</p></div>
-      <div class="card"><i class="fa fa-user-check"></i><span class="status" id="studentStatus">Good Standing</span><p>Status</p></div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-exclamation-circle"></i></div>
+        <div class="data"><div class="value" id="totalViolations">—</div><div class="label">Total Violations</div></div>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-folder-open"></i></div>
+        <div class="data"><div class="value" id="openCases">—</div><div class="label">Open Cases</div></div>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-calendar"></i></div>
+        <div class="data"><div class="value" id="lastViolation">—</div><div class="label">Last Violation</div></div>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fa fa-user-check"></i></div>
+        <div class="data"><div class="value"><span class="status" id="studentStatus">—</span></div><div class="label">Status</div></div>
+      </div>
     </section>
+    <!-- subtle notice area used when data could not be loaded (connection error) -->
+    <div id="dataNotice" class="notice" style="display:none; margin-top:10px; margin-bottom:12px;">Unable to load violation data. If this persists, please check your connection or try again later.</div>
+  <!-- Congratulatory message shown when student has no violations -->
+  <div id="congratsNotice" class="notice success" style="display:none; margin-top:10px; margin-bottom:12px;">Congratulations — you have no recorded violations. Keep up the good conduct!</div>
     <section class="grid-2">
       <div class="panel"><div class="panel-header"><h3>My Violations Over Time</h3></div><canvas id="lineChart" height="140"></canvas></div>
       <div class="panel"><div class="panel-header"><h3>Violation Breakdown</h3></div><canvas id="barChart" height="140"></canvas></div>
@@ -60,17 +90,123 @@
     import { api, getStudentId } from './js/api.js';
     let violations = [];
     let lineChart, barChart;
+    let currentStudentId = null;
+
+    // Populate profile area (name and grade/section) using student profile endpoint
+    // Accept optional studentId so caller can request a specific linked account.
+    async function loadProfile(studentId){
+      try {
+        if (!studentId) return null;
+        const profile = await api(`/students/${encodeURIComponent(studentId)}`);
+        return profile;
+      } catch (e){
+        // ignore profile failures (page still usable)
+        console.warn('Failed to load student profile', e);
+        return null;
+      }
+    }
+
+    // Update profile area and (if available) render an account selector when multiple
+    // linked accounts are present on the profile or the auth user object.
+    function updateProfileUI(profile){
+      if (!profile) return;
+      try {
+        const nameEl = document.getElementById('studentName');
+        const metaEl = document.getElementById('studentMeta');
+        const avatarEl = document.getElementById('studentAvatar');
+        const selector = document.getElementById('studentSelector');
+        const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ').trim() || (profile.full_name || 'Student');
+        if (nameEl) nameEl.textContent = fullName;
+        if (metaEl) metaEl.textContent = `${profile.grade ? 'Grade ' + profile.grade : ''}${profile.grade && profile.section ? ' • ' : ''}${profile.section || ''}`;
+        if (avatarEl && profile.photo_url) avatarEl.src = profile.photo_url;
+
+        // If the profile contains linked_accounts (array of accounts), populate selector
+        const linked = Array.isArray(profile.linked_accounts) && profile.linked_accounts.length ? profile.linked_accounts : (profile.accounts || null);
+        if (!selector) return;
+        if (linked && linked.length > 1) {
+          selector.innerHTML = '';
+          linked.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id || a.student_id || a.lrn || a.account_id || a.id;
+            opt.textContent = a.displayName || ( (a.first_name || a.full_name) ? `${(a.first_name||a.full_name)}${a.last_name ? ' ' + a.last_name : ''}` : (a.lrn || a.id) );
+            selector.appendChild(opt);
+          });
+          selector.value = currentStudentId || selector.options[0].value;
+          selector.style.display = '';
+          selector.onchange = () => {
+            currentStudentId = selector.value;
+            loadData(currentStudentId);
+          };
+        } else {
+          selector.style.display = 'none';
+        }
+
+        // Welcome banner text update (re-use existing banner elements)
+        const banner = document.getElementById('welcomeBanner');
+        const welcomeTitle = document.getElementById('welcomeTitle');
+        const welcomeSubtitle = document.getElementById('welcomeSubtitle');
+        const welcomeIllustration = document.getElementById('welcomeIllustration');
+        if (welcomeTitle) welcomeTitle.textContent = `Welcome back, ${fullName}`;
+        if (welcomeSubtitle) welcomeSubtitle.textContent = profile.welcome_message || `You have ${profile.pending_appeals || 0} pending appeal(s).`;
+        const welcomeIcon = document.getElementById('welcomeIcon');
+        if (welcomeIllustration && profile.banner_image_url) {
+          welcomeIllustration.src = profile.banner_image_url;
+          welcomeIllustration.alt = profile.school_name || 'Banner';
+          welcomeIllustration.style.display = '';
+          if (welcomeIcon) welcomeIcon.style.display = 'none';
+        } else {
+          if (welcomeIllustration) welcomeIllustration.style.display = 'none';
+          if (welcomeIcon) welcomeIcon.style.display = '';
+        }
+        if (banner) banner.style.display = '';
+      } catch (e){ console.warn('updateProfileUI error', e); }
+    }
+
+    // Helper that reads auth user object for linked accounts (if available)
+    function getAuthUser() {
+      return window.SDMSAuth && typeof window.SDMSAuth.getUser === 'function' ? window.SDMSAuth.getUser() : null;
+    }
 
     function updateCards(){
+      const totalEl = document.getElementById('totalViolations');
+      const openEl = document.getElementById('openCases');
+      const lastEl = document.getElementById('lastViolation');
+      const statusEl = document.getElementById('studentStatus');
+      const noticeEl = document.getElementById('dataNotice');
+
+      if (violations === null) {
+        // Data couldn't be fetched — show 'unknown' placeholders and a subtle notice.
+        if (totalEl) totalEl.textContent = '—';
+        if (openEl) openEl.textContent = '—';
+        if (lastEl) lastEl.textContent = '—';
+        if (statusEl) statusEl.textContent = 'Unknown';
+        if (noticeEl) { noticeEl.style.display = ''; }
+        return;
+      }
+
+      // violations is an array (possibly empty) — this represents a successful fetch
+  const congratsEl = document.getElementById('congratsNotice');
+  if (noticeEl) { noticeEl.style.display = 'none'; }
+  if (congratsEl) { congratsEl.style.display = 'none'; }
       const open = violations.filter(v=> (v.status||'').toLowerCase() === 'pending').length;
-      document.getElementById('totalViolations').textContent = violations.length;
-      document.getElementById('openCases').textContent = open;
-      document.getElementById('lastViolation').textContent = violations.length ? violations[violations.length-1].date : '—';
-      document.getElementById('studentStatus').textContent = open>=3 ? 'On Probation' : 'Good Standing';
+      if (totalEl) totalEl.textContent = String(violations.length);
+      if (openEl) openEl.textContent = String(open);
+      if (lastEl) lastEl.textContent = violations.length ? violations[violations.length-1].date : '—';
+      if (statusEl) statusEl.textContent = open>=3 ? 'On Probation' : 'Good Standing';
+      // If there are zero violations, show the congratulatory message
+      if (Array.isArray(violations) && violations.length === 0) {
+        if (congratsEl) congratsEl.style.display = '';
+      }
     }
+
     function renderTable(){
       const tbody = document.getElementById('violationRows');
       tbody.innerHTML='';
+      if (violations === null) {
+        // couldn't fetch — show a single-row notice that is not the same as "no violations"
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Violation data unavailable (could not connect to server)</td></tr>';
+        return;
+      }
       violations.forEach(v=>{
         const tr=document.createElement('tr');
         tr.innerHTML = `<td>${v.date}</td><td>${v.type}</td><td>${v.remarks}</td><td><span class="status ${ (v.status||'').toLowerCase() }">${v.status}</span></td>`;
@@ -80,19 +216,76 @@
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No violations yet</td></tr>';
       }
     }
+
     function renderCharts(){
       if(lineChart) lineChart.destroy();
       if(barChart) barChart.destroy();
+      // If data is unavailable, render empty charts (or a small placeholder)
+      if (violations === null || !violations.length) {
+        // create empty charts with no data to keep layout stable
+          lineChart = new Chart(document.getElementById('lineChart'),{
+            type:'line',
+            data:{labels:[],datasets:[{label:'Violations',data:[],borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},
+            options:{
+              plugins:{legend:{display:false}},
+              responsive:true,
+              scales: { x: { display: false }, y: { display: false } }
+            }
+          });
+          barChart = new Chart(document.getElementById('barChart'),{
+              type:'bar',
+              data:{labels:[],datasets:[{label:'Count',data:[],backgroundColor:[]}]},
+              options:{
+                plugins:{legend:{display:false}},
+                responsive:true,
+                scales: { x: { display: false }, y: { display: false } }
+              }
+            });
+        return;
+      }
       const labels = violations.map(v=>v.date);
       const counts = violations.map((_,i)=>i+1);
-      lineChart = new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},responsive:true}});
+      lineChart = new Chart(document.getElementById('lineChart'),{
+          type:'line',
+          data:{labels,datasets:[{label:'Violations',data:counts,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.3)',fill:true,tension:0.3}]},
+          options:{
+            plugins:{legend:{display:false}},
+            responsive:true,
+            scales: { x: { display: false }, y: { display: false } }
+          }
+        });
       const byType={}; violations.forEach(v=>{byType[v.type]=(byType[v.type]||0)+1});
-      barChart = new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},options:{plugins:{legend:{display:false}},responsive:true}});
+      barChart = new Chart(document.getElementById('barChart'),{
+          type:'bar',
+          data:{labels:Object.keys(byType),datasets:[{label:'Count',data:Object.values(byType),backgroundColor:['#3498db','#9b59b6','#f1c40f','#e67e22','#e74c3c']}]},
+          options:{
+            plugins:{legend:{display:false}},
+            responsive:true,
+            scales: { x: { display: false }, y: { display: false } }
+          }
+        });
     }
+
     async function loadData(){
-      const studentId = getStudentId();
+      // allow caller to pass specific student id (from selector). default to getStudentId() or 'me'
+      const studentId = arguments.length ? arguments[0] : getStudentId();
+      currentStudentId = studentId || currentStudentId || 'me';
+      // load profile first to replace hardcoded name/grade
+      let profile = null;
       try {
-        const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
+        profile = await loadProfile(currentStudentId || 'me');
+      } catch (e) { profile = null; }
+      // if auth user exposes linked accounts, merge minimally for selector population
+      const authUser = getAuthUser();
+      if (authUser && authUser.linked_accounts && Array.isArray(authUser.linked_accounts) && authUser.linked_accounts.length) {
+        profile = profile || {};
+        profile.linked_accounts = authUser.linked_accounts;
+      }
+      updateProfileUI(profile || (authUser || {}));
+
+      try {
+        // use snake_case query name expected by backend; server also enforces student scoping
+        const data = await api(`/violations?student_id=${encodeURIComponent(currentStudentId||'me')}`);
         violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({
           date: (v.date || v.created_at || '').slice(0,10),
             type: v.type || v.violation_type || v.offense || 'Unknown',
@@ -101,13 +294,16 @@
         }));
       } catch (e){
         console.error('Failed to load violations for dashboard', e);
-        violations = [];
+        // distinguish between "no violations" and "fetch failed"
+        // use `null` to indicate data couldn't be retrieved (likely connection issue)
+        violations = null;
       }
       updateCards();
       renderTable();
       renderCharts();
     }
-    loadData();
+    // initial load; pick any explicitly-provided student id (getStudentId) or default to 'me'
+    loadData(getStudentId() || 'me');
   </script>
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>

@@ -232,9 +232,9 @@
   const studentNameField = document.getElementById('studentName');
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
-  const descriptionField = document.getElementById('description');
   const violationTypeField = document.getElementById('violationType');
   const sanctionField = document.getElementById('sanction');
+  const remarksField = document.getElementById('remarks');
 
   const pastOffenseWrap = document.getElementById('pastOffenseWrap');
   const pastOffenseList = document.getElementById('pastOffenseList');
@@ -256,7 +256,6 @@
   const viewPastOffense = document.getElementById('viewPastOffense');
   const viewIncidentDate = document.getElementById('viewIncidentDate');
   const viewAddedDate = document.getElementById('viewAddedDate');
-  const viewDescription = document.getElementById('viewDescription');
   const viewViolationType = document.getElementById('viewViolationType');
   const viewSanction = document.getElementById('viewSanction');
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
@@ -417,7 +416,6 @@
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
         <td>${v.offense_type || '—'}</td>
-        <td>${v.description || '—'}</td>
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
@@ -550,9 +548,9 @@
     studentNameField.value = '';
     gradeSectionField.value = '';
     incidentDateField.value = '';
-    descriptionField.value = '';
     violationTypeField.value = '';
     sanctionField.value = '';
+    remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
     resetEvidence();
     displayPastOffensesFor(null);
@@ -578,9 +576,9 @@
     }
 
     incidentDateField.value = item.incident_date ? String(item.incident_date).slice(0, 10) : '';
-    descriptionField.value = item.description || '';
     violationTypeField.value = item.offense_type || '';
     sanctionField.value = item.sanction || '';
+    remarksField.value = item.remarks || '';
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     evidenceState = files.slice(0, 3);
@@ -597,9 +595,13 @@
     viewGradeSection.textContent = item.grade_section || '—';
     viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
     viewAddedDate.textContent = formatDate(item.created_at) || '—';
-    viewDescription.textContent = item.description || '—';
-    viewViolationType.textContent = item.offense_type || '—';
+    violationTypeField.value = item.description || item.offense_type || '';
     viewSanction.textContent = item.sanction || '—';
+    
+    const remarksRow = document.createElement('div');
+    remarksRow.classList.add('detail-row');
+    remarksRow.innerHTML = `<span class="label">Remarks</span><span class="value multiline">${item.remarks || '—'}</span>`;
+    document.querySelector('.violation-body').appendChild(remarksRow);
 
     const history = violations.filter(v => v.student_id === item.student_id && v.id !== item.id);
     if (history.length) {
@@ -652,6 +654,7 @@
       offense_type: violationTypeField?.value || null,
       description: descriptionField?.value?.trim() || null,
       sanction: sanctionField?.value || null,
+      remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
       evidence: evidenceState.length ? { files: evidenceState.slice(0, 3) } : null
     };
@@ -1010,7 +1013,6 @@ if (printReportBtn) {
     ensureModalZStack();
     bindEvents();
 
-    // also bind once page is fully loaded (covers dynamic DOM changes)
     window.addEventListener('load', bindEvents, { once: true });
 
     await Promise.all([loadStudents(), fetchData(1)]);

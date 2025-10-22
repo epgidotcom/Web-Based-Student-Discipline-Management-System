@@ -16,6 +16,114 @@ const appealForm = document.getElementById('appealForm');
 const violationInput = document.getElementById('violationText');
 const reasonInput = document.getElementById('appealReason');
 
+// Violation picker elements
+const violationToggle = document.getElementById('violationToggle');
+const violationDropdown = document.getElementById('violationDropdown');
+const violationListEl = document.getElementById('violationList');
+const violationSearch = document.getElementById('violationSearch');
+
+let violationsCatalog = [];
+
+async function loadViolationsCatalog(){
+  try {
+  // prefer local copy shipped with student bundle
+  // use import.meta.url so the path resolves relative to this module file in production
+  const res = await fetch(new URL('./school_violations.json', import.meta.url).href, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load violations catalog');
+    const payload = await res.json();
+    const categories = payload?.school_policy?.categories || [];
+    // flatten into id + description entries
+    violationsCatalog = categories.reduce((acc, cat) => {
+      const items = Array.isArray(cat.items) ? cat.items : [];
+      items.forEach(it => acc.push({ id: it.id, description: it.description, category: cat.category }));
+      return acc;
+    }, []);
+  } catch (e) {
+    console.warn('[appeals] could not load violations catalog', e);
+    violationsCatalog = [];
+  }
+  renderViolationsList(violationsCatalog);
+}
+
+function renderViolationsList(list){
+  if (!violationListEl) return;
+  violationListEl.innerHTML = '';
+  if (!list.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'No violations available';
+    violationListEl.appendChild(li);
+    return;
+  }
+  // group by category for readability
+  const byCat = list.reduce((m, it) => { (m[it.category] = m[it.category] || []).push(it); return m; }, {});
+  Object.keys(byCat).forEach(cat => {
+    const header = document.createElement('li');
+    header.className = 'violation-cat';
+    header.textContent = cat;
+    violationListEl.appendChild(header);
+    byCat[cat].forEach(item => {
+      const li = document.createElement('li');
+      li.tabIndex = 0;
+      li.className = 'violation-item';
+      li.dataset.id = item.id;
+      li.dataset.desc = item.description;
+      li.innerHTML = `<strong>${item.id}</strong> — <span class="desc">${item.description}</span>`;
+      li.addEventListener('click', () => {
+        violationInput.value = `${item.id} — ${item.description}`;
+        closeViolationDropdown();
+      });
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } });
+      violationListEl.appendChild(li);
+    });
+  });
+}
+
+function openViolationDropdown(){
+  if (!violationDropdown) return;
+  violationDropdown.hidden = false;
+  violationToggle?.setAttribute('aria-expanded', 'true');
+  violationSearch?.focus();
+}
+
+function closeViolationDropdown(){
+  if (!violationDropdown) return;
+  violationDropdown.hidden = true;
+  violationToggle?.setAttribute('aria-expanded', 'false');
+}
+
+async function toggleViolationDropdown(){
+  if (!violationDropdown) return violationToggle?.focus();
+  if (violationDropdown.hidden) {
+    // ensure catalog is loaded
+    if (!violationsCatalog.length) await loadViolationsCatalog();
+    // clear any previous search so user sees full list on click
+    if (violationSearch) { violationSearch.value = ''; }
+    renderViolationsList(violationsCatalog);
+    openViolationDropdown();
+  } else {
+    closeViolationDropdown();
+  }
+}
+
+function filterViolations(query){
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return renderViolationsList(violationsCatalog);
+  const filtered = violationsCatalog.filter(v => (`${v.id} ${v.description} ${v.category}`).toLowerCase().includes(q));
+  renderViolationsList(filtered);
+}
+
+document.addEventListener('click', (e) => {
+  if (!violationDropdown) return;
+  if (violationDropdown.hidden) return;
+  if (e.target === violationToggle || violationToggle?.contains(e.target) || violationDropdown.contains(e.target)) return;
+  closeViolationDropdown();
+});
+
+violationToggle?.addEventListener('click', toggleViolationDropdown);
+violationSearch?.addEventListener('input', (e) => filterViolations(e.target.value));
+
+
 const conversationSection = document.getElementById('appealConversation');
 const conversationMeta = document.getElementById('conversationAppealMeta');
 const conversationStatus = document.getElementById('conversationStatus');
@@ -282,6 +390,8 @@ async function submitMessage(event) {
 }
 
 populateProfile();
+// preload violations catalog (best-effort)
+loadViolationsCatalog().catch(()=>{});
 loadAppeals();
 appealRows?.addEventListener('click', handleAppealRowClick);
 appealForm?.addEventListener('submit', submitAppeal);
