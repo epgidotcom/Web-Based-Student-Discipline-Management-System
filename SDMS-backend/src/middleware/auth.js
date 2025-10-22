@@ -41,3 +41,25 @@ export function requireAdmin(req, res, next){
   }
   next();
 }
+
+// Non-blocking attempt to resolve user from Authorization header.
+// Returns the user row object or null if token missing/invalid.
+export async function tryGetUser(req){
+  try {
+    const hdr = req.headers.authorization || '';
+    const m = hdr.match(/^Bearer (.+)$/i);
+    if(!m) return null;
+    let payload;
+    try {
+      payload = jwt.verify(m[1], JWT_SECRET);
+    } catch(e){
+      return null;
+    }
+    const { rows } = await query('SELECT id, full_name, email, username, role, grade FROM accounts WHERE id = $1', [payload.sub]);
+    if(!rows.length) return null;
+    return rows[0];
+  } catch (e) {
+    console.warn('tryGetUser failed', e);
+    return null;
+  }
+}

@@ -40,14 +40,35 @@
 // Now filters to only show violations for ACTIVE student
   router.get('/', async (req, res) => {
   try {
-    const { student_id, offense_type, q, limit = 200 } = req.query;
+    // Accept both snake_case and camelCase query parameter names
+    const rawQuery = req.query || {};
+    const student_id = rawQuery.student_id || rawQuery.studentId || rawQuery.studentId || null;
+    const { offense_type, q, limit = 200 } = rawQuery;
     const clauses = [];
     const params = [];
 
-    // filters
-    if (student_id) {
-      params.push(student_id);
-      clauses.push(`v.student_id = $${params.length}`);
+    // If the request is authenticated and the user is a Student, force scoping
+    // so students can only see their own records.
+    try {
+      const { tryGetUser } = await import('../middleware/auth.js');
+      const user = await tryGetUser(req);
+      if (user && user.role && user.role.toLowerCase() === 'student') {
+        // override or set student_id to this user's id
+        if (user.id) {
+          params.push(user.id);
+          clauses.push(`v.student_id = $${params.length}`);
+        }
+      } else if (student_id) {
+        // only apply provided filter for non-student (or unauthenticated) requests
+        params.push(student_id);
+        clauses.push(`v.student_id = $${params.length}`);
+      }
+    } catch (e) {
+      // Fallback: if tryGetUser import fails or errors, honor incoming student_id if present
+      if (student_id) {
+        params.push(student_id);
+        clauses.push(`v.student_id = $${params.length}`);
+      }
     }
     if (offense_type) {
       params.push(offense_type);

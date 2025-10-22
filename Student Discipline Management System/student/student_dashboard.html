@@ -68,6 +68,8 @@
     </section>
     <!-- subtle notice area used when data could not be loaded (connection error) -->
     <div id="dataNotice" class="notice" style="display:none; margin-top:10px; margin-bottom:12px;">Unable to load violation data. If this persists, please check your connection or try again later.</div>
+  <!-- Congratulatory message shown when student has no violations -->
+  <div id="congratsNotice" class="notice success" style="display:none; margin-top:10px; margin-bottom:12px;">Congratulations — you have no recorded violations. Keep up the good conduct!</div>
     <section class="grid-2">
       <div class="panel"><div class="panel-header"><h3>My Violations Over Time</h3></div><canvas id="lineChart" height="140"></canvas></div>
       <div class="panel"><div class="panel-header"><h3>Violation Breakdown</h3></div><canvas id="barChart" height="140"></canvas></div>
@@ -152,12 +154,18 @@
       }
 
       // violations is an array (possibly empty) — this represents a successful fetch
-      if (noticeEl) { noticeEl.style.display = 'none'; }
+  const congratsEl = document.getElementById('congratsNotice');
+  if (noticeEl) { noticeEl.style.display = 'none'; }
+  if (congratsEl) { congratsEl.style.display = 'none'; }
       const open = violations.filter(v=> (v.status||'').toLowerCase() === 'pending').length;
       if (totalEl) totalEl.textContent = String(violations.length);
       if (openEl) openEl.textContent = String(open);
       if (lastEl) lastEl.textContent = violations.length ? violations[violations.length-1].date : '—';
       if (statusEl) statusEl.textContent = open>=3 ? 'On Probation' : 'Good Standing';
+      // If there are zero violations, show the congratulatory message
+      if (Array.isArray(violations) && violations.length === 0) {
+        if (congratsEl) congratsEl.style.display = '';
+      }
     }
 
     function renderTable(){
@@ -234,7 +242,8 @@
       updateProfileUI(profile);
 
       try {
-        const data = await api(`/violations?studentId=${encodeURIComponent(studentId||'me')}`);
+        // use snake_case query name expected by backend; server also enforces student scoping
+        const data = await api(`/violations?student_id=${encodeURIComponent(studentId||'me')}`);
         violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({
           date: (v.date || v.created_at || '').slice(0,10),
             type: v.type || v.violation_type || v.offense || 'Unknown',
