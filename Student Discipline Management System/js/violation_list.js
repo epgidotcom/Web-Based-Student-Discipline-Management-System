@@ -260,7 +260,7 @@
   const viewSanction = document.getElementById('viewSanction');
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
   const viewEvidence = document.getElementById('viewEvidence');
-  const viewRemarks = document.getElementById('viewRemarks');
+  const viewRemarks = document.getElementById('viewRemarks2');
 
   const imagePreviewModal = document.getElementById('imagePreviewModal');
   const imagePreviewClose = document.getElementById('imagePreviewClose');
@@ -608,6 +608,7 @@
       viewSanction.textContent = item.sanction || '—';
       //remarksField.textContent = item.remarks || '-';
       viewRemarks.textContext = item.remarks || '-';
+      document.getElementById('viewRemarks2').text = item.remarks || '-';
       // === All Offense Cards ===
       const allWrap = document.getElementById('viewAllOffensesWrap');
       const allContainer = document.getElementById('viewAllOffenses');
