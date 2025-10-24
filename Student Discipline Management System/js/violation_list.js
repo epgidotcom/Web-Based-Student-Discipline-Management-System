@@ -653,7 +653,7 @@
               <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
               <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
               <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
-              <div><strong>Description:</strong> ${off.remarks || '—'}</div>
+              <div><strong>Remarks:</strong> ${off.remarks || '—'}</div>
             </div>
           `;
           allContainer.appendChild(card);
