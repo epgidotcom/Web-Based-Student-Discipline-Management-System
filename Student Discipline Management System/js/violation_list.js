@@ -260,6 +260,7 @@
   const viewSanction = document.getElementById('viewSanction');
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
   const viewEvidence = document.getElementById('viewEvidence');
+  const viewRemarks = document.getElementById('viewRemarks');
 
   const imagePreviewModal = document.getElementById('imagePreviewModal');
   const imagePreviewClose = document.getElementById('imagePreviewClose');
@@ -605,7 +606,8 @@
       viewAddedDate.textContent = formatDate(item.created_at) || '—';
       viewViolationType.textContent =  item.description || '—';
       viewSanction.textContent = item.sanction || '—';
-      remarksField.textContent = item.remarks || '-';
+      //remarksField.textContent = item.remarks || '-';
+      viewRemarks.textContext = item.remarks || '-';
       // === All Offense Cards ===
       const allWrap = document.getElementById('viewAllOffensesWrap');
       const allContainer = document.getElementById('viewAllOffenses');
@@ -651,6 +653,7 @@
               <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
               <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
               <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
+              <div><strong>Description:</strong> ${off.remarks || '—'}</div>
             </div>
           `;
           allContainer.appendChild(card);
