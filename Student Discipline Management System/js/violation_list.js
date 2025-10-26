@@ -791,6 +791,61 @@
   const applyFilterBtn = document.getElementById('applyFilterBtn');
   const printReportBtn = document.getElementById('printReportBtn');
 
+  // --- Load school_violations.json and populate dropdowns ---
+  async function loadSchoolViolations() {
+    const candidatePaths = [
+      'student/js/school_violations.json',
+      'js/school_violations.json',
+      'student/school_violations.json'
+    ];
+
+    let payload = null;
+    for (const p of candidatePaths) {
+      try {
+        const res = await fetch(p, { cache: 'no-store' });
+        if (!res.ok) continue;
+        payload = await res.json();
+        break;
+      } catch (e) {
+        // try next
+      }
+    }
+
+    if (!payload || !payload.school_policy || !Array.isArray(payload.school_policy.categories)) {
+      // nothing to populate
+      return;
+    }
+
+    // collect descriptions (avoid duplicates)
+    const set = new Set();
+    payload.school_policy.categories.forEach(cat => {
+      if (!Array.isArray(cat.items)) return;
+      cat.items.forEach(it => {
+        const text = (it.description || '').trim();
+        if (text) set.add(text);
+      });
+    });
+
+    // helper to add option if not present
+    function addOptionsToSelect(selectEl) {
+      if (!selectEl) return;
+      // build existing values set to avoid duplicates
+      const existing = new Set(Array.from(selectEl.options).map(o => (o.value || o.text).trim()));
+      // append sorted
+      Array.from(set).sort().forEach(val => {
+        if (existing.has(val)) return;
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    // populate both filter and modal select
+    addOptionsToSelect(filterViolationType);
+    addOptionsToSelect(violationTypeField);
+  }
+
     function applyFilters() {
     const strand = (filterStrand?.value || '').toLowerCase();
     const violationType = (filterViolationType?.value || '').toLowerCase();
@@ -984,6 +1039,95 @@
     document.head.appendChild(s);
   }
 
+  // --- Floating centered select picker (improves long lists in modals) ---
+  let __floatingSelectEl = null;
+  let __floatingBackdrop = null;
+
+  function createFloatingSelectElements() {
+    if (__floatingSelectEl && __floatingBackdrop) return;
+    __floatingBackdrop = document.createElement('div');
+    __floatingBackdrop.className = 'sdms-floating-select-backdrop';
+
+    __floatingSelectEl = document.createElement('div');
+    __floatingSelectEl.className = 'sdms-floating-select';
+    __floatingSelectEl.setAttribute('role', 'dialog');
+    __floatingSelectEl.setAttribute('aria-modal', 'true');
+
+    const header = document.createElement('div');
+    header.className = 'sdms-floating-select-header';
+    header.textContent = 'Select an option';
+    __floatingSelectEl.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'sdms-floating-select-list';
+    __floatingSelectEl.appendChild(list);
+
+    document.body.appendChild(__floatingBackdrop);
+    document.body.appendChild(__floatingSelectEl);
+
+    // inject styles once
+    if (!document.getElementById('sdms-floating-select-styles')) {
+      const st = document.createElement('style');
+      st.id = 'sdms-floating-select-styles';
+      st.textContent = `
+        .sdms-floating-select-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index:100050; }
+        .sdms-floating-select { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(880px, 92%); max-height: 72vh; overflow: hidden; background: #fff; border-radius:8px; box-shadow: 0 10px 30px rgba(2,6,23,0.2); z-index:100051; display:none; font-family:inherit; }
+        .sdms-floating-select-header { padding: 12px 16px; border-bottom: 1px solid #eee; font-weight:600; }
+        .sdms-floating-select-list { max-height: calc(72vh - 52px); overflow: auto; padding: 8px 12px; }
+        .sdms-floating-select-item { padding:10px 12px; border-radius:6px; cursor:pointer; color:#111827; }
+        .sdms-floating-select-item:hover { background:#f3f4f6; }
+        .sdms-floating-select-item.current { background:#e6f4ea; }
+        @media (max-width:420px){ .sdms-floating-select { width: 96%; } }
+      `;
+      document.head.appendChild(st);
+    }
+
+    __floatingBackdrop.addEventListener('click', hideFloatingSelect);
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') hideFloatingSelect();
+    });
+  }
+
+  function showFloatingSelectFor(selectEl) {
+    if (!selectEl) return;
+    createFloatingSelectElements();
+    const list = __floatingSelectEl.querySelector('.sdms-floating-select-list');
+    list.innerHTML = '';
+    const opts = Array.from(selectEl.options || []);
+    // copy options
+    opts.forEach(o => {
+      const item = document.createElement('div');
+      item.className = 'sdms-floating-select-item';
+      item.tabIndex = 0;
+      item.textContent = o.textContent || o.value || '';
+      item.dataset.value = o.value;
+      if (o.disabled) item.classList.add('disabled');
+      if ((selectEl.value || '') === (o.value || '')) item.classList.add('current');
+      item.addEventListener('click', () => {
+        selectEl.value = item.dataset.value;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        hideFloatingSelect();
+      });
+      item.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') item.click();
+      });
+      list.appendChild(item);
+    });
+
+    __floatingBackdrop.style.display = '';
+    __floatingSelectEl.style.display = 'block';
+    // focus first selectable
+    setTimeout(() => {
+      const first = list.querySelector('.sdms-floating-select-item:not(.disabled)');
+      first && first.focus();
+    }, 10);
+  }
+
+  function hideFloatingSelect() {
+    if (__floatingSelectEl) __floatingSelectEl.style.display = 'none';
+    if (__floatingBackdrop) __floatingBackdrop.style.display = 'none';
+  }
+
   function bindEvents() {
     // initialize date filter wiring
     initDateFilter();
@@ -1072,6 +1216,22 @@
     applyFilterBtn?.addEventListener('click', applyFilters);
     filterStrand?.addEventListener('change', applyFilters);
     filterViolationType?.addEventListener('change', applyFilters);
+    // show centered floating picker for long lists (better display inside modals)
+    [filterViolationType, violationTypeField].forEach(sel => {
+      if (!sel) return;
+      sel.addEventListener('mousedown', (ev) => {
+        // prevent native opening and show our centered picker
+        ev.preventDefault();
+        showFloatingSelectFor(sel);
+      });
+      // keyboard users: open picker on Space/Enter
+      sel.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          showFloatingSelectFor(sel);
+        }
+      });
+    });
       filterText?.addEventListener('input', applyFilters); // <-- fixed typo here
 
     if (printReportBtn) {
@@ -1090,7 +1250,7 @@
 
     window.addEventListener('load', bindEvents, { once: true });
 
-    await Promise.all([loadStudents(), fetchData(1)]);
+    await Promise.all([loadStudents(), fetchData(1), loadSchoolViolations()]);
   }
 
   window.searchViolation = applyFilters;
