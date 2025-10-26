@@ -241,6 +241,39 @@
     function bindEvents() {
       if (isBound || !paginationContainer) return;
       paginationContainer.addEventListener('click', (event) => {
+        // Ensure a small on-screen debug badge exists so users without console logs
+        // can still see that clicks are reaching the pagination controller.
+        try {
+          let dbg = document.getElementById('sdms-pagination-debug');
+          if (!dbg) {
+            dbg = document.createElement('div');
+            dbg.id = 'sdms-pagination-debug';
+            dbg.style.position = 'fixed';
+            dbg.style.right = '12px';
+            dbg.style.bottom = '12px';
+            dbg.style.padding = '6px 10px';
+            dbg.style.background = 'rgba(0,0,0,0.6)';
+            dbg.style.color = '#fff';
+            dbg.style.fontSize = '12px';
+            dbg.style.borderRadius = '6px';
+            dbg.style.zIndex = '999999';
+            dbg.style.pointerEvents = 'none';
+            dbg.textContent = 'pagination: ready';
+            document.body.appendChild(dbg);
+          }
+        } catch (e) { /* ignore DOM insta-failures */ }
+        // Debug: trace clicks delegated to pagination container
+        try {
+          const btn = event.target && event.target.closest ? event.target.closest('.page-btn') : null;
+          console.debug('[pagination] click event', { target: String(event.target && (event.target.tagName || event.target.nodeName)), page: btn ? btn.dataset.page : null, disabled: !!(btn && btn.disabled) });
+          if (btn) {
+            const dbg = document.getElementById('sdms-pagination-debug');
+            if (dbg) dbg.textContent = `pagination: clicked page=${btn.dataset.page}`;
+          }
+        } catch (e) {
+          console.debug('[pagination] click event (debug failed)', e);
+        }
+
         const button = event.target.closest('.page-btn');
         if (!button || button.disabled) return;
         const nextPage = Number(button.dataset.page);

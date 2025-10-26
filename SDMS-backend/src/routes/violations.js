@@ -39,8 +39,16 @@ router.get('/', async (req, res) => {
   try {
     // Accept both snake_case and camelCase query parameter names
     const rawQuery = req.query || {};
-    const student_id = rawQuery.student_id || rawQuery.studentId || rawQuery.studentId || null;
-    const { offense_type, q, limit = 200 } = rawQuery;
+    const student_id = rawQuery.student_id || rawQuery.studentId || null;
+    const { offense_type, q } = rawQuery;
+
+    // pagination params
+    const pageRaw = Number.parseInt(rawQuery.page, 10);
+    const limitRaw = Number.parseInt(rawQuery.limit, 10);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100;
+    const offset = (page - 1) * limit;
+
     const clauses = [];
     const params = [];
 
@@ -67,6 +75,7 @@ router.get('/', async (req, res) => {
         clauses.push(`v.student_id = $${params.length}`);
       }
     }
+
     if (q) {
       params.push(`%${q.toLowerCase()}%`);
       clauses.push(`(
@@ -78,7 +87,15 @@ router.get('/', async (req, res) => {
     clauses.push(`s.active = TRUE`);
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
-    params.push(Math.min(Number(limit) || 200, 500));
+    // Count total matching rows (for accurate pagination metadata)
+    const countSql = `SELECT COUNT(*)::int AS total FROM violations v INNER JOIN students s ON v.student_id = s.id ${where}`;
+    const countRes = await query(countSql, params);
+    const total = countRes.rows[0]?.total ?? 0;
+
+    // fetch page
+    const pageParams = params.slice();
+    pageParams.push(limit);
+    pageParams.push(offset);
 
     const sql = `
       SELECT
@@ -87,8 +104,8 @@ router.get('/', async (req, res) => {
         v.student_name,
         v.grade_section,
         v.description AS violation_type,
-        v.description, -- added original description here
-        v.sanction, 
+        v.description,
+        v.sanction,
         v.incident_date,
         v.status,
         v.repeat_count_at_insert,
@@ -100,11 +117,19 @@ router.get('/', async (req, res) => {
       INNER JOIN students s ON v.student_id = s.id
       ${where}
       ORDER BY v.incident_date DESC, v.created_at DESC
-      LIMIT $${params.length};
+      LIMIT $${pageParams.length - 1}
+      OFFSET $${pageParams.length};
     `;
 
-    const { rows } = await query(sql, params);
-    res.json(rows.map(r => ({ ...r, repeat_count: r.repeat_count_at_insert })));
+    const { rows } = await query(sql, pageParams);
+    const data = rows.map(r => ({ ...r, repeat_count: r.repeat_count_at_insert }));
+    return res.json({
+      data,
+      currentPage: page,
+      limit,
+      totalItems: total,
+      totalPages: Math.max(1, Math.ceil(total / limit))
+    });
   } catch (e) {
     console.error('Error fetching active violations:', e);
     res.status(500).json({ error: e.message });

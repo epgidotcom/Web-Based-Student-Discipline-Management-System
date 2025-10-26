@@ -443,6 +443,8 @@
     paginationContainer: paginationControls,
     summaryElement: paginationSummary,
     async fetcher(page, limit) {
+  console.debug('[violations] fetcher called', { page, limit, rangeFrom: __rangeFrom, rangeTo: __rangeTo, selectedDate: __selectedDate });
+  try { const dbg = document.getElementById('sdms-pagination-debug'); if (dbg) dbg.textContent = `violations: fetching page=${page}`; } catch (e) {}
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
 
       // 1) Prefer explicit range if set
@@ -456,11 +458,35 @@
         if (r.to)   params.set('date_to',   r.to);
       }
 
-      return api(`/violations?${params.toString()}`);
+      const res = await api(`/violations?${params.toString()}`);
+      console.debug('[violations] fetcher response', { page, items: Array.isArray(res) ? res.length : (Array.isArray(res?.data) ? res.data.length : null), payload: res });
+      try { const dbg = document.getElementById('sdms-pagination-debug'); if (dbg) dbg.textContent = `violations: fetched page=${page}, items=${Array.isArray(res) ? res.length : (Array.isArray(res?.data) ? res.data.length : 0)}`; } catch (e) {}
+      return res;
     },
-    onData(rows) {
-      violations = Array.isArray(rows) ? rows : [];
+    // onData now receives the normalized array and controller state from
+    // createPaginationController.fetchData -> onData(normalized.data, state)
+    onData(dataPayload, controllerState) {
+      console.debug('[violations] onData', { currentPage: controllerState?.currentPage, totalItems: controllerState?.totalItems, totalPages: controllerState?.totalPages, dataLength: Array.isArray(dataPayload) ? dataPayload.length : 0 });
+      try { const dbg = document.getElementById('sdms-pagination-debug'); if (dbg) dbg.textContent = `violations: onData page=${controllerState?.currentPage} items=${Array.isArray(dataPayload) ? dataPayload.length : 0}`; } catch (e) {}
+      const data = Array.isArray(dataPayload) ? dataPayload : [];
+      violations = data;
       renderTable(violations);
+
+      // Prefer controller-provided totals/state when available
+      const total = controllerState?.totalItems ?? controllerState?.total ?? null;
+      const currentPage = Number(controllerState?.currentPage ?? 1);
+      const totalPages = Number(controllerState?.totalPages ?? 1);
+
+      // Update pagination UI/summary. The controller will also render the
+      // pagination buttons, but we update the summary here to reflect
+      // the controller's computed values.
+      try { paginator?.renderPagination?.(totalPages, currentPage); } catch (e) { /* ignore */ }
+      if (paginationSummary) {
+        const shown = Array.isArray(data) ? data.length : 0;
+        const start = shown ? ((currentPage - 1) * PAGE_LIMIT + 1) : 0;
+        const end = shown ? (start + shown - 1) : 0;
+        paginationSummary.textContent = total != null ? `Showing ${start}-${end} of ${total}` : `Showing ${start}-${end}`;
+      }
     },
 
     onError(err) {
