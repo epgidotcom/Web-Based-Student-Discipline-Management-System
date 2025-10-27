@@ -732,7 +732,6 @@
       student_id: studentId,
       grade_section: gradeSectionField?.value?.trim() || null,
       offense_type: violationTypeField?.value || null,
-      description: descriptionField?.value?.trim() || null,
       sanction: sanctionField?.value || null,
       remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
@@ -1286,4 +1285,5 @@
   window.searchViolation = applyFilters;
 
   init();
+
 })();
