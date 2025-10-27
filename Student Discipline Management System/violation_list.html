@@ -197,8 +197,11 @@
         <option value="Expulsion">Expulsion</option>
       </select>
 
-      <label>Remarks / Details:</label>
-      <textarea id="remarks" rows="3" placeholder="Add additional notes or details (optional)"></textarea>
+      <label>Remarks:</label>
+        <select id="remarks" required>
+          <option value="" disabled selected>Select type</option>       
+      </select>
+
 
       <div class="evidence-uploader" id="evidenceUploader">
         <div class="head"><strong>Evidence (optional)</strong></div>
@@ -276,4 +279,5 @@
   })();
 </script>
 </body>
+
 </html>
