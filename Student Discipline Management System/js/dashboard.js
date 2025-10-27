@@ -160,9 +160,9 @@ document.addEventListener("DOMContentLoaded", () => {
         students = [];
       }
 
-      if (Array.isArray(violationsRes) && violationsRes.length) {
+      if (Array.isArray(violationsRes.data) && violationsRes.totalItems) {
         const studentIndex = new Map(students.map((s) => [s.id, s]));
-        violations = violationsRes.map((row) => normalizeViolation(row, studentIndex));
+        violations = violationsRes.data.map((row) => normalizeViolation(row, studentIndex));
       } else {
         violations = [];
       }
@@ -544,6 +544,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   init();
 });
+
 
 
 
