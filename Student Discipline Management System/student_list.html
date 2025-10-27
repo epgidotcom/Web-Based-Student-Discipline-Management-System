@@ -65,9 +65,9 @@
       <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchStudent()">
       <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
 
-      <!-- Dropdown filters (strand + grade)-->
+      <!-- Dropdown filters (strand + grade) copied from violation_list -->
       <div class="dropdown-filters" id="dropdownFilters">
-        <select id="filterSection" class="filter-select" aria-label="Filter by strand">
+        <select id="filterStrand" class="filter-select" aria-label="Filter by strand">
           <option value="">All Strands</option>
           <option value="ABM">ABM</option>
           <option value="HUMSS">HUMSS</option>
@@ -230,7 +230,7 @@
     </div>
   </div>
 </div>
-
+  
 <!-- Page scripts -->
 <script src="js/config.js" defer></script>
 <script src="js/auth.js" defer></script>
