@@ -286,7 +286,7 @@
       try {
         // use snake_case query name expected by backend; server also enforces student scoping
         const data = await api(`/violations?student_id=${encodeURIComponent(currentStudentId||'me')}`);
-        violations = (Array.isArray(data) ? data : data.rows || []).map(v=>({
+        violations = (Array.isArray(data.data) ? data.data : data.data.rows || []).map(v=>({
           date: (v.date || v.created_at || '').slice(0,10),
             type: v.type || v.violation_type || v.offense || 'Unknown',
             remarks: v.remarks || v.description || '',
@@ -308,4 +308,5 @@
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>
+
 </html>
