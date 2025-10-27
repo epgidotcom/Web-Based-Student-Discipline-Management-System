@@ -653,7 +653,6 @@
             </div>
             <div class="offense-body">
               <div><strong>Violation Type:</strong> ${off.description || '—'}</div>
-              <div><strong>Description:</strong> ${off.description || '—'}</div>
               <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
               <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
               <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
@@ -1257,4 +1256,5 @@
 
   init();
 })();
+
 
