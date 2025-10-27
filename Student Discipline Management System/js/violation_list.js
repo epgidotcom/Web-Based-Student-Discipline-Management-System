@@ -843,7 +843,7 @@
 
     // populate both filter and modal select
     addOptionsToSelect(filterViolationType);
-    addOptionsToSelect(violationTypeField);
+    addOptionsToSelect(remarksField);
   }
 
     function applyFilters() {
@@ -1257,3 +1257,4 @@
 
   init();
 })();
+
