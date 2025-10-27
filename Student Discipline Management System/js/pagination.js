@@ -70,28 +70,71 @@
 
     let isBound = false;
 
-    function normalizePayload(payload, requestedPage) {
-      if (Array.isArray(payload)) {
-        return {
-          data: payload,
-          currentPage: 1,
-          totalPages: 1,
-          totalItems: payload.length
-        };
-      }
+  // PATCH: optimistic pagination when API doesn't return totals
+  function normalizePayload(payload, requestedPage) {
+    if (Array.isArray(payload)) {
+      const data = payload;
+      const currentPage = Math.max(1, Number(requestedPage) || 1);
 
-      const data = Array.isArray(payload?.data) ? payload.data : [];
-      const currentPage = normalizeNumber(payload?.currentPage ?? payload?.page ?? requestedPage, requestedPage);
-      const totalPages = normalizeNumber(payload?.totalPages ?? payload?.total_pages ?? payload?.pages, 1);
-      const totalItems = resolveTotalItems(payload, data.length, state.limit, currentPage, totalPages);
+      let totalPages = 1;
+      if (data.length === state.limit) {
+        totalPages = Math.max(2, currentPage + 1);
+      }
 
       return {
         data,
-        currentPage: Math.max(1, currentPage),
-        totalPages: Math.max(1, totalPages),
-        totalItems: Math.max(0, totalItems)
+        currentPage,
+        totalPages,
+        totalItems: Math.max(
+          data.length,
+          (currentPage - 1) * state.limit + data.length
+        ),
       };
     }
+
+    // Object payloads (try to read common shapes)
+    const data = Array.isArray(payload?.data) ? payload.data : [];
+    const currentPage = normalizeNumber(
+      payload?.currentPage ?? payload?.page ?? requestedPage,
+      requestedPage
+    );
+
+    // Prefer explicit totalPages if present
+    let totalPages = normalizeNumber(
+      payload?.totalPages ?? payload?.total_pages ?? payload?.pages,
+      0
+    );
+
+    // Derive/confirm totalItems from common fields (or estimate)
+    let totalItems = resolveTotalItems(
+      payload,
+      data.length,
+      state.limit,
+      currentPage,
+      totalPages
+    );
+
+    // Optimistic inference when totals are missing or 1:
+    // - exactly limit items => likely more pages
+    // - 0 items on later page => clamp to current page
+    if (!totalPages || totalPages <= 1) {
+      if (data.length === state.limit) {
+        totalPages = Math.max(2, currentPage + 1);
+      } else if (data.length === 0 && currentPage > 1) {
+        totalPages = currentPage;
+      } else {
+        totalPages = 1;
+      }
+    }
+
+    return {
+      data,
+      currentPage: Math.max(1, currentPage),
+      totalPages: Math.max(1, totalPages),
+      totalItems: Math.max(0, totalItems),
+    };
+  }
+
 
     function updateSummary() {
       if (!summaryElement) return;
@@ -198,6 +241,39 @@
     function bindEvents() {
       if (isBound || !paginationContainer) return;
       paginationContainer.addEventListener('click', (event) => {
+        // Ensure a small on-screen debug badge exists so users without console logs
+        // can still see that clicks are reaching the pagination controller.
+        try {
+          let dbg = document.getElementById('sdms-pagination-debug');
+          if (!dbg) {
+            dbg = document.createElement('div');
+            dbg.id = 'sdms-pagination-debug';
+            dbg.style.position = 'fixed';
+            dbg.style.right = '12px';
+            dbg.style.bottom = '12px';
+            dbg.style.padding = '6px 10px';
+            dbg.style.background = 'rgba(0,0,0,0.6)';
+            dbg.style.color = '#fff';
+            dbg.style.fontSize = '12px';
+            dbg.style.borderRadius = '6px';
+            dbg.style.zIndex = '999999';
+            dbg.style.pointerEvents = 'none';
+            dbg.textContent = 'pagination: ready';
+            document.body.appendChild(dbg);
+          }
+        } catch (e) { /* ignore DOM insta-failures */ }
+        // Debug: trace clicks delegated to pagination container
+        try {
+          const btn = event.target && event.target.closest ? event.target.closest('.page-btn') : null;
+          console.debug('[pagination] click event', { target: String(event.target && (event.target.tagName || event.target.nodeName)), page: btn ? btn.dataset.page : null, disabled: !!(btn && btn.disabled) });
+          if (btn) {
+            const dbg = document.getElementById('sdms-pagination-debug');
+            if (dbg) dbg.textContent = `pagination: clicked page=${btn.dataset.page}`;
+          }
+        } catch (e) {
+          console.debug('[pagination] click event (debug failed)', e);
+        }
+
         const button = event.target.closest('.page-btn');
         if (!button || button.disabled) return;
         const nextPage = Number(button.dataset.page);

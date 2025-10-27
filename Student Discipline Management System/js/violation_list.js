@@ -450,6 +450,8 @@
     paginationContainer: paginationControls,
     summaryElement: paginationSummary,
     async fetcher(page, limit) {
+  console.debug('[violations] fetcher called', { page, limit, rangeFrom: __rangeFrom, rangeTo: __rangeTo, selectedDate: __selectedDate });
+  try { const dbg = document.getElementById('sdms-pagination-debug'); if (dbg) dbg.textContent = `violations: fetching page=${page}`; } catch (e) {}
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
 
       // 1) Prefer explicit range if set
@@ -463,11 +465,35 @@
         if (r.to)   params.set('date_to',   r.to);
       }
 
-      return api(`/violations?${params.toString()}`);
+      const res = await api(`/violations?${params.toString()}`);
+      console.debug('[violations] fetcher response', { page, items: Array.isArray(res) ? res.length : (Array.isArray(res?.data) ? res.data.length : null), payload: res });
+      try { const dbg = document.getElementById('sdms-pagination-debug'); if (dbg) dbg.textContent = `violations: fetched page=${page}, items=${Array.isArray(res) ? res.length : (Array.isArray(res?.data) ? res.data.length : 0)}`; } catch (e) {}
+      return res;
     },
-    onData(rows) {
-      violations = Array.isArray(rows) ? rows : [];
+    // onData now receives the normalized array and controller state from
+    // createPaginationController.fetchData -> onData(normalized.data, state)
+    onData(dataPayload, controllerState) {
+      console.debug('[violations] onData', { currentPage: controllerState?.currentPage, totalItems: controllerState?.totalItems, totalPages: controllerState?.totalPages, dataLength: Array.isArray(dataPayload) ? dataPayload.length : 0 });
+      try { const dbg = document.getElementById('sdms-pagination-debug'); if (dbg) dbg.textContent = `violations: onData page=${controllerState?.currentPage} items=${Array.isArray(dataPayload) ? dataPayload.length : 0}`; } catch (e) {}
+      const data = Array.isArray(dataPayload) ? dataPayload : [];
+      violations = data;
       renderTable(violations);
+
+      // Prefer controller-provided totals/state when available
+      const total = controllerState?.totalItems ?? controllerState?.total ?? null;
+      const currentPage = Number(controllerState?.currentPage ?? 1);
+      const totalPages = Number(controllerState?.totalPages ?? 1);
+
+      // Update pagination UI/summary. The controller will also render the
+      // pagination buttons, but we update the summary here to reflect
+      // the controller's computed values.
+      try { paginator?.renderPagination?.(totalPages, currentPage); } catch (e) { /* ignore */ }
+      if (paginationSummary) {
+        const shown = Array.isArray(data) ? data.length : 0;
+        const start = shown ? ((currentPage - 1) * PAGE_LIMIT + 1) : 0;
+        const end = shown ? (start + shown - 1) : 0;
+        paginationSummary.textContent = total != null ? `Showing ${start}-${end} of ${total}` : `Showing ${start}-${end}`;
+      }
     },
 
     onError(err) {
@@ -595,8 +621,8 @@
     openModal(violationModal);
   }
 
-    function showViewModal(index) {
-      const item = violations[index];
+  function showViewModal(index) {
+    const item = violations[index];
       if (!item) return;
 
       // === Current Offense Details ===
@@ -661,9 +687,10 @@
           `;
           allContainer.appendChild(card);
         });
-      } else {
-        allWrap.classList.add('is-hidden');
-      }
+    } else {
+      viewPastOffenseRow.classList.add('is-hidden');
+      viewPastOffense.textContent = '';
+    }
 
     const files = Array.isArray(item.evidence?.files) ? item.evidence.files : [];
     if (files.length) {
@@ -705,6 +732,7 @@
       student_id: studentId,
       grade_section: gradeSectionField?.value?.trim() || null,
       offense_type: violationTypeField?.value || null,
+      description: descriptionField?.value?.trim() || null,
       sanction: sanctionField?.value || null,
       remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
@@ -772,6 +800,7 @@
     alert(err.message || 'Failed to update status.');
   }
 }
+
 
   // === Existing global search ===
   function filterTable() {
@@ -845,6 +874,7 @@
     addOptionsToSelect(remarksField);
   }
 
+
     function applyFilters() {
     const strand = (filterStrand?.value || '').toLowerCase();
     const violationType = (filterViolationType?.value || '').toLowerCase();
@@ -869,6 +899,7 @@
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
+      const description = row.cells[4]?.textContent.toLowerCase() || '';
       const rowText = row.innerText.toLowerCase();
 
       const matchStrand = !strand || gradeSection.includes(strand);
@@ -964,7 +995,7 @@
     window.onafterprint = cleanupPrintArtifacts;
   }
 
-   // === NEW: Download (CSV) of the currently filtered/visible rows ===
+  // === NEW: Download (CSV) of the currently filtered/visible rows ===
   function downloadFilteredReport() {
     const table = document.getElementById('violationTable');
     if (!table) return;
@@ -1213,7 +1244,7 @@
 
     // filter + print
     applyFilterBtn?.addEventListener('click', applyFilters);
-    filterStrand?.addEventListener('change', applyFilters);
+  filterStrand?.addEventListener('change', applyFilters);
     filterViolationType?.addEventListener('change', applyFilters);
     // show centered floating picker for long lists (better display inside modals)
     [filterViolationType, violationTypeField].forEach(sel => {
@@ -1242,7 +1273,7 @@
       printReportBtn.addEventListener('click', downloadFilteredReport);
       }
     }
-
+  
   async function init() {
     ensureModalZStack();
     bindEvents();
@@ -1256,5 +1287,3 @@
 
   init();
 })();
-
-
