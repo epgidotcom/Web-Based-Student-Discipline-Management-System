@@ -170,7 +170,7 @@
   // The backend expects `student_id` (snake_case) to enforce proper filtering.
   const data = await api(`/violations?student_id=${encodeURIComponent(currentStudentId||'me')}`);
         // Normalize expected shape
-        violations = (Array.isArray(data) ? data : data.rows || [])
+        violations = (Array.isArray(data.data) ? data.data : data.data.rows || [])
           .map(v => ({
             date: (v.date || v.created_at || '').slice(0,10),
             type: v.type || v.violation_type || v.offense || 'Unknown',
@@ -315,4 +315,5 @@
   <script src="js/sidebar.js"></script>
   <script src="js/main.js"></script>
 </body>
+
 </html>
