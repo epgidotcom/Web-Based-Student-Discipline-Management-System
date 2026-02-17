@@ -16,13 +16,17 @@ const TEMPLATE_LABELS = {
 
 function sanitizePhone(phoneRaw = '') {
   const digits = String(phoneRaw).replace(/\D/g, '');
-  if (!/^\d{11}$/.test(digits)) {
-    return null;
-  }
-  if (digits.startsWith('09')) {
+  if (!digits) return null;
+  if (digits.length === 11 && digits.startsWith('09')) {
     return `63${digits.slice(1)}`;
   }
-  return digits;
+  if (digits.length === 12 && digits.startsWith('63')) {
+    return digits;
+  }
+  if (digits.length === 10 && digits.startsWith('9')) {
+    return `63${digits}`;
+  }
+  return null;
 }
 
 // SHA256 keeps the value traceable for duplicates without exposing the original data.
@@ -136,7 +140,7 @@ router.post('/sanctions/send', async (req, res) => {
     student: studentName = null,
     studentId = null,
     violation: violationType = null,
-    smsProvider: requestedProvider = 1
+    smsProvider: requestedProvider = 0
   } = req.body || {};
 
   // Check if this is a batch request
@@ -148,7 +152,9 @@ router.post('/sanctions/send', async (req, res) => {
     const inputPhone = phone_number ?? phone ?? null;
     const normalized = sanitizePhone(inputPhone);
     if (!normalized) {
-      return res.status(400).json({ error: 'Phone number must be 11 digits.' });
+      return res.status(400).json({
+        error: 'Phone number must be 11 digits (09xxxxxxxxx) or 12 digits starting with 63.'
+      });
     }
 
     if (!message || typeof message !== 'string' || !message.trim()) {
@@ -160,7 +166,7 @@ router.post('/sanctions/send', async (req, res) => {
     const provider = Number.isInteger(requestedProvider)
       ? requestedProvider
       : Number.parseInt(requestedProvider, 10);
-    const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 1;
+    const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 0;
 
     // iProgTech token (hardcoded per requirement)
     const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
@@ -262,7 +268,7 @@ router.post('/sanctions/send', async (req, res) => {
   const provider = Number.isInteger(requestedProvider)
     ? requestedProvider
     : Number.parseInt(requestedProvider, 10);
-  const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 1;
+  const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 0;
 
   // iProgTech token (hardcoded per requirement)
   const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
@@ -281,8 +287,8 @@ router.post('/sanctions/send', async (req, res) => {
   });
 
   if (normalizedPhones.length === 0) {
-    return res.status(400).json({ 
-      error: 'No valid phone numbers provided.',
+    return res.status(400).json({
+      error: 'No valid phone numbers provided. Use 09xxxxxxxxx or 639xxxxxxxxx.',
       invalid: invalidPhones
     });
   }
@@ -301,14 +307,14 @@ router.post('/sanctions/send', async (req, res) => {
     try {
       const maskedPhone = maskPhone(normalized);
       console.log(`Sending batch SMS to: ${maskedPhone}`);
-      
+
       await sendViaIProg({
         apiToken: iprogToken,
         phone: normalized,
         message: messageText,
         provider: smsProvider
       });
-      
+
       sent.push(raw);
       console.info(`[sms] ${messageId} batch dispatched to ${maskedPhone}`);
     } catch (err) {
@@ -327,8 +333,8 @@ router.post('/sanctions/send', async (req, res) => {
   const batchPhoneHash = hashValue(combinedPhones);
 
   const batchStatus = sent.length > 0 ? 'Sent' : 'Failed';
-  const batchErrorDetail = failures.length > 0 
-    ? `Batch: ${sent.length} sent, ${failures.length} failed` 
+  const batchErrorDetail = failures.length > 0
+    ? `Batch: ${sent.length} sent, ${failures.length} failed`
     : null;
 
   try {
