@@ -291,8 +291,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function parsePhoneNumbers(text) {
     if (!text) return { valid: [], invalid: [] };
     
-    // Split by comma, space, or newline
-    const parts = text.split(/[\s,\n]+/).map(p => p.trim()).filter(p => p);
+    // Split by comma or whitespace (including newlines)
+    const parts = text.split(/[\s,]+/).map(p => p.trim()).filter(p => p);
     
     const valid = [];
     const invalid = [];
@@ -329,10 +329,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let html = '';
         if (valid.length > 0) {
-          html += `<div style="color: #059669;">✓ ${valid.length} valid number${valid.length !== 1 ? 's' : ''}</div>`;
+          html += `<div style="color: #059669;" role="status" aria-live="polite">✓ ${valid.length} valid number${valid.length !== 1 ? 's' : ''}</div>`;
         }
         if (invalid.length > 0) {
-          html += `<div style="color: #dc2626;">✗ ${invalid.length} invalid number${invalid.length !== 1 ? 's' : ''}: ${invalid.join(', ')}</div>`;
+          html += `<div style="color: #dc2626;" role="alert" aria-live="assertive">✗ ${invalid.length} invalid number${invalid.length !== 1 ? 's' : ''}: ${invalid.join(', ')}</div>`;
         }
         
         feedback.innerHTML = html;
