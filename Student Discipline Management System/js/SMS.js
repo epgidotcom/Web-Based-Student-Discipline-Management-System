@@ -115,25 +115,74 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#sendBtn')?.addEventListener('click', (e) => {
     e.preventDefault();
 
+    const isBlastMode = $('#blastModeToggle')?.checked || false;
     const phoneEl = $('#phone');
-    const phone = (phoneEl?.value || '').replace(/\D/g, ''); // digits only
+    const phonesEl = $('#phones');
     const message = getVal('message');
 
-    if (!phone) { alert("Please enter parent's phone number."); phoneEl?.focus(); return; }
-    if (!/^\d{11}$/.test(phone)) { alert('Phone number must be exactly 11 digits.'); phoneEl?.focus(); return; }
     if (!message) { alert('Please generate or type a message.'); return; }
 
-    const payload = {
-      phone,
-      student:   getVal('student'),
-      grade:     getVal('grade'),
-      violation: getVal('violation'),
-      sanction:  getVal('sanction'),
-      date:      $('#date')?.value || '',
-      teacher:   getVal('teacher'),
-      template:  $('#template')?.value || 'default',
-      message
-    };
+    let payload;
+    let validPhones;
+    let invalidPhones = [];
+
+    if (isBlastMode) {
+      // Multiple phone numbers mode
+      const phonesText = phonesEl?.value || '';
+      if (!phonesText.trim()) {
+        alert('Please enter at least one phone number.');
+        phonesEl?.focus();
+        return;
+      }
+
+      const parsed = parsePhoneNumbers(phonesText);
+      validPhones = parsed.valid;
+      invalidPhones = parsed.invalid;
+
+      if (validPhones.length === 0) {
+        alert('No valid phone numbers found. Please check the format (11 digits each).');
+        phonesEl?.focus();
+        return;
+      }
+
+      payload = {
+        phones: validPhones,
+        student:   getVal('student'),
+        grade:     getVal('grade'),
+        violation: getVal('violation'),
+        sanction:  getVal('sanction'),
+        date:      $('#date')?.value || '',
+        teacher:   getVal('teacher'),
+        template:  $('#template')?.value || 'default',
+        message
+      };
+    } else {
+      // Single phone number mode
+      const phone = (phoneEl?.value || '').replace(/\D/g, '');
+      
+      if (!phone) { 
+        alert("Please enter parent's phone number."); 
+        phoneEl?.focus(); 
+        return; 
+      }
+      if (!/^\d{11}$/.test(phone)) { 
+        alert('Phone number must be exactly 11 digits.'); 
+        phoneEl?.focus(); 
+        return; 
+      }
+
+      payload = {
+        phone,
+        student:   getVal('student'),
+        grade:     getVal('grade'),
+        violation: getVal('violation'),
+        sanction:  getVal('sanction'),
+        date:      $('#date')?.value || '',
+        teacher:   getVal('teacher'),
+        template:  $('#template')?.value || 'default',
+        message
+      };
+    }
 
     // Send to backend
     (async () => {
@@ -167,9 +216,47 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           throw new Error(detail);
         }
-        await res.json();
-        pushBubble(`✔️ Sent to ${payload.phone}:\n\n${payload.message}`, 'right');
-        setTimeout(() => pushBubble('✅ Delivery accepted for processing by SMS gateway.'), 300);
+        
+        const result = await res.json();
+        
+        if (isBlastMode) {
+          // Show batch result
+          const sent = result.sent || 0;
+          const failed = result.failed || 0;
+          const invalid = invalidPhones.length;
+          
+          let summaryMsg = `Text Blast Complete!\n\n`;
+          summaryMsg += `✓ Sent: ${sent}\n`;
+          if (failed > 0) summaryMsg += `✗ Failed: ${failed}\n`;
+          if (invalid > 0) summaryMsg += `⚠ Invalid: ${invalid}\n`;
+          
+          pushBubble(summaryMsg, 'right');
+          
+          // Show details if there are failures
+          if (result.failures && result.failures.length > 0) {
+            const failureDetails = result.failures.map(f => 
+              `${f.phone}: ${f.error}`
+            ).join('\n');
+            pushBubble(`Failed numbers:\n${failureDetails}`, 'right');
+          }
+          
+          if (invalid > 0) {
+            pushBubble(`Invalid numbers: ${invalidPhones.join(', ')}`, 'right');
+          }
+          
+          // Clear textarea on success
+          if (sent > 0 && phonesEl) {
+            phonesEl.value = '';
+            const feedback = $('#phoneValidationFeedback');
+            if (feedback) feedback.innerHTML = '';
+          }
+          
+          setTimeout(() => pushBubble('✅ Batch delivery accepted for processing by SMS gateway.'), 300);
+        } else {
+          // Single phone number response
+          pushBubble(`✔️ Sent to ${payload.phone}:\n\n${payload.message}`, 'right');
+          setTimeout(() => pushBubble('✅ Delivery accepted for processing by SMS gateway.'), 300);
+        }
       } catch (err) {
         console.error('[sms] send failed', err);
         alert(`Failed to send SMS. ${err.message || ''}`.trim());
@@ -181,6 +268,77 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#phone')?.addEventListener('input', (e) => {
     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11);
   });
+
+  // --- Text Blast Mode Toggle ------------------------------------------------
+  const blastModeToggle = $('#blastModeToggle');
+  const singlePhoneContainer = $('#singlePhoneContainer');
+  const multiplePhoneContainer = $('#multiplePhoneContainer');
+
+  if (blastModeToggle && singlePhoneContainer && multiplePhoneContainer) {
+    blastModeToggle.addEventListener('change', (e) => {
+      const isBlastMode = e.target.checked;
+      if (isBlastMode) {
+        singlePhoneContainer.style.display = 'none';
+        multiplePhoneContainer.style.display = 'block';
+      } else {
+        singlePhoneContainer.style.display = 'block';
+        multiplePhoneContainer.style.display = 'none';
+      }
+    });
+  }
+
+  // --- Parse and validate phone numbers -------------------------------------
+  function parsePhoneNumbers(text) {
+    if (!text) return { valid: [], invalid: [] };
+    
+    // Split by comma or whitespace (including newlines)
+    const parts = text.split(/[\s,]+/).map(p => p.trim()).filter(p => p);
+    
+    const valid = [];
+    const invalid = [];
+    
+    parts.forEach(part => {
+      const digits = part.replace(/\D/g, '');
+      if (/^\d{11}$/.test(digits)) {
+        valid.push(digits);
+      } else if (digits) {
+        invalid.push(part);
+      }
+    });
+    
+    return { valid, invalid };
+  }
+
+  // Update validation feedback in real-time
+  const phonesTextarea = $('#phones');
+  if (phonesTextarea) {
+    let validationTimeout;
+    phonesTextarea.addEventListener('input', (e) => {
+      clearTimeout(validationTimeout);
+      validationTimeout = setTimeout(() => {
+        const feedback = $('#phoneValidationFeedback');
+        if (!feedback) return;
+        
+        const text = e.target.value.trim();
+        if (!text) {
+          feedback.innerHTML = '';
+          return;
+        }
+        
+        const { valid, invalid } = parsePhoneNumbers(text);
+        
+        let html = '';
+        if (valid.length > 0) {
+          html += `<div style="color: #059669;" role="status" aria-live="polite">✓ ${valid.length} valid number${valid.length !== 1 ? 's' : ''}</div>`;
+        }
+        if (invalid.length > 0) {
+          html += `<div style="color: #dc2626;" role="alert" aria-live="assertive">✗ ${invalid.length} invalid number${invalid.length !== 1 ? 's' : ''}: ${invalid.join(', ')}</div>`;
+        }
+        
+        feedback.innerHTML = html;
+      }, 300);
+    });
+  }
 
   // Reset
   $('#resetBtn')?.addEventListener('click', (e) => {
