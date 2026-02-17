@@ -129,6 +129,7 @@ router.use(requireAuth, requireAdmin);
 router.post('/sanctions/send', async (req, res) => {
   const {
     phone,
+    phones,
     phone_number,
     message,
     template = 'default',
@@ -138,13 +139,120 @@ router.post('/sanctions/send', async (req, res) => {
     smsProvider: requestedProvider = 1
   } = req.body || {};
 
-  // Accept legacy `phone` field while preferring `phone_number` (new contract).
-  const inputPhone = phone_number ?? phone ?? null;
-  const normalized = sanitizePhone(inputPhone);
-  if (!normalized) {
-    return res.status(400).json({ error: 'Phone number must be 11 digits.' });
+  // Check if this is a batch request
+  const isBatch = Array.isArray(phones) && phones.length > 0;
+
+  if (!isBatch) {
+    // Single phone number mode
+    // Accept legacy `phone` field while preferring `phone_number` (new contract).
+    const inputPhone = phone_number ?? phone ?? null;
+    const normalized = sanitizePhone(inputPhone);
+    if (!normalized) {
+      return res.status(400).json({ error: 'Phone number must be 11 digits.' });
+    }
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Message content is required.' });
+    }
+
+    const messageText = message.trim();
+
+    const provider = Number.isInteger(requestedProvider)
+      ? requestedProvider
+      : Number.parseInt(requestedProvider, 10);
+    const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 1;
+
+    // iProgTech token (hardcoded per requirement)
+    const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
+
+    const messageId = buildMessageId();
+    const dateSent = new Date();
+    const senderAccountId = req.user?.id ?? null;
+    const messageType = TEMPLATE_LABELS[template] || TEMPLATE_LABELS.default;
+    const maskedPhone = maskPhone(normalized);
+    const phoneHash = hashPhone(normalized);
+    const studentNameHash = studentName ? hashValue(studentName.trim().toLowerCase()) : null;
+
+    let status = 'Failed';
+    let errorDetail = null;
+
+    let providerResponse = null;
+    try {
+      console.log(`Sending SMS to: ${maskPhone(normalized)}`);
+      const providerPayload = await sendViaIProg({
+        apiToken: iprogToken,
+        phone: normalized,
+        message: messageText,
+        provider: smsProvider
+      });
+      providerResponse = providerPayload?.message
+        || providerPayload?.status
+        || providerPayload?.data?.status
+        || 'Accepted';
+      status = 'Sent';
+      console.info(`[sms] ${messageId} dispatched to ${maskedPhone}`);
+    } catch (err) {
+      errorDetail = err?.message || 'Unknown SMS gateway error';
+      const errMeta = {
+        name: err?.name,
+        code: err?.code ?? err?.cause?.code ?? err?.cause?.errno,
+        syscall: err?.cause?.syscall,
+        hostname: err?.cause?.hostname,
+        type: err?.type
+      };
+      console.error(`[sms] ${messageId} failed for ${maskedPhone}: ${errorDetail}`, errMeta);
+    }
+
+    try {
+      await ensureMessageLogTable();
+      await query(
+        `INSERT INTO message_logs (
+           message_id,
+           student_id,
+           student_name,
+           student_name_hash,
+           violation_type,
+           message_type,
+           message_status,
+           date_sent,
+           sender_account_id,
+           sender_name,
+           phone_hash,
+           error_detail
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)` ,
+        [
+          messageId,
+          studentId || null,
+          studentName || null,
+          studentNameHash,
+          violationType || null,
+          messageType,
+          status,
+          dateSent.toISOString(),
+          senderAccountId,
+          'MPNAGSDMS',
+          phoneHash,
+          errorDetail
+        ]
+      );
+    } catch (logErr) {
+      console.error('[sms] Failed to persist message log', logErr);
+    }
+
+    if (status !== 'Sent') {
+      return res.status(502).json({
+        error: 'SMS send failed',
+        detail: errorDetail || 'Unable to deliver SMS'
+      });
+    }
+
+    return res.json({
+      status: 'Sent',
+      providerResponse: providerResponse || 'Accepted'
+    });
   }
 
+  // Batch mode - multiple phone numbers
   if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'Message content is required.' });
   }
@@ -159,43 +267,69 @@ router.post('/sanctions/send', async (req, res) => {
   // iProgTech token (hardcoded per requirement)
   const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
 
+  // Normalize and validate all phone numbers
+  const normalizedPhones = [];
+  const invalidPhones = [];
+
+  phones.forEach(rawPhone => {
+    const normalized = sanitizePhone(rawPhone);
+    if (normalized) {
+      normalizedPhones.push({ raw: rawPhone, normalized });
+    } else {
+      invalidPhones.push(rawPhone);
+    }
+  });
+
+  if (normalizedPhones.length === 0) {
+    return res.status(400).json({ 
+      error: 'No valid phone numbers provided.',
+      invalid: invalidPhones
+    });
+  }
+
   const messageId = buildMessageId();
   const dateSent = new Date();
   const senderAccountId = req.user?.id ?? null;
   const messageType = TEMPLATE_LABELS[template] || TEMPLATE_LABELS.default;
-  const maskedPhone = maskPhone(normalized);
-  const phoneHash = hashPhone(normalized);
   const studentNameHash = studentName ? hashValue(studentName.trim().toLowerCase()) : null;
 
-  let status = 'Failed';
-  let errorDetail = null;
+  // Send to all valid numbers and collect results
+  const sent = [];
+  const failures = [];
 
-  let providerResponse = null;
-  try {
-    console.log(`Sending SMS to: ${maskPhone(normalized)}`);
-    const providerPayload = await sendViaIProg({
-      apiToken: iprogToken,
-      phone: normalized,
-      message: messageText,
-      provider: smsProvider
-    });
-    providerResponse = providerPayload?.message
-      || providerPayload?.status
-      || providerPayload?.data?.status
-      || 'Accepted';
-    status = 'Sent';
-    console.info(`[sms] ${messageId} dispatched to ${maskedPhone}`);
-  } catch (err) {
-    errorDetail = err?.message || 'Unknown SMS gateway error';
-    const errMeta = {
-      name: err?.name,
-      code: err?.code ?? err?.cause?.code ?? err?.cause?.errno,
-      syscall: err?.cause?.syscall,
-      hostname: err?.cause?.hostname,
-      type: err?.type
-    };
-    console.error(`[sms] ${messageId} failed for ${maskedPhone}: ${errorDetail}`, errMeta);
+  for (const { raw, normalized } of normalizedPhones) {
+    try {
+      const maskedPhone = maskPhone(normalized);
+      console.log(`Sending batch SMS to: ${maskedPhone}`);
+      
+      await sendViaIProg({
+        apiToken: iprogToken,
+        phone: normalized,
+        message: messageText,
+        provider: smsProvider
+      });
+      
+      sent.push(raw);
+      console.info(`[sms] ${messageId} batch dispatched to ${maskedPhone}`);
+    } catch (err) {
+      const errorDetail = err?.message || 'Unknown SMS gateway error';
+      failures.push({
+        phone: raw,
+        error: errorDetail
+      });
+      console.error(`[sms] ${messageId} batch failed for ${maskPhone(normalized)}: ${errorDetail}`);
+    }
   }
+
+  // Create batch log entry with combined phone_hash
+  // Compute phone_hash from the combined list of valid numbers
+  const combinedPhones = normalizedPhones.map(p => p.normalized).sort().join(',');
+  const batchPhoneHash = hashValue(combinedPhones);
+
+  const batchStatus = sent.length > 0 ? 'Sent' : 'Failed';
+  const batchErrorDetail = failures.length > 0 
+    ? `Batch: ${sent.length} sent, ${failures.length} failed` 
+    : null;
 
   try {
     await ensureMessageLogTable();
@@ -221,28 +355,28 @@ router.post('/sanctions/send', async (req, res) => {
         studentNameHash,
         violationType || null,
         messageType,
-        status,
+        batchStatus,
         dateSent.toISOString(),
         senderAccountId,
         'MPNAGSDMS',
-        phoneHash,
-        errorDetail
+        batchPhoneHash,
+        batchErrorDetail
       ]
     );
   } catch (logErr) {
-    console.error('[sms] Failed to persist message log', logErr);
+    console.error('[sms] Failed to persist batch message log', logErr);
   }
 
-  if (status !== 'Sent') {
-    return res.status(502).json({
-      error: 'SMS send failed',
-      detail: errorDetail || 'Unable to deliver SMS'
-    });
-  }
-
+  // Return comprehensive batch result
   return res.json({
-    status: 'Sent',
-    providerResponse: providerResponse || 'Accepted'
+    status: 'Batch',
+    messageId,
+    sent: sent.length,
+    failed: failures.length,
+    invalid: invalidPhones.length,
+    failures: failures.length > 0 ? failures : undefined,
+    invalidNumbers: invalidPhones.length > 0 ? invalidPhones : undefined,
+    timestamp: dateSent.toISOString()
   });
 });
 
