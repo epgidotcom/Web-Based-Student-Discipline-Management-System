@@ -13,14 +13,22 @@ export function signToken(account){
   }, JWT_SECRET, { expiresIn: TOKEN_TTL_SECONDS });
 }
 
+function getAuthToken(req){
+  const hdr = req.headers.authorization || '';
+  const m = hdr.match(/^Bearer (.+)$/i);
+  if (m?.[1]) return m[1];
+  const headerToken = req.headers['x-access-token'];
+  if (headerToken) return headerToken;
+  return req.body?.token || req.query?.token || null;
+}
+
 export async function requireAuth(req, res, next){
   try {
-    const hdr = req.headers.authorization || '';
-    const m = hdr.match(/^Bearer (.+)$/i);
-    if(!m) return res.status(401).json({ error: 'Missing token' });
+    const token = getAuthToken(req);
+    if(!token) return res.status(401).json({ error: 'Missing token' });
     let payload;
     try {
-      payload = jwt.verify(m[1], JWT_SECRET);
+      payload = jwt.verify(token, JWT_SECRET);
     } catch(e){
       return res.status(401).json({ error: 'Invalid token' });
     }
@@ -47,12 +55,11 @@ export function requireAdmin(req, res, next){
 // Returns the user row object or null if token missing/invalid.
 export async function tryGetUser(req){
   try {
-    const hdr = req.headers.authorization || '';
-    const m = hdr.match(/^Bearer (.+)$/i);
-    if(!m) return null;
+    const token = getAuthToken(req);
+    if(!token) return null;
     let payload;
     try {
-      payload = jwt.verify(m[1], JWT_SECRET);
+      payload = jwt.verify(token, JWT_SECRET);
     } catch(e){
       return null;
     }
