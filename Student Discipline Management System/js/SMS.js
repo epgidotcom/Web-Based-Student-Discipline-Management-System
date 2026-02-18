@@ -12,10 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use the configured base, preferring API_BASE if set
     let base = apiBase || (configBase ? `${configBase}/api` : '');
     
-    // If on Vercel production (mpnag.vercel.app) and using relative /api path,
+    // If on Vercel production and using relative /api path,
     // switch to direct backend URL to preserve Authorization headers
-    if (window.location.hostname.includes('vercel.app') && base.startsWith('/')) {
-      base = 'https://sdms-backend.onrender.com/api';
+    // (Vercel rewrites strip auth headers)
+    const hostname = window.location.hostname || '';
+    if (hostname.endsWith('.vercel.app') && base.startsWith('/')) {
+      // Use configured backend URL if available, otherwise fallback to default
+      const backendUrl = window.SDMS_CONFIG?.BACKEND_URL || 'https://sdms-backend.onrender.com';
+      base = `${backendUrl}/api`.replace(/\/+$/, '');
     }
     
     return base.replace(/\/+$/, '');
