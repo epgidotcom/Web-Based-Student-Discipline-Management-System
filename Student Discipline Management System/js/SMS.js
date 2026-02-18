@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hostname.endsWith('.vercel.app') && base.startsWith('/')) {
       // Use configured backend URL if available, otherwise fallback to default
       const backendUrl = window.SDMS_CONFIG?.BACKEND_URL || 'https://sdms-backend.onrender.com';
+      if (!window.SDMS_CONFIG?.BACKEND_URL) {
+        console.warn('[SMS] Using default backend URL. Consider setting SDMS_CONFIG.BACKEND_URL for production.');
+      }
       base = `${backendUrl}/api`.replace(/\/+$/, '');
     }
     
