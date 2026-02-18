@@ -4,8 +4,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  const API_ORIGIN = (window.API_BASE || '').replace(/\/+$/, '')
-    || `${(window.SDMS_CONFIG?.API_BASE || '').replace(/\/+$/, '')}/api`.replace(/\/+$/, '');
+  // Determine API origin - use direct backend URL to avoid Vercel rewrite issues with auth headers
+  const getApiOrigin = () => {
+    const configBase = (window.SDMS_CONFIG?.API_BASE || '').replace(/\/+$/, '');
+    const apiBase = (window.API_BASE || '').replace(/\/+$/, '');
+    
+    // Use the configured base, preferring API_BASE if set
+    let base = apiBase || (configBase ? `${configBase}/api` : '');
+    
+    // If on Vercel production and using relative /api path,
+    // switch to direct backend URL to preserve Authorization headers
+    // (Vercel rewrites strip auth headers)
+    const hostname = window.location.hostname || '';
+    if (hostname.endsWith('.vercel.app') && base.startsWith('/')) {
+      // Use configured backend URL if available, otherwise fallback to default
+      const backendUrl = window.SDMS_CONFIG?.BACKEND_URL || 'https://sdms-backend.onrender.com';
+      if (!window.SDMS_CONFIG?.BACKEND_URL) {
+        console.warn('[SMS] Using default backend URL. Consider setting SDMS_CONFIG.BACKEND_URL for production.');
+      }
+      base = `${backendUrl}/api`.replace(/\/+$/, '');
+    }
+    
+    return base.replace(/\/+$/, '');
+  };
+  
+  const API_ORIGIN = getApiOrigin();
   const getToken = () => window.SDMSAuth?.getToken?.() || null;
 
   // --- Helpers ---------------------------------------------------------------
