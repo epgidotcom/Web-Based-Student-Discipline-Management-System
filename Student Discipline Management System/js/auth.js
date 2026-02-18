@@ -7,7 +7,11 @@ function saveAuth(data){
 function getAuth(){
   try { return JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); } catch(_) { return null; }
 }
-function getToken(){ return getAuth()?.token || null; }
+function getToken(){ 
+  const token = getAuth()?.token;
+  // Return null if token is missing, empty, or whitespace-only
+  return (token && typeof token === 'string' && token.trim()) ? token.trim() : null;
+}
 function getUser(){ return getAuth()?.account || null; }
 function logout(){ localStorage.removeItem(AUTH_KEY); window.location.href='index.html'; }
 

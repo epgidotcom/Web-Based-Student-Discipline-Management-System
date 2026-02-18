@@ -17,7 +17,9 @@ function getAuthPayload(){
 
 function getStoredToken(){
   const auth = getAuthPayload();
-  return auth?.token || auth?.accessToken || null;
+  const token = auth?.token || auth?.accessToken;
+  // Return null if token is missing, empty, or whitespace-only
+  return (token && typeof token === 'string' && token.trim()) ? token.trim() : null;
 }
 
 function buildUrl(path){
