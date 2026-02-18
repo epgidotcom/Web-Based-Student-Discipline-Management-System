@@ -56,7 +56,7 @@ const corsOptions = {
     cb(null, ok);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Access-Token'],
   credentials: false, // set to true only if using cookies/auth headers across sites
   optionsSuccessStatus: 204,
 };
