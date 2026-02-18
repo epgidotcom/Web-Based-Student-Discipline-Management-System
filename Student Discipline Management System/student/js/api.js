@@ -17,9 +17,14 @@ function getAuthPayload(){
 
 function getStoredToken(){
   const auth = getAuthPayload();
-  const token = auth?.token || auth?.accessToken;
-  // Return null if token is missing, empty, or whitespace-only
-  return (token && typeof token === 'string' && token.trim()) ? token.trim() : null;
+  // Helper to validate a single token
+  const validateToken = (t) => {
+    if (!t || typeof t !== 'string') return null;
+    const trimmed = t.trim();
+    return trimmed || null;
+  };
+  // Try token first, then fallback to accessToken
+  return validateToken(auth?.token) || validateToken(auth?.accessToken) || null;
 }
 
 function buildUrl(path){

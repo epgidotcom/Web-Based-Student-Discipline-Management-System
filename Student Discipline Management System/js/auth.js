@@ -10,7 +10,9 @@ function getAuth(){
 function getToken(){ 
   const token = getAuth()?.token;
   // Return null if token is missing, empty, or whitespace-only
-  return (token && typeof token === 'string' && token.trim()) ? token.trim() : null;
+  if (!token || typeof token !== 'string') return null;
+  const trimmed = token.trim();
+  return trimmed || null;
 }
 function getUser(){ return getAuth()?.account || null; }
 function logout(){ localStorage.removeItem(AUTH_KEY); window.location.href='index.html'; }
