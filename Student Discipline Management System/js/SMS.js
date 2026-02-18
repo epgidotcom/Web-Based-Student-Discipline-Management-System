@@ -197,7 +197,8 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            'X-Access-Token': token
           },
           body: JSON.stringify(payload)
         });

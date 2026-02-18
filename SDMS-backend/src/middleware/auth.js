@@ -13,15 +13,10 @@ export function signToken(account){
   }, JWT_SECRET, { expiresIn: TOKEN_TTL_SECONDS });
 }
 
-function isJwtLike(token = ''){
-  return /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(token);
-}
-
-function _getAuthToken(req){
+function extractAuthToken(req){
   const hdr = req.headers.authorization || '';
   const m = hdr.match(/^Bearer (.+)$/i);
   if (m?.[1]) return m[1];
-  if (hdr && !/\s/.test(hdr) && isJwtLike(hdr)) return hdr;
   const headerToken = req.headers['x-access-token'];
   if (headerToken) return headerToken;
   return null;
@@ -29,7 +24,7 @@ function _getAuthToken(req){
 
 export async function requireAuth(req, res, next){
   try {
-    const token = _getAuthToken(req);
+    const token = extractAuthToken(req);
     if(!token) return res.status(401).json({ error: 'Missing token' });
     let payload;
     try {
@@ -60,7 +55,7 @@ export function requireAdmin(req, res, next){
 // Returns the user row object or null if token missing/invalid.
 export async function tryGetUser(req){
   try {
-    const token = _getAuthToken(req);
+    const token = extractAuthToken(req);
     if(!token) return null;
     let payload;
     try {
