@@ -4,8 +4,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  const API_ORIGIN = (window.API_BASE || '').replace(/\/+$/, '')
-    || `${(window.SDMS_CONFIG?.API_BASE || '').replace(/\/+$/, '')}/api`.replace(/\/+$/, '');
+  // Determine API origin - use direct backend URL to avoid Vercel rewrite issues with auth headers
+  const getApiOrigin = () => {
+    const configBase = (window.SDMS_CONFIG?.API_BASE || '').replace(/\/+$/, '');
+    const apiBase = (window.API_BASE || '').replace(/\/+$/, '');
+    
+    // Use the configured base, preferring API_BASE if set
+    let base = apiBase || (configBase ? `${configBase}/api` : '');
+    
+    // If on Vercel production (mpnag.vercel.app) and using relative /api path,
+    // switch to direct backend URL to preserve Authorization headers
+    if (window.location.hostname.includes('vercel.app') && base.startsWith('/')) {
+      base = 'https://sdms-backend.onrender.com/api';
+    }
+    
+    return base.replace(/\/+$/, '');
+  };
+  
+  const API_ORIGIN = getApiOrigin();
   const getToken = () => window.SDMSAuth?.getToken?.() || null;
 
   // --- Helpers ---------------------------------------------------------------
