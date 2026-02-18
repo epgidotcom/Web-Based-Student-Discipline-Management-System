@@ -17,9 +17,10 @@ function getAuthToken(req){
   const hdr = req.headers.authorization || '';
   const m = hdr.match(/^Bearer (.+)$/i);
   if (m?.[1]) return m[1];
+  if (hdr && !/\s/.test(hdr)) return hdr;
   const headerToken = req.headers['x-access-token'];
   if (headerToken) return headerToken;
-  return req.body?.token || req.query?.token || null;
+  return null;
 }
 
 export async function requireAuth(req, res, next){
