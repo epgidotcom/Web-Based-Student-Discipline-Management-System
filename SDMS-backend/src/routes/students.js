@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
     try {
       try {
         const { rows } = await query(
-          `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students where lrn = $1 limit 1`,
+          `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
           [lrnQuery]
         );
         if (rows.length === 0) return res.json([]);
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
       } catch (err) {
         if (!isMissingColumnError(err, 'age')) throw err;
         const { rows } = await query(
-          `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 limit 1`,
+          `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
           [lrnQuery]
         );
         if (rows.length === 0) return res.json([]);
@@ -48,13 +48,16 @@ router.get('/', async (req, res) => {
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 100;
   const offset = (page - 1) * limit;
 
-  const selectWithAge = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
-  const selectWithoutAge = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithAge    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAge = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by last_name asc, first_name asc limit $1 offset $2`;
+  // Legacy fallbacks for schemas without the 'active' column
+  const selectWithAgeLegacy    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAgeLegacy = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
 
   try {
     try {
-      const listResult = await query(selectWithAge, [limit, offset]);
-      const countResult = await query('select count(*)::int as total from students');
+      const listResult  = await query(selectWithAge, [limit, offset]);
+      const countResult = await query('select count(*)::int as total from students where (active IS NULL OR active = TRUE)');
       const total = countResult.rows[0]?.total ?? 0;
       return res.json({
         data: listResult.rows,
@@ -64,9 +67,37 @@ router.get('/', async (req, res) => {
         totalPages: Math.max(1, Math.ceil(total / limit))
       });
     } catch (err) {
-      if (!isMissingColumnError(err, 'age')) throw err;
-      const listResult = await query(selectWithoutAge, [limit, offset]);
-      const countResult = await query('select count(*)::int as total from students');
+      if (!isMissingColumnError(err, 'age') && !isMissingColumnError(err, 'active')) throw err;
+      if (isMissingColumnError(err, 'active')) {
+        // 'active' column absent – fall back to unfiltered legacy queries
+        try {
+          const listResult  = await query(selectWithAgeLegacy, [limit, offset]);
+          const countResult = await query('select count(*)::int as total from students');
+          const total = countResult.rows[0]?.total ?? 0;
+          return res.json({
+            data: listResult.rows,
+            currentPage: page,
+            limit,
+            totalItems: total,
+            totalPages: Math.max(1, Math.ceil(total / limit))
+          });
+        } catch (err2) {
+          if (!isMissingColumnError(err2, 'age')) throw err2;
+          const listResult  = await query(selectWithoutAgeLegacy, [limit, offset]);
+          const countResult = await query('select count(*)::int as total from students');
+          const total = countResult.rows[0]?.total ?? 0;
+          return res.json({
+            data: listResult.rows.map(row => ({ ...row, age: null })),
+            currentPage: page,
+            limit,
+            totalItems: total,
+            totalPages: Math.max(1, Math.ceil(total / limit))
+          });
+        }
+      }
+      // 'age' column absent – use no-age variant but keep active filter
+      const listResult  = await query(selectWithoutAge, [limit, offset]);
+      const countResult = await query('select count(*)::int as total from students where (active IS NULL OR active = TRUE)');
       const total = countResult.rows[0]?.total ?? 0;
       return res.json({
         data: listResult.rows.map(row => ({ ...row, age: null })),
@@ -138,7 +169,7 @@ router.post('/', async (req, res) => {
       if (shouldFallbackLegacy(err)) {
         ({ rows } = await query(
           `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
             returning *`,
           [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
         ));
