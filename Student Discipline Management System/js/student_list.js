@@ -755,5 +755,6 @@
   window.editStudent = openEdit;
   window.deleteStudent = removeStudent;
   window.searchStudent = searchStudent;
+  window.SDMS_refreshStudents = () => fetchData(1);
 
 })();
