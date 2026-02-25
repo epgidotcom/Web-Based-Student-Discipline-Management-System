@@ -127,8 +127,9 @@ app.use((err, _req, res, _next) => {
   try {
     if (process.env.AUTO_MIGRATE !== 'false') { // default: run
       console.log('Running migrations (startup)...');
-      // Migrations disabled - migrate.js file not found
-      console.log('Skipping migrations - file not found.');
+      const { runMigrations } = await import('./src/migrate.js');
+      await runMigrations();
+      console.log('Migrations complete.');
     } else {
       console.log('AUTO_MIGRATE disabled; skipping migrations.');
     }
