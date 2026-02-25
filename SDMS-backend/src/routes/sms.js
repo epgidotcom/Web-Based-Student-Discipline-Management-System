@@ -168,8 +168,11 @@ router.post('/sanctions/send', async (req, res) => {
       : Number.parseInt(requestedProvider, 10);
     const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 0;
 
-    // iProgTech token (hardcoded per requirement)
-    const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
+    const iprogToken = process.env.IPROG_API_TOKEN;
+    if (!iprogToken) {
+      console.error('[sms] Missing IPROG_API_TOKEN environment variable.');
+      return res.status(500).json({ error: 'SMS gateway not configured.' });
+    }
 
     const messageId = buildMessageId();
     const dateSent = new Date();
@@ -247,14 +250,18 @@ router.post('/sanctions/send', async (req, res) => {
 
     if (status !== 'Sent') {
       return res.status(502).json({
-        error: 'SMS send failed',
-        detail: errorDetail || 'Unable to deliver SMS'
+        messageId,
+        status: 'Failed',
+        error: errorDetail || 'Unable to deliver SMS',
+        timestamp: dateSent.toISOString()
       });
     }
 
     return res.json({
+      messageId,
       status: 'Sent',
-      providerResponse: providerResponse || 'Accepted'
+      providerResponse: providerResponse || 'Accepted',
+      timestamp: dateSent.toISOString()
     });
   }
 
@@ -270,8 +277,11 @@ router.post('/sanctions/send', async (req, res) => {
     : Number.parseInt(requestedProvider, 10);
   const smsProvider = Number.isInteger(provider) && provider >= 0 ? provider : 0;
 
-  // iProgTech token (hardcoded per requirement)
-  const iprogToken = '749479e8e029099681e03ac811a1a8cce8ae8b4f';
+  const iprogToken = process.env.IPROG_API_TOKEN;
+  if (!iprogToken) {
+    console.error('[sms] Missing IPROG_API_TOKEN environment variable.');
+    return res.status(500).json({ error: 'SMS gateway not configured.' });
+  }
 
   // Normalize and validate all phone numbers
   const normalizedPhones = [];
