@@ -22,6 +22,16 @@
   <a href="SMS.html" class="active"><i class="fa fa-message"></i> Messages &amp; SMS</a>
     <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
     <div class="sidebar-footer">
+
+          <button id="settingsBtn" class="logout-side" type="button" aria-expanded="false" aria-controls="settingsMenu" style="background:#9ca3af;">
+      <i class="fa fa-gear" aria-hidden="true"></i>
+      <span>Settings</span>
+    </button>
+    <div id="settingsMenu" class="settings-submenu" hidden style="margin-top:6px;padding-left:8px;">
+    </div>
+
+    <br> </br>
+
       <button id="logoutBtn" class="logout-side" type="button">
         <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
         <span>Logout</span>
@@ -106,14 +116,7 @@
 
           <form id="formPanel" autocomplete="off" novalidate>
             <div class="form-grid">
-              <div class="full">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                  <input type="checkbox" id="blastModeToggle" style="cursor: pointer;" />
-                  <span>Text Blast Mode (Send to multiple phone numbers)</span>
-                </label>
-              </div>
-
-              <div id="singlePhoneContainer">
+              <div>
                 <label for="phone">Parent's Phone Number:</label>
                 <input
                   id="phone"
@@ -125,17 +128,6 @@
                   required
                 />
                 <small class="help">11 digits, numbers only.</small>
-              </div>
-
-              <div id="multiplePhoneContainer" class="full" style="display: none;">
-                <label for="phones">Phone Numbers (comma, space, or newline separated):</label>
-                <textarea
-                  id="phones"
-                  rows="4"
-                  placeholder="e.g., 09171234567, 09181234568&#10;09191234569"
-                ></textarea>
-                <small class="help">Enter multiple 11-digit phone numbers separated by comma, space, or newline.</small>
-                <div id="phoneValidationFeedback" style="margin-top: 8px; font-size: 0.9em;"></div>
               </div>
 
               <div>
