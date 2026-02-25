@@ -56,7 +56,7 @@ const corsOptions = {
     cb(null, ok);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Access-Token'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: false, // set to true only if using cookies/auth headers across sites
   optionsSuccessStatus: 204,
 };
@@ -127,7 +127,8 @@ app.use((err, _req, res, _next) => {
   try {
     if (process.env.AUTO_MIGRATE !== 'false') { // default: run
       console.log('Running migrations (startup)...');
-      await runMigrations();
+      // Migrations disabled - migrate.js file not found
+      console.log('Skipping migrations - file not found.');
     } else {
       console.log('AUTO_MIGRATE disabled; skipping migrations.');
     }

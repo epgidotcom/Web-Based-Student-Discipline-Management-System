@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
+  <title>SDMS - Settings</title>
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar" aria-hidden="true">
+  <img src="images/mpnag_logo.png" alt="MPNAG Logo">
+  <a href="dashboard.html"><i class="fa fa-gauge"></i> Dashboard</a>
+  <a href="student_list.html"><i class="fa fa-users"></i> Student List</a>
+  <a href="violation_list.html"><i class="fa fa-exclamation-triangle"></i> Violation List</a>
+  <a href="appeals.html"><i class="fa fa-file-circle-question"></i> Appeals</a>
+  <a href="SMS.html"><i class="fa fa-message"></i> Messages &amp; SMS</a>
+  <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
+
+  <div class="sidebar-footer">
+    <button id="settingsBtn" class="logout-side active" type="button" aria-expanded="false" aria-controls="settingsMenu" style="background:#9ca3af;">
+      <i class="fa fa-gear" aria-hidden="true"></i>
+      <span>Settings</span>
+    </button>
+    <div id="settingsMenu" class="settings-submenu" hidden style="margin-top:6px;padding-left:8px;">
+    </div>
+
+    <br> </br>
+
+    <button id="logoutBtn" class="logout-side" type="button">
+      <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
+  </div>
+</nav>
+
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="fa fa-bars" aria-hidden="true"></i><span> Menu</span>
+    </button>
+    <h1>Student Discipline Management System</h1>
+
+    <div class="user-area">
+      <button class="user-chip" id="userChip" type="button" aria-label="Current user">
+        <span class="user-avatar" id="userAvatar">A</span>
+        <span class="user-name" id="userName">Admin</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings Container -->
+  <div class="settings-container">
+    <div class="settings-header">
+      <h2>System Settings</h2>
+      <p>Manage violation types, sanction types, and grade/section information</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="settings-tabs">
+      <button class="tab-btn active" data-tab="violations">
+        <i class="fa fa-exclamation-triangle"></i> Violation Types
+      </button>
+      <button class="tab-btn" data-tab="sanctions">
+        <i class="fa fa-gavel"></i> Sanction Types
+      </button>
+      <button class="tab-btn" data-tab="grades">
+        <i class="fa fa-graduation-cap"></i> Grade & Sections
+      </button>
+    </div>
+
+    <!-- TAB 1: Violation Types -->
+    <div id="violations-tab" class="tab-content active">
+      <div class="widget">
+        <div class="widget-head">
+          <h3>Add Violation Type</h3>
+        </div>
+        <div class="widget-body">
+          <form id="violationForm">
+            <div class="form-group">
+              <label for="violationTypeName">Violation Type</label>
+              <input type="text" id="violationTypeName" placeholder="e.g., Bullying" required>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">
+                <i class="fa fa-plus"></i> Add Violation Type
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Existing Violation Types List -->
+      <div class="widget">
+        <div class="widget-head">
+          <h3>Existing Violation Types</h3>
+        </div>
+        <div class="widget-body">
+          <div id="violationsList" class="list-container">
+            <p class="empty-state"><i class="fa fa-inbox"></i> Loading violation types...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Sanction Types -->
+    <div id="sanctions-tab" class="tab-content">
+      <div class="widget">
+        <div class="widget-head">
+          <h3>Add Sanction Type</h3>
+        </div>
+        <div class="widget-body">
+          <form id="sanctionForm">
+            <div class="form-group">
+              <label for="sanctionTypeName">Sanction Type</label>
+              <input type="text" id="sanctionTypeName" placeholder="e.g., Verbal Warning" required>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">
+                <i class="fa fa-plus"></i> Add Sanction Type
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Existing Sanction Types List -->
+      <div class="widget">
+        <div class="widget-head">
+          <h3>Existing Sanction Types</h3>
+        </div>
+        <div class="widget-body">
+          <div id="sanctionsList" class="list-container">
+            <p class="empty-state"><i class="fa fa-inbox"></i> Loading sanction types...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Grades & Sections -->
+    <div id="grades-tab" class="tab-content">
+      <div class="widget">
+        <div class="widget-head">
+          <h3>Add Grade & Section</h3>
+        </div>
+        <div class="widget-body">
+          <form id="gradeForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="gradeName">Grade Level</label>
+                <input type="text" id="gradeName" placeholder="e.g., Grade 7" required>
+              </div>
+
+              <div class="form-group">
+                <label for="sectionName">Section</label>
+                <input type="text" id="sectionName" placeholder="e.g., A" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="adviser">Class Adviser</label>
+              <input type="text" id="adviser" placeholder="Name of the adviser">
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">
+                <i class="fa fa-plus"></i> Add Grade & Section
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Existing Grades & Sections List -->
+      <div class="widget">
+        <div class="widget-head">
+          <h3>Existing Grades & Sections</h3>
+        </div>
+        <div class="widget-body">
+          <div id="gradesList" class="list-container">
+            <p class="empty-state"><i class="fa fa-inbox"></i> Loading grades and sections...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- Scripts -->
+<script type="module" src="js/config.js"></script>
+<script type="module" src="js/main.js"></script>
+<script type="module" src="js/settings.js"></script>
+
+</body>
+</html>

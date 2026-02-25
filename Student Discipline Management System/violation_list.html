@@ -35,6 +35,15 @@
   <a href="SMS.html"><i class="fa fa-message"></i> Messages &amp; SMS</a>
   <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
   <div class="sidebar-footer">
+    <button id="settingsBtn" class="logout-side" type="button" aria-expanded="false" aria-controls="settingsMenu" style="background:#9ca3af;">
+      <i class="fa fa-gear" aria-hidden="true"></i>
+      <span>Settings</span>
+    </button>
+    <div id="settingsMenu" class="settings-submenu" hidden style="margin-top:6px;padding-left:8px;">
+    </div>
+
+    <br> </br>
+
     <button id="logoutBtn" class="logout-side" type="button">
       <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
       <span>Logout</span>
@@ -102,8 +111,9 @@
           <option value="STEM">STEM</option>
           <option value="HUMSS">HUMSS</option>
           <option value="ABM">ABM</option>
+          <option value="HE">HE</option>
+          <option value="ICT">ICT</option>
           <option value="GAS">GAS</option>
-          <option value="TVL">TVL</option>
         </select>
 
         <select id="filterViolationType">
@@ -200,7 +210,7 @@
       </select>
 
       <div class="evidence-uploader" id="evidenceUploader">
-        <div class="head"><strong>Evidence (optional)</strong></div>
+        <div class="head"><strong>Evidence</strong></div>
         <div class="evidence-preview is-hidden" id="evidencePreview"></div>
         <div class="drop" id="evidenceDrop">
           <i class="fa fa-paperclip"></i>
@@ -273,6 +283,19 @@
     const fallback = isLocal ? '' : 'https://web-based-student-discipline-management.onrender.com';
     window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
   })();
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var settingsBtn = document.getElementById('settingsBtn');
+    var settingsMenu = document.getElementById('settingsMenu');
+    if (settingsBtn && settingsMenu) {
+      settingsBtn.addEventListener('click', function () {
+        var open = settingsMenu.hasAttribute('hidden');
+        settingsMenu.toggleAttribute('hidden');
+        settingsBtn.setAttribute('aria-expanded', String(open));
+      });
+    }
+  });
 </script>
 </body>
 </html>

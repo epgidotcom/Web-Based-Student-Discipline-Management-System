@@ -29,6 +29,14 @@
   <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
 
   <div class="sidebar-footer">
+    <button id="settingsBtn" class="logout-side" type="button" aria-expanded="false" aria-controls="settingsMenu" style="background:#9ca3af;">
+      <i class="fa fa-gear" aria-hidden="true"></i>
+      <span>Settings</span>
+    </button>
+    <div id="settingsMenu" class="settings-submenu" hidden style="margin-top:6px;padding-left:8px;">
+    </div>
+    <br> </br>
+
     <button id="logoutBtn" class="logout-side" type="button">
       <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
       <span>Logout</span>
@@ -169,7 +177,6 @@
               <option value="ABM">ABM</option>
               <option value="GAS">GAS</option>
               <option value="HUMSS">HUMSS</option>
-              <option value="TVL">TVL</option>
             </select>
           </label>
           <label>
@@ -190,7 +197,7 @@
       </div>
 
       <p class="chart-note">
-        Forecasted number of students likely to commit repeat offenses every 7 days, grouped by strand (STEM, ABM, GAS, HUMSS, TVL).
+        Forecasted number of students likely to commit repeat offenses every 7 days, grouped by strand (STEM, ABM, GAS, HUMSS).
       </p>
     </div>
   </div>
@@ -210,5 +217,4 @@
     window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
   })();
 </script>
-</body>
-</html>
+

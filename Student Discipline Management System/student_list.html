@@ -26,6 +26,15 @@
   <a href="account.html"><i class="fa fa-user-plus"></i> Accounts</a>
 
   <div class="sidebar-footer">
+    <button id="settingsBtn" class="logout-side" type="button" aria-expanded="false" aria-controls="settingsMenu" style="background:#9ca3af;">
+      <i class="fa fa-gear" aria-hidden="true"></i>
+      <span>Settings</span>
+    </button>
+    <div id="settingsMenu" class="settings-submenu" hidden style="margin-top:6px;padding-left:8px;">
+    </div>
+
+    <br> </br>
+
     <button id="logoutBtn" class="logout-side" type="button">
       <i class="fa fa-sign-out-alt" aria-hidden="true"></i>
       <span>Logout</span>
@@ -56,9 +65,14 @@
     <div class="widget-head">
       <h3>Student List</h3>
 
-      <button id="addStudentBtn" class="add-btn">
-        <i class="fa fa-plus"></i> Add Student
-      </button>
+      <div style="display: flex; gap: 10px;">
+        <button id="addStudentBtn" class="add-btn">
+          <i class="fa fa-plus"></i> Add Student
+        </button>
+        <button id="batchUploadBtn" class="add-btn" style="background: #10b981;">
+          <i class="fa fa-upload"></i> Batch Upload
+        </button>
+      </div>
     </div>
 
     <div class="search-container">
@@ -72,8 +86,9 @@
           <option value="ABM">ABM</option>
           <option value="HUMSS">HUMSS</option>
           <option value="STEM">STEM</option>
+          <option value="HE">HE</option>
+          <option value="ICT">ICT</option>
           <option value="GAS">GAS</option>
-          <option value="TVL">TVL</option>
         </select>
 
         <select id="filterGrade" class="filter-select" aria-label="Filter by grade">
@@ -230,6 +245,97 @@
     </div>
   </div>
 </div>
+
+<!-- Batch Upload Modal -->
+<div id="batchUploadModal" class="modal">
+  <div class="modal-content" style="max-width: 900px;">
+    <div class="modal-header">
+      <h2>Batch Upload Students</h2>
+      <span class="close-btn" id="closeBatchUploadBtn">&times;</span>
+    </div>
+
+    <div style="padding: 20px;">
+      <div class="upload-section">
+        <p style="margin-bottom: 15px; color: #6b7280;">
+          Upload a CSV file with the following headers (in exact order):
+          <strong>LRN, FullName, Age, Grade, Section, Strand</strong>
+        </p>
+        
+        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0; font-size: 14px; color: #374151;">
+            <strong>Example format:</strong><br>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px;">123456789012,Juan Dela Cruz,16,11,A,STEM</code>
+          </p>
+          <p style="margin: 10px 0 0 0; font-size: 13px; color: #6b7280;">
+            <em>Note: Parent contact will default to 09000000000. You can edit individual records later.</em>
+          </p>
+          <button type="button" id="downloadTemplateBtn" class="btn" style="background: #3b82f6; color: white; margin-top: 10px;">
+            <i class="fa fa-download"></i> Download CSV Template
+          </button>
+        </div>
+
+        <div id="dropZone" style="border: 2px dashed #d1d5db; border-radius: 8px; padding: 30px; text-align: center; background: #f9fafb; cursor: pointer; transition: all 0.3s; margin-bottom: 15px;">
+          <i class="fa fa-cloud-upload" style="font-size: 48px; color: #9ca3af; margin-bottom: 15px;"></i>
+          <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 16px;">
+            <strong>Drag & drop your CSV file here</strong>
+          </p>
+          <p style="margin: 0; color: #9ca3af; font-size: 14px;">or click to browse</p>
+          <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+        </div>
+
+        <div id="fileInfo" style="display: none; background: #e0f2fe; border: 1px solid #0284c7; border-radius: 6px; padding: 10px; margin-bottom: 15px;">
+          <i class="fa fa-file-csv" style="color: #0284c7;"></i>
+          <span id="fileName" style="margin-left: 8px; color: #0c4a6e;"></span>
+          <button type="button" id="clearFileBtn" style="float: right; background: none; border: none; color: #dc2626; cursor: pointer;">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+
+        <button type="button" id="parseCSVBtn" class="save-btn" style="width: 100%;">
+          <i class="fa fa-check-circle"></i> Parse & Preview
+        </button>
+      </div>
+
+      <div id="csvPreviewSection" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h3 style="margin: 0;">Preview (<span id="previewCount">0</span> students)</h3>
+          <div>
+            <button type="button" id="cancelUploadBtn" class="btn" style="background: #6b7280; color: white; margin-right: 10px;">
+              <i class="fa fa-times"></i> Cancel
+            </button>
+            <button type="button" id="confirmUploadBtn" class="save-btn">
+              <i class="fa fa-save"></i> Save All Students
+            </button>
+          </div>
+        </div>
+
+        <div id="validationErrors" style="display: none; background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+          <h4 style="margin: 0 0 10px 0; color: #dc2626;"><i class="fa fa-exclamation-triangle"></i> Validation Errors</h4>
+          <ul id="errorList" style="margin: 0; padding-left: 20px; color: #991b1b;"></ul>
+        </div>
+
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table id="csvPreviewTable">
+            <thead>
+              <tr>
+                <th>LRN</th>
+                <th>Full Name</th>
+                <th>Age</th>
+                <th>Grade</th>
+                <th>Section</th>
+                <th>Strand</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Preview rows will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
   
 <!-- Page scripts -->
 <script src="js/config.js" defer></script>
@@ -237,6 +343,7 @@
 <script src="js/main.js" defer></script>
 <script src="js/pagination.js" defer></script>
 <script src="js/student_list.js" defer></script>
+<script src="js/batch_upload.js" defer></script>
 
 <script>
   (function(){
@@ -267,6 +374,16 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('keydown', function(e){ if(e.key === 'Escape') setOpen(false); });
     window.addEventListener('resize', function(){ if (window.innerWidth >= 769) setOpen(false); });
     menuBtn.dataset.bound = '1';
+  }
+
+  var settingsBtn = document.getElementById('settingsBtn');
+  var settingsMenu = document.getElementById('settingsMenu');
+  if (settingsBtn && settingsMenu) {
+    settingsBtn.addEventListener('click', function () {
+      var open = settingsMenu.hasAttribute('hidden');
+      settingsMenu.toggleAttribute('hidden');
+      settingsBtn.setAttribute('aria-expanded', String(open));
+    });
   }
 });
 </script>
