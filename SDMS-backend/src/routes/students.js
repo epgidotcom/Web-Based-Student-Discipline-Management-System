@@ -156,6 +156,98 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Batch create students
+router.post('/batch', async (req, res) => {
+  const { students } = req.body ?? {};
+  
+  if (!Array.isArray(students) || students.length === 0) {
+    return res.status(400).json({ error: 'students array is required and must not be empty' });
+  }
+
+  const results = {
+    inserted: 0,
+    skipped: 0,
+    failed: 0,
+    errors: [],
+    details: []
+  };
+
+  // Process each student
+  for (let i = 0; i < students.length; i++) {
+    const student = students[i];
+    const { lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact } = student;
+
+    // Validate required fields
+    if (!first_name || !last_name) {
+      results.failed++;
+      results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'first_name and last_name are required' });
+      results.details.push({ row: i + 1, status: 'failed', lrn, reason: 'Missing required fields' });
+      continue;
+    }
+
+    const cleanAge = age === undefined || age === null || age === '' ? null : Number(age);
+    if (cleanAge !== null && !Number.isFinite(cleanAge)) {
+      results.failed++;
+      results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'Invalid age' });
+      results.details.push({ row: i + 1, status: 'failed', lrn, reason: 'Invalid age' });
+      continue;
+    }
+
+    try {
+      const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim() || null;
+      const grade_level = grade ?? null;
+      const isActive = true;
+
+      let rows;
+      try {
+        ({ rows } = await query(
+          `insert into students (lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, full_name, grade_level, active)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           returning *`,
+          [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, cleanAge, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, full_name, grade_level, isActive]
+        ));
+      } catch (err) {
+        if (shouldFallbackLegacy(err)) {
+          ({ rows } = await query(
+            `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+             returning *`,
+            [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
+          ));
+        } else {
+          throw err;
+        }
+      }
+
+      results.inserted++;
+      results.details.push({ row: i + 1, status: 'inserted', lrn, id: rows[0]?.id });
+    } catch (e) {
+      // Handle duplicate LRN - skip it
+      if (e && e.code === '23505' && /lrn/i.test(e.detail || '')) {
+        results.skipped++;
+        results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'LRN already exists (skipped)' });
+        results.details.push({ row: i + 1, status: 'skipped', lrn, reason: 'Duplicate LRN' });
+      } else {
+        results.failed++;
+        results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: e.message });
+        results.details.push({ row: i + 1, status: 'failed', lrn, reason: e.message });
+      }
+    }
+  }
+
+  // Determine appropriate HTTP status code
+  let statusCode;
+  if (results.failed === students.length) {
+    statusCode = 400; // All failed
+  } else if (results.inserted === students.length) {
+    statusCode = 201; // All succeeded
+  } else {
+    statusCode = 207; // Multi-Status: partial success
+  }
+
+  res.status(statusCode).json(results);
+});
+
 // Update student
 router.put('/:id', async (req, res) => {
   const { lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact } = req.body ?? {};
