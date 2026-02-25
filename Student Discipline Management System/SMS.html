@@ -116,7 +116,14 @@
 
           <form id="formPanel" autocomplete="off" novalidate>
             <div class="form-grid">
-              <div>
+              <div class="full">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:0;">
+                  <input type="checkbox" id="blastModeToggle" style="width:auto; margin:0;" />
+                  Enable Text Blast (send to multiple recipients)
+                </label>
+              </div>
+
+              <div id="singlePhoneContainer">
                 <label for="phone">Parent's Phone Number:</label>
                 <input
                   id="phone"
@@ -128,6 +135,17 @@
                   required
                 />
                 <small class="help">11 digits, numbers only.</small>
+              </div>
+
+              <div id="multiplePhoneContainer" class="full" style="display:none;">
+                <label for="phones">Phone Numbers:</label>
+                <textarea
+                  id="phones"
+                  rows="4"
+                  placeholder="Enter 11-digit numbers separated by commas or new lines&#10;e.g., 09171234567, 09281234567"
+                ></textarea>
+                <div id="phoneValidationFeedback" class="help"></div>
+                <small class="help">Separate multiple numbers with commas or new lines.</small>
               </div>
 
               <div>
