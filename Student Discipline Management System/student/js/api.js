@@ -17,14 +17,7 @@ function getAuthPayload(){
 
 function getStoredToken(){
   const auth = getAuthPayload();
-  // Helper to validate a single token
-  const validateToken = (t) => {
-    if (!t || typeof t !== 'string') return null;
-    const trimmed = t.trim();
-    return trimmed || null;
-  };
-  // Try token first, then fallback to accessToken
-  return validateToken(auth?.token) || validateToken(auth?.accessToken) || null;
+  return auth?.token || auth?.accessToken || null;
 }
 
 function buildUrl(path){
