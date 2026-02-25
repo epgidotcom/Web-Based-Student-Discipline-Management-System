@@ -11,7 +11,7 @@ function shouldFallbackLegacy(err) {
   const msg = err?.message?.toLowerCase?.() || '';
   return (
     /full_name|grade_level/.test(msg) && msg.includes('does not exist')
-  ) || isMissingColumnError(err, 'age');
+  ) || isMissingColumnError(err, 'age') || isMissingColumnError(err, 'last_name');
 }
 
 const router = Router();
@@ -30,7 +30,25 @@ router.get('/', async (req, res) => {
         if (rows.length === 0) return res.json([]);
         return res.json(rows);
       } catch (err) {
-        if (!isMissingColumnError(err, 'age')) throw err;
+        if (!isMissingColumnError(err, 'age') && !isMissingColumnError(err, 'last_name')) throw err;
+        if (isMissingColumnError(err, 'last_name')) {
+          try {
+            const { rows } = await query(
+              `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
+              [lrnQuery]
+            );
+            if (rows.length === 0) return res.json([]);
+            return res.json(rows);
+          } catch (err2) {
+            if (!isMissingColumnError(err2, 'age')) throw err2;
+            const { rows } = await query(
+              `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
+              [lrnQuery]
+            );
+            if (rows.length === 0) return res.json([]);
+            return res.json([{ ...rows[0], age: null }]);
+          }
+        }
         const { rows } = await query(
           `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
           [lrnQuery]
@@ -53,6 +71,11 @@ router.get('/', async (req, res) => {
   // Legacy fallbacks for schemas without the 'active' column
   const selectWithAgeLegacy    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
   const selectWithoutAgeLegacy = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+  // Fallbacks for schemas without the 'last_name' column (uses full_name instead)
+  const selectWithAgeNoLast    = `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAgeNoLast = `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithAgeNoLastLegacy    = `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAgeNoLastLegacy = `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at from students order by full_name asc, first_name asc limit $1 offset $2`;
 
   try {
     try {
@@ -67,7 +90,60 @@ router.get('/', async (req, res) => {
         totalPages: Math.max(1, Math.ceil(total / limit))
       });
     } catch (err) {
-      if (!isMissingColumnError(err, 'age') && !isMissingColumnError(err, 'active')) throw err;
+      if (!isMissingColumnError(err, 'age') && !isMissingColumnError(err, 'active') && !isMissingColumnError(err, 'last_name')) throw err;
+      if (isMissingColumnError(err, 'last_name')) {
+        // 'last_name' column absent – use full_name variants
+        try {
+          const listResult  = await query(selectWithAgeNoLast, [limit, offset]);
+          const countResult = await query('select count(*)::int as total from students where (active IS NULL OR active = TRUE)');
+          const total = countResult.rows[0]?.total ?? 0;
+          return res.json({
+            data: listResult.rows,
+            currentPage: page,
+            limit,
+            totalItems: total,
+            totalPages: Math.max(1, Math.ceil(total / limit))
+          });
+        } catch (err2) {
+          if (!isMissingColumnError(err2, 'age') && !isMissingColumnError(err2, 'active')) throw err2;
+          if (isMissingColumnError(err2, 'active')) {
+            try {
+              const listResult  = await query(selectWithAgeNoLastLegacy, [limit, offset]);
+              const countResult = await query('select count(*)::int as total from students');
+              const total = countResult.rows[0]?.total ?? 0;
+              return res.json({
+                data: listResult.rows,
+                currentPage: page,
+                limit,
+                totalItems: total,
+                totalPages: Math.max(1, Math.ceil(total / limit))
+              });
+            } catch (err3) {
+              if (!isMissingColumnError(err3, 'age')) throw err3;
+              const listResult  = await query(selectWithoutAgeNoLastLegacy, [limit, offset]);
+              const countResult = await query('select count(*)::int as total from students');
+              const total = countResult.rows[0]?.total ?? 0;
+              return res.json({
+                data: listResult.rows.map(row => ({ ...row, age: null })),
+                currentPage: page,
+                limit,
+                totalItems: total,
+                totalPages: Math.max(1, Math.ceil(total / limit))
+              });
+            }
+          }
+          const listResult  = await query(selectWithoutAgeNoLast, [limit, offset]);
+          const countResult = await query('select count(*)::int as total from students where (active IS NULL OR active = TRUE)');
+          const total = countResult.rows[0]?.total ?? 0;
+          return res.json({
+            data: listResult.rows.map(row => ({ ...row, age: null })),
+            currentPage: page,
+            limit,
+            totalItems: total,
+            totalPages: Math.max(1, Math.ceil(total / limit))
+          });
+        }
+      }
       if (isMissingColumnError(err, 'active')) {
         // 'active' column absent – fall back to unfiltered legacy queries
         try {
@@ -124,7 +200,27 @@ router.get('/:id', async (req, res) => {
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
       return res.json(rows[0]);
     } catch (err) {
-      if (!isMissingColumnError(err, 'age')) throw err;
+      if (!isMissingColumnError(err, 'age') && !isMissingColumnError(err, 'last_name')) throw err;
+      if (isMissingColumnError(err, 'last_name')) {
+        try {
+          const { rows } = await query(
+            `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at
+               from students where id = $1`,
+            [req.params.id]
+          );
+          if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+          return res.json(rows[0]);
+        } catch (err2) {
+          if (!isMissingColumnError(err2, 'age')) throw err2;
+          const { rows } = await query(
+            `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at
+               from students where id = $1`,
+            [req.params.id]
+          );
+          if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+          return res.json({ ...rows[0], age: null });
+        }
+      }
     }
 
     const { rows } = await query(
@@ -142,7 +238,7 @@ router.get('/:id', async (req, res) => {
 // Create student
 router.post('/', async (req, res) => {
   const { lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact } = req.body ?? {};
-  if (!first_name || !last_name) return res.status(400).json({ error: 'first_name and last_name are required' });
+  if (!first_name) return res.status(400).json({ error: 'first_name is required' });
   const cleanAge = age === undefined || age === null || age === '' ? null : Number(age);
   if (cleanAge !== null && !Number.isFinite(cleanAge)) {
     return res.status(400).json({ error: 'Invalid age' });
@@ -168,10 +264,10 @@ router.post('/', async (req, res) => {
       // If error mentions unknown column (e.g., after we drop legacy columns) retry without them.
       if (shouldFallbackLegacy(err)) {
         ({ rows } = await query(
-          `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          `insert into students (lrn, first_name, middle_name, birthdate, address, grade, section, parent_contact, active)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             returning *`,
-          [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
+          [lrn ?? null, first_name, middle_name ?? null, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
         ));
       } else {
         throw err;
@@ -209,9 +305,9 @@ router.post('/batch', async (req, res) => {
     const { lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact } = student;
 
     // Validate required fields
-    if (!first_name || !last_name) {
+    if (!first_name) {
       results.failed++;
-      results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'first_name and last_name are required' });
+      results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'first_name is required' });
       results.details.push({ row: i + 1, status: 'failed', lrn, reason: 'Missing required fields' });
       continue;
     }
@@ -240,10 +336,10 @@ router.post('/batch', async (req, res) => {
       } catch (err) {
         if (shouldFallbackLegacy(err)) {
           ({ rows } = await query(
-            `insert into students (lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, active)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            `insert into students (lrn, first_name, middle_name, birthdate, address, grade, section, parent_contact, active)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
              returning *`,
-            [lrn ?? null, first_name, middle_name ?? null, last_name, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
+            [lrn ?? null, first_name, middle_name ?? null, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, isActive]
           ));
         } else {
           throw err;
@@ -293,17 +389,29 @@ router.put('/:id', async (req, res) => {
     let grade_level = null;
     if (first_name || middle_name || last_name || grade) {
       try {
-        const current = await query('select first_name, middle_name, last_name, grade from students where id = $1', [req.params.id]);
+        const current = await query('select first_name, middle_name, last_name, full_name, grade from students where id = $1', [req.params.id]);
         if (current.rows.length === 0) return res.status(404).json({ error: 'Not found' });
         const cur = current.rows[0];
         const newFirst = first_name ?? cur.first_name;
         const newMiddle = middle_name ?? cur.middle_name;
         const newLast = last_name ?? cur.last_name;
         const newGrade = grade ?? cur.grade;
-        full_name = [newFirst, newMiddle, newLast].filter(Boolean).join(' ').trim() || null;
+        full_name = [newFirst, newMiddle, newLast].filter(Boolean).join(' ').trim() || cur.full_name || null;
         grade_level = newGrade ?? null;
       } catch (e) {
-        // If select fails we still proceed with basic update; error handled later if update fails.
+        // If select fails (e.g. last_name column absent) try without last_name
+        try {
+          const current = await query('select first_name, middle_name, full_name, grade from students where id = $1', [req.params.id]);
+          if (current.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+          const cur = current.rows[0];
+          const newFirst = first_name ?? cur.first_name;
+          const newMiddle = middle_name ?? cur.middle_name;
+          const newGrade = grade ?? cur.grade;
+          full_name = [newFirst, newMiddle].filter(Boolean).join(' ').trim() || cur.full_name || null;
+          grade_level = newGrade ?? null;
+        } catch (_e2) {
+          // If select still fails we still proceed with basic update; error handled later if update fails.
+        }
       }
     }
 
@@ -334,15 +442,14 @@ router.put('/:id', async (req, res) => {
               set lrn            = coalesce($1, lrn),
                   first_name     = coalesce($2, first_name),
                   middle_name    = coalesce($3, middle_name),
-                  last_name      = coalesce($4, last_name),
-                  birthdate      = coalesce($5, birthdate),
-                  address        = coalesce($6, address),
-                  grade          = coalesce($7, grade),
-                  section        = coalesce($8, section),
-                  parent_contact = coalesce($9, parent_contact)
-            where id = $10
+                  birthdate      = coalesce($4, birthdate),
+                  address        = coalesce($5, address),
+                  grade          = coalesce($6, grade),
+                  section        = coalesce($7, section),
+                  parent_contact = coalesce($8, parent_contact)
+            where id = $9
             returning *`,
-          [lrn ?? null, first_name ?? null, middle_name ?? null, last_name ?? null, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, req.params.id]
+          [lrn ?? null, first_name ?? null, middle_name ?? null, birthdate ?? null, address ?? null, grade ?? null, section ?? null, parent_contact ?? null, req.params.id]
         ));
       } else {
         throw err;
