@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://web-based-student-discipline-management.onrender.com/api/:path*"
+      "destination": "https://sdms-backend.onrender.com/api/:path*"
     }
   ]
 }
