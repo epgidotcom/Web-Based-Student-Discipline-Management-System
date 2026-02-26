@@ -9,20 +9,7 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const NUMERIC_ID_REGEX = /^\d+$/;
-
-const getStudentLookup = (idParam) => {
-  if (UUID_REGEX.test(idParam)) {
-    return { column: 'id', value: idParam };
-  }
-
-  if (NUMERIC_ID_REGEX.test(idParam)) {
-    return { column: 'student_id', value: Number.parseInt(idParam, 10) };
-  }
-
-  return null;
-};
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 
 // List students (paginated)
@@ -69,8 +56,7 @@ router.get('/', async (req, res) => {
 
 // Get one student
 router.get('/:id', async (req, res) => {
-  const lookup = getStudentLookup(req.params.id);
-  if (!lookup) {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
@@ -218,6 +204,10 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
   try {
     const { rows } = await query(
       `update students
@@ -242,8 +232,7 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  const lookup = getStudentLookup(req.params.id);
-  if (!lookup) {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
