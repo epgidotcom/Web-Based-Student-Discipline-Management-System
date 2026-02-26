@@ -16,12 +16,6 @@ async function insertStudentFlexible(acctId, fullName, lrn, section, grade, age)
   );
   const cols = new Set(colRes.rows.map(r => r.column_name));
 
-  // split name into parts
-  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
-  const first = parts.length ? parts[0] : 'Unknown';
-  const last = parts.length > 1 ? parts[parts.length - 1] : (parts.length ? parts[0] : 'Unknown');
-  const middle = parts.length > 2 ? parts.slice(1, parts.length - 1).join(' ') : null;
-
   // helper to push column and value
   const colsToInsert = [];
   const vals = [];
@@ -40,12 +34,6 @@ async function insertStudentFlexible(acctId, fullName, lrn, section, grade, age)
   // try to satisfy both legacy and modern columns
   add('full_name', fullName?.trim() || null);
   add('lrn', lrn || null);
-  add('first_name', first);
-  add('middle_name', middle || null);
-  add('last_name', last);
-  add('birthdate', null);
-  add('age', age === undefined || age === null ? null : age);
-  add('address', null);
   add('grade', grade || null);
   // mirror grade into grade_level if present
   add('grade_level', grade || null);
@@ -139,7 +127,7 @@ router.post('/', async (req, res) => {
           if (!studentRow && role === 'Student') {
             try {
               const sQ = await query(
-                `SELECT id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, full_name, created_at
+                `SELECT id, lrn, full_name, grade, section, strand
                  FROM students WHERE id = $1 OR account_id = $1 LIMIT 1`,
                 [acct.id]
               );

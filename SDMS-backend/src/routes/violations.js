@@ -6,34 +6,16 @@ const router = Router();
 // Helper: fetch student by id
 async function fetchStudent(id) {
   if (!id) return null;
-  try {
-    const { rows } = await query(
-      'SELECT id, first_name, middle_name, last_name, grade, section FROM students WHERE id = $1',
-      [id]
-    );
-    return rows[0] || null;
-  } catch (err) {
-    const msg = err?.message?.toLowerCase?.() || '';
-    if (msg.includes('column "last_name"') && msg.includes('does not exist')) {
-      const { rows } = await query(
-        'SELECT id, first_name, middle_name, full_name, grade, section FROM students WHERE id = $1',
-        [id]
-      );
-      return rows[0] || null;
-    }
-    throw err;
-  }
+  const { rows } = await query(
+    'SELECT id, full_name, grade, section, strand FROM students WHERE id = $1',
+    [id]
+  );
+  return rows[0] || null;
 }
 
 function buildStudentDisplay(s) {
   if (!s) return null;
-  if (!s.last_name && s.full_name) return s.full_name;
-  const parts = [s.last_name, s.first_name];
-  if (s.middle_name) {
-    const m = s.middle_name.trim();
-    if (m) parts.push(m[0] + '.');
-  }
-  return parts.filter(Boolean).join(', ').replace(/\s+/g, ' ').trim();
+  return s.full_name || null;
 }
 
 function normalizeEvidence(raw) {
