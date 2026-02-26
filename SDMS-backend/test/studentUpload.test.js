@@ -68,3 +68,12 @@ test('mapStudentUploadToColumns maps grade/lrn to legacy column names', () => {
   assert.deepEqual(mapped.columns, ['student_id', 'first_name', 'middle_name', 'grade_level', 'section']);
   assert.deepEqual(mapped.values, ['123456789012', 'Jane', 'Doe', '11', 'A']);
 });
+
+test('mapStudentUploadToColumns preserves remaining name parts as middle_name', () => {
+  const mapped = mapStudentUploadToColumns(
+    { full_name: 'Jane Marie Doe' },
+    ['first_name', 'middle_name']
+  );
+
+  assert.deepEqual(mapped.values, ['Jane', 'Marie Doe']);
+});
