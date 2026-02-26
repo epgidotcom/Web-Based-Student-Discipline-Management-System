@@ -1,6 +1,9 @@
 (() => {
-  const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '';
-  const API_ROOT = `${API_BASE.replace(/\/+$/, '')}/api`;
+  const API_BASE = ((window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '')
+    .replace(/\/+$/, '');
+  const BATCH_UPLOAD_URL = API_BASE.endsWith('/api')
+    ? `${API_BASE}/students/batch`
+    : `${API_BASE}/api/students/batch`;
   const stripWebsiteContentTags = window.SDMSUrlSanitize?.stripWebsiteContentTags || ((value) => {
     if (value == null) return '';
     return String(value).replace(/^<WebsiteContent_[^>]+>/, '').replace(/<\/WebsiteContent_[^>]+>$/, '').trim();
@@ -31,8 +34,8 @@
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
-  async function api(path, { method = 'POST', body } = {}) {
-    const res = await fetch(`${API_ROOT}${path}`, {
+  async function apiRequest(url, { method = 'POST', body } = {}) {
+    const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: body !== undefined ? JSON.stringify(body) : undefined
@@ -239,7 +242,7 @@
       const start = chunkIndex * BATCH_CHUNK_SIZE;
       const chunk = students.slice(start, start + BATCH_CHUNK_SIZE);
       if (confirmUploadBtn) confirmUploadBtn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Uploading chunk ${chunkIndex + 1}/${totalChunks}...`;
-      const result = await api('/students/batch', { method: 'POST', body: { students: chunk } });
+      const result = await apiRequest(BATCH_UPLOAD_URL, { method: 'POST', body: { students: chunk } });
       aggregate.inserted += result.inserted || 0;
       aggregate.skipped += result.skipped || 0;
       aggregate.failed += result.failed || 0;
