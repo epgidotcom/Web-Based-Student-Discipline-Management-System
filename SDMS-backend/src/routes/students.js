@@ -45,7 +45,7 @@ async function hasStudentUniqueConstraint(columnName) {
     );
     return rows.length > 0;
   } catch (error) {
-    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint; duplicates may now fail inserts', {
+    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint; omitting ON CONFLICT so duplicate LRNs will fail inserts', {
       columnName,
       error: error?.message
     });
