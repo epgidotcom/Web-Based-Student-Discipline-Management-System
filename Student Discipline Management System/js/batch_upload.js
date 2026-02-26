@@ -256,14 +256,23 @@
       body: formData
     });
     const ct = res.headers.get('content-type') || '';
-    const data = ct.includes('application/json') ? await res.json() : {};
+    if (!ct.includes('application/json')) throw new Error(`Unexpected response format: expected application/json, got ${ct || 'unknown'} (${res.status})`);
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Invalid JSON response (${res.status})`);
+    }
     if (!res.ok) {
       const message = data.error || data.message || `Request failed (${res.status})`;
       console.error('[BatchUpload] uploadStudentCSV failed:', message);
       throw new Error(message);
     }
-    console.log('[BatchUpload] uploadStudentCSV success:', data.inserted);
-    return Number(data.inserted) || 0;
+    if (data.inserted == null) throw new Error('Invalid upload response: inserted count is missing.');
+    const inserted = Number(data.inserted);
+    if (!Number.isInteger(inserted) || inserted < 0) throw new Error('Invalid upload response: inserted count must be a non-negative integer.');
+    console.log('[BatchUpload] uploadStudentCSV success:', inserted);
+    return inserted;
   }
 
   openBtn?.addEventListener('click', openModal);
