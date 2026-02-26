@@ -45,9 +45,9 @@ async function hasStudentUniqueConstraint(columnName) {
     );
     return rows.length > 0;
   } catch (error) {
-    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint on column. ON CONFLICT clause will be skipped; if a constraint exists, duplicate rows will fail with constraint violations', {
+    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint; skipping ON CONFLICT (duplicates may fail)', {
       columnName,
-      error: error?.message
+      error: error.message
     });
     return false;
   }
@@ -220,9 +220,9 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         ? 'on conflict (lrn) do nothing'
         : '';
       const insertSql = `insert into students (${mappedStudent.columns.join(',')})
-         values (${placeholders})
-         ${rowConflictClause}`;
-      const { rowCount } = await query(insertSql, mappedStudent.values);
+         values (${placeholders})`;
+      const finalSql = rowConflictClause ? `${insertSql} ${rowConflictClause}` : insertSql;
+      const { rowCount } = await query(finalSql, mappedStudent.values);
 
       inserted += rowCount;
     }
