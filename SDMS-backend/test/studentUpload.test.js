@@ -30,6 +30,24 @@ test('normalizeStudentUploadRow preserves full_name and ignores invalid age valu
   assert.equal(row.age, null);
 });
 
+test('normalizeStudentUploadRow supports CSV headers used by batch upload template', () => {
+  const row = normalizeStudentUploadRow({
+    LRN: '123456789012',
+    FullName: 'Juan Dela Cruz',
+    Age: '16',
+    Grade: '11',
+    Section: 'A',
+    Strand: 'STEM'
+  });
+
+  assert.equal(row.lrn, '123456789012');
+  assert.equal(row.full_name, 'Juan Dela Cruz');
+  assert.equal(row.age, 16);
+  assert.equal(row.grade, '11');
+  assert.equal(row.section, 'A');
+  assert.equal(row.strand, 'STEM');
+});
+
 test('validateStudentUploadRow returns structured errors for invalid rows', () => {
   const errors = validateStudentUploadRow({
     lrn: 'ABC123',

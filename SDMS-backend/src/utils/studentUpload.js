@@ -10,19 +10,20 @@ function sanitizeText(value) {
 
 export function normalizeStudentUploadRow(student = {}) {
   const sanitizedStudent = sanitizeRow(student);
-  const firstName = sanitizeText(sanitizedStudent.first_name);
-  const middleName = sanitizeText(sanitizedStudent.middle_name);
-  const lastName = sanitizeText(sanitizedStudent.last_name);
-  const fallbackFullName = sanitizeText(sanitizedStudent.full_name);
+  const firstName = sanitizeText(sanitizedStudent.first_name ?? sanitizedStudent.FirstName ?? sanitizedStudent['First Name']);
+  const middleName = sanitizeText(sanitizedStudent.middle_name ?? sanitizedStudent.MiddleName ?? sanitizedStudent['Middle Name']);
+  const lastName = sanitizeText(sanitizedStudent.last_name ?? sanitizedStudent.LastName ?? sanitizedStudent['Last Name']);
+  const fallbackFullName = sanitizeText(sanitizedStudent.full_name ?? sanitizedStudent.FullName ?? sanitizedStudent['Full Name']);
   const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || fallbackFullName;
 
-  const ageRaw = sanitizedStudent.age == null || sanitizedStudent.age === '' ? null : Number(sanitizedStudent.age);
+  const ageValue = sanitizedStudent.age ?? sanitizedStudent.Age;
+  const ageRaw = ageValue == null || ageValue === '' ? null : Number(ageValue);
   return {
-    lrn: sanitizeText(sanitizedStudent.lrn),
+    lrn: sanitizeText(sanitizedStudent.lrn ?? sanitizedStudent.LRN),
     full_name: fullName,
-    grade: sanitizeText(sanitizedStudent.grade),
-    section: sanitizeText(sanitizedStudent.section),
-    strand: sanitizeText(sanitizedStudent.strand),
+    grade: sanitizeText(sanitizedStudent.grade ?? sanitizedStudent.Grade),
+    section: sanitizeText(sanitizedStudent.section ?? sanitizedStudent.Section),
+    strand: sanitizeText(sanitizedStudent.strand ?? sanitizedStudent.Strand),
     email: sanitizeText(sanitizedStudent.email),
     phone: sanitizeText(sanitizedStudent.phone),
     profile_url: sanitizeText(sanitizedStudent.profile_url),
