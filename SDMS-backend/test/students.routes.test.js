@@ -18,3 +18,11 @@ test('students router declares static routes before parameterized routes', async
 
   assert.equal(staticPathsAfterParams.length, 0);
 });
+
+test('students route id lookup accepts numeric ids', async () => {
+  process.env.DATABASE_URL ??= 'postgres://user:pass@localhost:5432/sdms_test';
+  const { getStudentLookup } = await import('../src/routes/students.js');
+
+  assert.deepEqual(getStudentLookup('42'), { column: 'id', value: 42 });
+  assert.equal(getStudentLookup('batch'), null);
+});
