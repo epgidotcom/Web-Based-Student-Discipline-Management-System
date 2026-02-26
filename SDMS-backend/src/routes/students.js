@@ -27,6 +27,7 @@ async function getStudentTableColumns() {
   return rows.map((row) => row.column_name);
 }
 
+// Falls back to false when the constraint lookup fails to avoid invalid conflict targets.
 async function hasStudentUniqueConstraint(columnName) {
   try {
     const { rows } = await query(
@@ -195,6 +196,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
     const hasLrnUniqueConstraint = availableColumns.includes('lrn')
       ? await hasStudentUniqueConstraint('lrn')
       : false;
+    const conflictClause = hasLrnUniqueConstraint ? 'on conflict (lrn) do nothing' : '';
     let inserted = 0;
 
     for (const row of rows) {
@@ -217,7 +219,6 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         continue;
       }
       const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
-      const conflictClause = hasLrnUniqueConstraint ? 'on conflict (lrn) do nothing' : '';
       const { rowCount } = await query(
         `insert into students (${mappedStudent.columns.join(',')})
          values (${placeholders})
