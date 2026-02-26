@@ -44,7 +44,10 @@ async function hasStudentUniqueConstraint(columnName) {
     );
     return rows.length > 0;
   } catch (error) {
-    console.warn('[hasStudentUniqueConstraint] lookup failed', { columnName, error: error?.message });
+    console.warn('[hasStudentUniqueConstraint] lookup failed; defaulting to no conflict target', {
+      columnName,
+      error: error?.message
+    });
     return false;
   }
 }
