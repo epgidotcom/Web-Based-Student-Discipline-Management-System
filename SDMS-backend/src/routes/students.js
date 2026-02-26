@@ -1,10 +1,15 @@
 import { Router } from 'express';
+import multer from 'multer';
+import csv from 'csv-parser';
+import { Readable } from 'node:stream';
 import { query } from '../db.js';
 import { processBatchStudents } from '../utils/studentUpload.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 
 // List students (paginated)
@@ -51,6 +56,10 @@ router.get('/', async (req, res) => {
 
 // Get one student
 router.get('/:id', async (req, res) => {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
   try {
     const { rows } = await query(
       `select ${STUDENT_COLUMNS} from students where id = $1`,
@@ -135,10 +144,64 @@ router.post('/batch', async (req, res) => {
   });
 });
 
+// Batch upload students from CSV
+router.post('/batch-upload', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'CSV file is required' });
+  }
+
+  const rows = [];
+
+  try {
+    await new Promise((resolve, reject) => {
+      Readable.from(req.file.buffer)
+        .pipe(csv())
+        .on('data', (row) => {
+          rows.push(row);
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    let inserted = 0;
+
+    for (const row of rows) {
+      const lrn = row.LRN?.trim() || null;
+      const fullName = row.FullName?.trim();
+      const grade = row.Grade?.trim() || null;
+      const section = row.Section?.trim() || null;
+      const strand = row.Strand?.trim() || null;
+      const age = Number.parseInt(row.Age, 10);
+
+      if (!fullName) {
+        continue;
+      }
+
+      const { rowCount } = await query(
+        `insert into students (lrn, full_name, age, grade, section, strand)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (lrn) do nothing`,
+        [lrn, fullName, Number.isNaN(age) ? null : age, grade, section, strand]
+      );
+
+      inserted += rowCount;
+    }
+
+    return res.json({ success: true, inserted });
+  } catch (error) {
+    console.error('Error in /api/students/batch-upload:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Update student
 router.put('/:id', async (req, res) => {
   // Removed legacy payload fields including last_name; update only current schema columns.
   const { lrn, full_name, grade, section, strand } = req.body ?? {};
+
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
 
   try {
     const { rows } = await query(
@@ -164,6 +227,10 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
   try {
     const { rowCount } = await query('DELETE FROM students WHERE id = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
