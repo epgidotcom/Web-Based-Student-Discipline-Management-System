@@ -1,9 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
   const rawApiBase = window.SDMS_CONFIG?.API_BASE || "";
-  const API_BASE = window.SDMSUrlSanitize?.stripWebsiteContentWrappers
-    ? window.SDMSUrlSanitize.stripWebsiteContentWrappers(rawApiBase)
-    : rawApiBase;
-  const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
+  const sanitizeText = window.SDMSUrlSanitize?.stripWebsiteContentTags || window.SDMSUrlSanitize?.stripWebsiteContentWrappers;
+  const sanitizeUrl = window.SDMSUrlSanitize?.toSafeHttpUrl;
+  const API_BASE = sanitizeText ? sanitizeText(rawApiBase) : rawApiBase;
+  const safeApiBase = sanitizeUrl ? sanitizeUrl(API_BASE) : API_BASE;
+  const API_ROOT = safeApiBase ? `${safeApiBase.replace(/\/+$/, '')}/api` : '';
   const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
   let students = [];
@@ -54,7 +55,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (body !== undefined) {
       init.body = typeof body === 'string' ? body : JSON.stringify(body);
     }
-    const res = await fetch(`${API_ROOT}${path}`, init);
+    const safePath = sanitizeText ? sanitizeText(path) : path;
+    if (!safePath || !safePath.startsWith('/')) {
+      console.warn('[dashboard] refusing request with invalid path', { path });
+      throw new Error('Invalid API path');
+    }
+    const requestUrl = `${API_ROOT}${safePath}`;
+    const safeRequestUrl = sanitizeUrl ? sanitizeUrl(requestUrl) : requestUrl;
+    if (!safeRequestUrl) {
+      console.warn('[dashboard] refusing request with invalid URL', { requestUrl });
+      throw new Error('Invalid request URL');
+    }
+    const res = await fetch(safeRequestUrl, init);
     if (res.status === 401) {
       console.warn('[dashboard] unauthorized – redirecting to login');
       window.location.href = 'index.html';
@@ -556,7 +568,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  init();
+  init().catch((error) => {
+    console.error('[dashboard] initialization failed', { error: error?.message || String(error) });
+  });
 });
 
 
