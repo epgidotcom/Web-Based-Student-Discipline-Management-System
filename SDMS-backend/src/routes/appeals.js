@@ -81,54 +81,25 @@ async function loadAppealRow(appealId) {
 
 async function fetchStudentById(id) {
   if (!id) return null;
-  try {
-    const { rows } = await query(
-      'SELECT id, lrn, first_name, middle_name, last_name, grade, section FROM students WHERE id = $1',
-      [id]
-    );
-    return rows[0] || null;
-  } catch (err) {
-    const msg = err?.message?.toLowerCase?.() || '';
-    if (msg.includes('column "last_name"') && msg.includes('does not exist')) {
-      const { rows } = await query(
-        'SELECT id, lrn, first_name, middle_name, full_name, grade, section FROM students WHERE id = $1',
-        [id]
-      );
-      return rows[0] || null;
-    }
-    throw err;
-  }
+  const { rows } = await query(
+    'SELECT id, lrn, full_name, grade, section, strand FROM students WHERE id = $1',
+    [id]
+  );
+  return rows[0] || null;
 }
 
 async function fetchStudentByLrn(lrn) {
   if (!lrn) return null;
-  try {
-    const { rows } = await query(
-      'SELECT id, lrn, first_name, middle_name, last_name, grade, section FROM students WHERE lrn = $1',
-      [lrn]
-    );
-    return rows[0] || null;
-  } catch (err) {
-    const msg = err?.message?.toLowerCase?.() || '';
-    if (msg.includes('column "last_name"') && msg.includes('does not exist')) {
-      const { rows } = await query(
-        'SELECT id, lrn, first_name, middle_name, full_name, grade, section FROM students WHERE lrn = $1',
-        [lrn]
-      );
-      return rows[0] || null;
-    }
-    throw err;
-  }
+  const { rows } = await query(
+    'SELECT id, lrn, full_name, grade, section, strand FROM students WHERE lrn = $1',
+    [lrn]
+  );
+  return rows[0] || null;
 }
 
 function buildStudentName(student) {
   if (!student) return null;
-  if (!student.last_name && student.full_name) return student.full_name;
-  return [student.first_name, student.middle_name, student.last_name]
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return student.full_name || null;
 }
 
 function normalizeStatus(input) {
