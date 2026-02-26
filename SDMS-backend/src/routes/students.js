@@ -1,8 +1,12 @@
 import { Router } from 'express';
+import multer from 'multer';
+import csv from 'csv-parser';
+import { Readable } from 'node:stream';
 import { query } from '../db.js';
 import { processBatchStudents } from '../utils/studentUpload.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
 
@@ -133,6 +137,56 @@ router.post('/batch', async (req, res) => {
     warnings: results.warnings,
     details: results.details
   });
+});
+
+// Batch upload students from CSV
+router.post('/batch-upload', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'CSV file is required' });
+  }
+
+  const rows = [];
+
+  try {
+    await new Promise((resolve, reject) => {
+      Readable.from(req.file.buffer)
+        .pipe(csv())
+        .on('data', (row) => {
+          rows.push(row);
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    let inserted = 0;
+
+    for (const row of rows) {
+      const lrn = row.LRN?.trim() || null;
+      const fullName = row.FullName?.trim();
+      const grade = row.Grade?.trim() || null;
+      const section = row.Section?.trim() || null;
+      const strand = row.Strand?.trim() || null;
+      const age = Number.parseInt(row.Age, 10);
+
+      if (!fullName) {
+        continue;
+      }
+
+      const { rowCount } = await query(
+        `insert into students (lrn, full_name, age, grade, section, strand)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (lrn) do nothing`,
+        [lrn, fullName, Number.isNaN(age) ? null : age, grade, section, strand]
+      );
+
+      inserted += rowCount;
+    }
+
+    return res.json({ success: true, inserted });
+  } catch (error) {
+    console.error('Error in /api/students/batch-upload:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Update student
