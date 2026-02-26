@@ -48,6 +48,22 @@ test('normalizeStudentUploadRow supports CSV headers used by batch upload templa
   assert.equal(row.strand, 'STEM');
 });
 
+test('normalizeStudentUploadRow supports space-separated CSV name headers', () => {
+  const row = normalizeStudentUploadRow({
+    LRN: '123456789012',
+    'Full Name': 'Juan Dela Cruz',
+    Age: '16',
+    Grade: '11',
+    Section: 'A'
+  });
+
+  assert.equal(row.lrn, '123456789012');
+  assert.equal(row.full_name, 'Juan Dela Cruz');
+  assert.equal(row.age, 16);
+  assert.equal(row.grade, '11');
+  assert.equal(row.section, 'A');
+});
+
 test('validateStudentUploadRow returns structured errors for invalid rows', () => {
   const errors = validateStudentUploadRow({
     lrn: 'ABC123',
