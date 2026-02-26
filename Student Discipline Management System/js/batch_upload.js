@@ -240,7 +240,14 @@
     const totalChunks = Math.ceil(students.length / BATCH_CHUNK_SIZE);
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       const start = chunkIndex * BATCH_CHUNK_SIZE;
-      const chunk = students.slice(start, start + BATCH_CHUNK_SIZE);
+      const chunk = students.slice(start, start + BATCH_CHUNK_SIZE).map((student) => ({
+        lrn: student?.lrn || null,
+        full_name: student?.full_name || null,
+        age: student?.age ?? null,
+        grade: student?.grade || null,
+        section: student?.section || null,
+        strand: student?.strand || null
+      }));
       if (confirmUploadBtn) confirmUploadBtn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Uploading chunk ${chunkIndex + 1}/${totalChunks}...`;
       const result = await apiRequest(BATCH_UPLOAD_URL, { method: 'POST', body: { students: chunk } });
       aggregate.inserted += result.inserted || 0;
@@ -300,7 +307,7 @@
 
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
-      const payload = parsedStudents.map(s => ({ lrn: s.lrn || null, full_name: s.full_name, last_name: s.last_name || null, age: s.age, grade: s.grade || null, section: s.section || null, strand: s.strand || null, email: s.email || null, phone: s.phone || null, profile_url: s.profile_url || null }));
+      const payload = parsedStudents.map(s => ({ lrn: s.lrn || null, full_name: s.full_name || null, age: s.age ?? null, grade: s.grade || null, section: s.section || null, strand: s.strand || null }));
       const result = await uploadInChunks(payload);
       let msg = `Upload complete!\n✅ Inserted: ${result.inserted}`;
       if (result.skipped > 0) msg += `\n⏭️ Skipped (duplicate LRN): ${result.skipped}`;
