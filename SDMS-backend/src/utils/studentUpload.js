@@ -1,4 +1,4 @@
-import { stripWebsiteContentTags } from './urlSanitize.js';
+import { stripWebsiteContentTags, sanitizeRow } from './sanitizer.js';
 
 const STRICT_UPLOAD_SCHEMA = process.env.SDMS_STRICT_UPLOAD_SCHEMA === 'true';
 
@@ -9,19 +9,23 @@ function sanitizeText(value) {
 }
 
 export function normalizeStudentUploadRow(student = {}) {
-  const firstName = sanitizeText(student.first_name);
-  const middleName = sanitizeText(student.middle_name);
-  const lastName = sanitizeText(student.last_name);
-  const fallbackFullName = sanitizeText(student.full_name);
+  const sanitizedStudent = sanitizeRow(student);
+  const firstName = sanitizeText(sanitizedStudent.first_name);
+  const middleName = sanitizeText(sanitizedStudent.middle_name);
+  const lastName = sanitizeText(sanitizedStudent.last_name);
+  const fallbackFullName = sanitizeText(sanitizedStudent.full_name);
   const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || fallbackFullName;
 
-  const ageRaw = student.age == null || student.age === '' ? null : Number(student.age);
+  const ageRaw = sanitizedStudent.age == null || sanitizedStudent.age === '' ? null : Number(sanitizedStudent.age);
   return {
-    lrn: sanitizeText(student.lrn),
+    lrn: sanitizeText(sanitizedStudent.lrn),
     full_name: fullName,
-    grade: sanitizeText(student.grade),
-    section: sanitizeText(student.section),
-    strand: sanitizeText(student.strand),
+    grade: sanitizeText(sanitizedStudent.grade),
+    section: sanitizeText(sanitizedStudent.section),
+    strand: sanitizeText(sanitizedStudent.strand),
+    email: sanitizeText(sanitizedStudent.email),
+    phone: sanitizeText(sanitizedStudent.phone),
+    profile_url: sanitizeText(sanitizedStudent.profile_url),
     age: Number.isFinite(ageRaw) ? ageRaw : null,
     compat: {
       ignored_last_name: Boolean(lastName && fallbackFullName),
@@ -35,11 +39,23 @@ export function validateStudentUploadRow(student = {}, row = 1) {
   if (!student.full_name) issues.push({ row, field: 'full_name', error: 'required' });
   if (student.lrn && !/^\d{1,12}$/.test(student.lrn)) issues.push({ row, field: 'lrn', error: 'invalid_format' });
   if (student.age != null && (student.age < 0 || student.age > 120)) issues.push({ row, field: 'age', error: 'invalid_range' });
+  if (student.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) issues.push({ row, field: 'email', error: 'invalid_format' });
+  if (student.phone && !/^\+?[0-9()\-\s]{7,20}$/.test(student.phone)) issues.push({ row, field: 'phone', error: 'invalid_format' });
+  if (student.profile_url) {
+    try {
+      const parsed = new URL(student.profile_url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        issues.push({ row, field: 'profile_url', error: 'invalid_format' });
+      }
+    } catch {
+      issues.push({ row, field: 'profile_url', error: 'invalid_format' });
+    }
+  }
   return issues;
 }
 
 export async function processBatchStudents(students = [], insertStudent) {
-  const results = { inserted: 0, skipped: 0, failed: 0, errors: [], details: [] };
+  const results = { inserted: 0, skipped: 0, failed: 0, errors: [], warnings: [], details: [] };
 
   for (let i = 0; i < students.length; i++) {
     const row = i + 1;
@@ -53,7 +69,10 @@ export async function processBatchStudents(students = [], insertStudent) {
     }
 
     try {
-      const inserted = await insertStudent(normalized);
+      if (normalized.compat?.ignored_last_name) {
+        results.warnings.push({ row, field: 'last_name', warning: 'ignored_legacy_field' });
+      }
+      const inserted = await insertStudent(normalized, row, students[i] ?? {});
       results.inserted++;
       results.details.push({ row, status: 'inserted', lrn: normalized.lrn, id: inserted?.id ?? null });
     } catch (e) {

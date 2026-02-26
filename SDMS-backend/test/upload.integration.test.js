@@ -30,4 +30,5 @@ test('processBatchStudents keeps valid rows and reports structured errors for in
     { row: 3, field: 'full_name', error: 'required' },
     { row: 4, field: 'lrn', error: 'duplicate' }
   ]);
+  assert.deepEqual(result.warnings, []);
 });
