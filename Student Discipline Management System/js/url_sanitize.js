@@ -19,6 +19,15 @@
     return stripWebsiteContentTags(input);
   }
 
+
+  function sanitizeRow(row) {
+    const source = row || {};
+    return Object.keys(source).reduce((acc, key) => {
+      acc[key] = stripWebsiteContentTags(source[key]);
+      return acc;
+    }, {});
+  }
+
   function toSafeHttpUrl(input) {
     const cleaned = stripWebsiteContentTags(input);
     if (!cleaned) return null;
@@ -45,6 +54,7 @@
   window.SDMSUrlSanitize = {
     stripWebsiteContentTags,
     stripWebsiteContentWrappers,
+    sanitizeRow,
     toSafeHttpUrl,
     sanitizePageMetadata
   };

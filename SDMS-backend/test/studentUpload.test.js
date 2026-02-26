@@ -43,3 +43,18 @@ test('validateStudentUploadRow returns structured errors for invalid rows', () =
     { row: 4, field: 'age', error: 'invalid_range' }
   ]);
 });
+
+test('validateStudentUploadRow flags optional email/phone/url format issues', () => {
+  const errors = validateStudentUploadRow({
+    full_name: 'Valid Name',
+    email: 'invalid-email',
+    phone: 'bad',
+    profile_url: 'ftp://example.com'
+  }, 2);
+
+  assert.deepEqual(errors, [
+    { row: 2, field: 'email', error: 'invalid_format' },
+    { row: 2, field: 'phone', error: 'invalid_format' },
+    { row: 2, field: 'profile_url', error: 'invalid_format' }
+  ]);
+});

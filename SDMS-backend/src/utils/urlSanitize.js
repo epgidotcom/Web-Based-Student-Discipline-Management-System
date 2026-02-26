@@ -1,9 +1,9 @@
-const WRAPPER_TAG_RE = /^\s*<WebsiteContent_[^>]+>|<\/WebsiteContent_[^>]+>\s*$/gi;
+import { stripWebsiteContentTags as baseStripWebsiteContentTags } from './sanitizer.js';
 
 export function stripWebsiteContentTags(input) {
   if (input == null) return '';
   const original = String(input);
-  const cleaned = original.replace(WRAPPER_TAG_RE, '').trim();
+  const cleaned = baseStripWebsiteContentTags(original);
   if (cleaned !== original.trim()) {
     console.info('[urlSanitize] WebsiteContent tags stripped', {
       changed: true,

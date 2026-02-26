@@ -87,14 +87,14 @@ router.post('/', async (req, res) => {
 
 // Batch create students
 router.post('/batch', async (req, res) => {
+  const requestId = req.headers['x-request-id'] || `batch-${Date.now()}`;
   const { students } = req.body ?? {};
 
   if (!Array.isArray(students) || students.length === 0) {
-    return res.status(400).json({ error: 'students array is required and must not be empty' });
+    return res.status(400).json({ error: 'students array is required and must not be empty', requestId });
   }
 
-  const results = await processBatchStudents(students, async (student) => {
-    const requestId = req.headers['x-request-id'] || `batch-${Date.now()}`;
+  const results = await processBatchStudents(students, async (student, rowNumber, rawStudent) => {
     const { lrn, full_name, grade, section, strand } = student;
 
     try {
@@ -109,6 +109,8 @@ router.post('/batch', async (req, res) => {
     } catch (e) {
       console.error('[students.batch] row_insert_error', {
         requestId,
+        row: rowNumber,
+        raw: rawStudent,
         sanitized: student,
         error: e.message,
         time: new Date().toISOString()
@@ -122,7 +124,15 @@ router.post('/batch', async (req, res) => {
   else if (results.inserted === students.length) statusCode = 201;
   else statusCode = 207;
 
-  res.status(statusCode).json(results);
+  res.status(statusCode).json({
+    requestId,
+    inserted: results.inserted,
+    skipped: results.skipped,
+    failed: results.failed,
+    errors: results.errors,
+    warnings: results.warnings,
+    details: results.details
+  });
 });
 
 // Update student
