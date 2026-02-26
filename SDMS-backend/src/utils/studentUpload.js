@@ -54,6 +54,39 @@ export function validateStudentUploadRow(student = {}, row = 1) {
   return issues;
 }
 
+export function mapStudentUploadToColumns(student = {}, availableColumns = []) {
+  const columnsSet = new Set(availableColumns);
+  const columns = [];
+  const values = [];
+  const add = (column, value) => {
+    if (columnsSet.has(column)) {
+      columns.push(column);
+      values.push(value ?? null);
+    }
+  };
+
+  const fullName = sanitizeText(student.full_name);
+  const nameParts = (fullName || '').split(/\s+/).filter(Boolean);
+  const firstName = sanitizeText(student.first_name) ?? nameParts[0] ?? null;
+  const middleName = sanitizeText(student.middle_name) ?? (nameParts.length > 1 ? nameParts.slice(1).join(' ') : null);
+  const grade = sanitizeText(student.grade);
+  const lrn = sanitizeText(student.lrn);
+  const age = Number.isFinite(student.age) ? student.age : null;
+
+  add('student_id', lrn);
+  add('lrn', lrn);
+  add('full_name', fullName);
+  add('first_name', firstName);
+  add('middle_name', middleName);
+  add('grade_level', grade);
+  add('grade', grade);
+  add('section', sanitizeText(student.section));
+  add('strand', sanitizeText(student.strand));
+  add('age', age);
+
+  return { columns, values };
+}
+
 export async function processBatchStudents(students = [], insertStudent) {
   const results = { inserted: 0, skipped: 0, failed: 0, errors: [], warnings: [], details: [] };
 

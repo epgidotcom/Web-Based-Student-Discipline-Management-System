@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeStudentUploadRow, validateStudentUploadRow } from '../src/utils/studentUpload.js';
+import { normalizeStudentUploadRow, validateStudentUploadRow, mapStudentUploadToColumns } from '../src/utils/studentUpload.js';
 
 test('normalizeStudentUploadRow strips WebsiteContent wrappers and composes full_name from legacy name fields', () => {
   const row = normalizeStudentUploadRow({
@@ -57,4 +57,14 @@ test('validateStudentUploadRow flags optional email/phone/url format issues', ()
     { row: 2, field: 'phone', error: 'invalid_format' },
     { row: 2, field: 'profile_url', error: 'invalid_format' }
   ]);
+});
+
+test('mapStudentUploadToColumns maps grade/lrn to legacy column names', () => {
+  const mapped = mapStudentUploadToColumns(
+    { lrn: '123456789012', full_name: 'Jane Doe', grade: '11', section: 'A' },
+    ['student_id', 'first_name', 'middle_name', 'grade_level', 'section']
+  );
+
+  assert.deepEqual(mapped.columns, ['student_id', 'first_name', 'middle_name', 'grade_level', 'section']);
+  assert.deepEqual(mapped.values, ['123456789012', 'Jane', 'Doe', '11', 'A']);
 });
