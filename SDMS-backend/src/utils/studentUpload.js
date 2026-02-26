@@ -74,7 +74,6 @@ export function mapStudentUploadToColumns(student = {}, availableColumns = []) {
   const lrn = sanitizeText(student.lrn);
   const age = Number.isFinite(student.age) ? student.age : null;
 
-  add('student_id', lrn);
   add('lrn', lrn);
   add('full_name', fullName);
   add('first_name', firstName);
