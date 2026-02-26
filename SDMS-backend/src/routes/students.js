@@ -61,24 +61,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get one student
-router.get('/:id', async (req, res) => {
-  if (!UUID_V4_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid student id format' });
-  }
-
-  try {
-    const { rows } = await query(
-      `select ${STUDENT_COLUMNS} from students where ${lookup.column} = $1`,
-      [lookup.value]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // Create student
 router.post('/', async (req, res) => {
   // Removed legacy payload fields (first_name/middle_name/last_name/etc.); schema now uses full_name.
@@ -213,6 +195,24 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
   } catch (error) {
     console.error('Error in /api/students/batch-upload:', error);
     return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get one student
+router.get('/:id', async (req, res) => {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
+  try {
+    const { rows } = await query(
+      `select ${STUDENT_COLUMNS} from students where ${lookup.column} = $1`,
+      [lookup.value]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
