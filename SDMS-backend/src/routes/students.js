@@ -9,6 +9,7 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 
 // List students (paginated)
@@ -55,6 +56,10 @@ router.get('/', async (req, res) => {
 
 // Get one student
 router.get('/:id', async (req, res) => {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
   try {
     const { rows } = await query(
       `select ${STUDENT_COLUMNS} from students where id = $1`,
@@ -194,6 +199,10 @@ router.put('/:id', async (req, res) => {
   // Removed legacy payload fields including last_name; update only current schema columns.
   const { lrn, full_name, grade, section, strand } = req.body ?? {};
 
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
   try {
     const { rows } = await query(
       `update students
@@ -218,6 +227,10 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  if (!UUID_V4_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
+
   try {
     const { rowCount } = await query('DELETE FROM students WHERE id = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
