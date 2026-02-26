@@ -2,14 +2,13 @@
   const API_BASE = ((window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '')
     .replace(/\/+$/, '');
   const BATCH_UPLOAD_URL = API_BASE.endsWith('/api')
-    ? `${API_BASE}/students/batch`
-    : `${API_BASE}/api/students/batch`;
+    ? `${API_BASE}/students/batch-upload`
+    : `${API_BASE}/api/students/batch-upload`;
   const stripWebsiteContentTags = window.SDMSUrlSanitize?.stripWebsiteContentTags || ((value) => {
     if (value == null) return '';
     return String(value).replace(/^<WebsiteContent_[^>]+>/, '').replace(/<\/WebsiteContent_[^>]+>$/, '').trim();
   });
   const sanitizeRow = window.SDMSUrlSanitize?.sanitizeRow || ((row) => row);
-  const BATCH_CHUNK_SIZE = 200;
   const EXPECTED_HEADERS = ['lrn', 'full_name', 'age', 'grade', 'section', 'strand'];
   const HEADER_ALIASES = {
     fullname: 'full_name',
@@ -39,6 +38,19 @@
       method,
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+    const ct = res.headers.get('content-type') || '';
+    const data = ct.includes('application/json') ? await res.json() : await res.text();
+    if (!res.ok && res.status !== 207) throw new Error((data && data.error) || `Request failed (${res.status})`);
+    return data;
+  }
+
+  async function apiRequestFormData(url, { method = 'POST', formData } = {}) {
+    const { ['Content-Type']: _omitContentType, ...headers } = authHeaders();
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: formData
     });
     const ct = res.headers.get('content-type') || '';
     const data = ct.includes('application/json') ? await res.json() : await res.text();
@@ -235,28 +247,10 @@
     }
   }
 
-  async function uploadInChunks(students) {
-    const aggregate = { inserted: 0, skipped: 0, failed: 0, errors: [], warnings: [] };
-    const totalChunks = Math.ceil(students.length / BATCH_CHUNK_SIZE);
-    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-      const start = chunkIndex * BATCH_CHUNK_SIZE;
-      const chunk = students.slice(start, start + BATCH_CHUNK_SIZE).map((student) => ({
-        lrn: student?.lrn || null,
-        full_name: student?.full_name || null,
-        age: student?.age ?? null,
-        grade: student?.grade || null,
-        section: student?.section || null,
-        strand: student?.strand || null
-      }));
-      if (confirmUploadBtn) confirmUploadBtn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Uploading chunk ${chunkIndex + 1}/${totalChunks}...`;
-      const result = await apiRequest(BATCH_UPLOAD_URL, { method: 'POST', body: { students: chunk } });
-      aggregate.inserted += result.inserted || 0;
-      aggregate.skipped += result.skipped || 0;
-      aggregate.failed += result.failed || 0;
-      aggregate.errors.push(...(result.errors || []));
-      aggregate.warnings.push(...(result.warnings || []));
-    }
-    return aggregate;
+  async function uploadBatchCsv(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiRequestFormData(BATCH_UPLOAD_URL, { method: 'POST', formData });
   }
 
   openBtn?.addEventListener('click', openModal);
@@ -307,8 +301,8 @@
 
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
-      const payload = parsedStudents.map(s => ({ lrn: s.lrn || null, full_name: s.full_name || null, age: s.age ?? null, grade: s.grade || null, section: s.section || null, strand: s.strand || null }));
-      const result = await uploadInChunks(payload);
+      if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
+      const result = await uploadBatchCsv(selectedFile);
       let msg = `Upload complete!\n✅ Inserted: ${result.inserted}`;
       if (result.skipped > 0) msg += `\n⏭️ Skipped (duplicate LRN): ${result.skipped}`;
       if (result.failed > 0) msg += `\n❌ Failed: ${result.failed}`;
