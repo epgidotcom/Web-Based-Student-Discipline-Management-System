@@ -1,17 +1,29 @@
-const WRAPPER_TAG_RE = /<\/?WebsiteContent_[^>]*>/gi;
+const WRAPPER_TAG_RE = /^\s*<WebsiteContent_[^>]+>|<\/WebsiteContent_[^>]+>\s*$/gi;
+
+export function stripWebsiteContentTags(input) {
+  if (input == null) return '';
+  const original = String(input);
+  const cleaned = original.replace(WRAPPER_TAG_RE, '').trim();
+  if (cleaned !== original.trim()) {
+    console.info('[urlSanitize] WebsiteContent tags stripped', {
+      changed: true,
+      originalLength: original.length,
+      cleanedLength: cleaned.length
+    });
+  }
+  return cleaned;
+}
 
 export function stripWebsiteContentWrappers(input) {
-  if (input == null) return '';
-  return String(input).replace(WRAPPER_TAG_RE, '').trim();
+  return stripWebsiteContentTags(input);
 }
 
 export function toSafeHttpUrl(input) {
-  const cleaned = stripWebsiteContentWrappers(input);
+  const cleaned = stripWebsiteContentTags(input);
   if (!cleaned) return null;
   try {
     const url = new URL(cleaned);
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
-    if (!url.hostname) return null;
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) return null;
     return url.toString();
   } catch {
     return null;
@@ -20,7 +32,7 @@ export function toSafeHttpUrl(input) {
 
 export function sanitizePageMetadata({ pageTitle, pageUrl } = {}) {
   return {
-    pageTitle: stripWebsiteContentWrappers(pageTitle),
+    pageTitle: stripWebsiteContentTags(pageTitle) || 'Untitled',
     pageUrl: toSafeHttpUrl(pageUrl)
   };
 }
