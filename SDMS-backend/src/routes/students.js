@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
     try {
       try {
         const { rows } = await query(
-          `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
+          `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
           [lrnQuery]
         );
         if (rows.length === 0) return res.json([]);
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
         if (isMissingColumnError(err, 'last_name')) {
           try {
             const { rows } = await query(
-              `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
+              `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
               [lrnQuery]
             );
             if (rows.length === 0) return res.json([]);
@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
           } catch (err2) {
             if (!isMissingColumnError(err2, 'age')) throw err2;
             const { rows } = await query(
-              `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
+              `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
               [lrnQuery]
             );
             if (rows.length === 0) return res.json([]);
@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
           }
         }
         const { rows } = await query(
-          `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
+          `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where lrn = $1 and (active IS NULL OR active = TRUE) limit 1`,
           [lrnQuery]
         );
         if (rows.length === 0) return res.json([]);
@@ -66,16 +66,16 @@ router.get('/', async (req, res) => {
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 100;
   const offset = (page - 1) * limit;
 
-  const selectWithAge    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by last_name asc, first_name asc limit $1 offset $2`;
-  const selectWithoutAge = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithAge    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where (active IS NULL OR active = TRUE) order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAge = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where (active IS NULL OR active = TRUE) order by last_name asc, first_name asc limit $1 offset $2`;
   // Legacy fallbacks for schemas without the 'active' column
-  const selectWithAgeLegacy    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
-  const selectWithoutAgeLegacy = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithAgeLegacy    = `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAgeLegacy = `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students order by last_name asc, first_name asc limit $1 offset $2`;
   // Fallbacks for schemas without the 'last_name' column (uses full_name instead)
-  const selectWithAgeNoLast    = `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by full_name asc, first_name asc limit $1 offset $2`;
-  const selectWithoutAgeNoLast = `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at from students where (active IS NULL OR active = TRUE) order by full_name asc, first_name asc limit $1 offset $2`;
-  const selectWithAgeNoLastLegacy    = `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at from students order by full_name asc, first_name asc limit $1 offset $2`;
-  const selectWithoutAgeNoLastLegacy = `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at from students order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithAgeNoLast    = `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where (active IS NULL OR active = TRUE) order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAgeNoLast = `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students where (active IS NULL OR active = TRUE) order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithAgeNoLastLegacy    = `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students order by full_name asc, first_name asc limit $1 offset $2`;
+  const selectWithoutAgeNoLastLegacy = `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at from students order by full_name asc, first_name asc limit $1 offset $2`;
 
   try {
     try {
@@ -193,7 +193,7 @@ router.get('/:id', async (req, res) => {
   try {
     try {
       const { rows } = await query(
-        `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, created_at
+        `select id, lrn, first_name, middle_name, last_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at
            from students where id = $1`,
         [req.params.id]
       );
@@ -204,7 +204,7 @@ router.get('/:id', async (req, res) => {
       if (isMissingColumnError(err, 'last_name')) {
         try {
           const { rows } = await query(
-            `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, created_at
+            `select id, lrn, first_name, middle_name, full_name, birthdate, age, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at
                from students where id = $1`,
             [req.params.id]
           );
@@ -213,7 +213,7 @@ router.get('/:id', async (req, res) => {
         } catch (err2) {
           if (!isMissingColumnError(err2, 'age')) throw err2;
           const { rows } = await query(
-            `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, created_at
+            `select id, lrn, first_name, middle_name, full_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at
                from students where id = $1`,
             [req.params.id]
           );
@@ -224,7 +224,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const { rows } = await query(
-      `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, created_at
+      `select id, lrn, first_name, middle_name, last_name, birthdate, address, grade, section, parent_contact, to_jsonb(students)->>'created_at' as created_at
          from students where id = $1`,
       [req.params.id]
     );
