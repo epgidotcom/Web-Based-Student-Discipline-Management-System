@@ -46,9 +46,10 @@
   }
 
   async function apiRequestFormData(url, { method = 'POST', formData } = {}) {
+    const { ['Content-Type']: _omitContentType, ...headers } = authHeaders();
     const res = await fetch(url, {
       method,
-      headers: { ...authHeaders() },
+      headers,
       body: formData
     });
     const ct = res.headers.get('content-type') || '';
@@ -300,7 +301,7 @@
 
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
-      if (!selectedFile) throw new Error('CSV file is required');
+      if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
       const result = await uploadBatchCsv(selectedFile);
       let msg = `Upload complete!\n✅ Inserted: ${result.inserted}`;
       if (result.skipped > 0) msg += `\n⏭️ Skipped (duplicate LRN): ${result.skipped}`;
