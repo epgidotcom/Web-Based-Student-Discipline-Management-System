@@ -3,13 +3,20 @@ import multer from 'multer';
 import csv from 'csv-parser';
 import { Readable } from 'node:stream';
 import { query } from '../db.js';
-import { processBatchStudents } from '../utils/studentUpload.js';
+import { processBatchStudents, mapStudentUploadToColumns } from '../utils/studentUpload.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function getStudentTableColumns() {
+  const { rows } = await query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'students' ORDER BY ordinal_position`
+  );
+  return rows.map((row) => row.column_name);
+}
 
 
 // List students (paginated)
@@ -103,15 +110,20 @@ router.post('/batch', async (req, res) => {
     return res.status(400).json({ error: 'students array is required and must not be empty', requestId });
   }
 
+  const availableColumns = await getStudentTableColumns();
   const results = await processBatchStudents(students, async (student, rowNumber, rawStudent) => {
-    const { lrn, full_name, grade, section, strand } = student;
+    const mappedStudent = mapStudentUploadToColumns(student, availableColumns);
+    if (!mappedStudent.columns.length) {
+      throw new Error('No compatible students columns found');
+    }
+    const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
 
     try {
       const { rows } = await query(
-        `insert into students (lrn, full_name, grade, section, strand)
-         values ($1,$2,$3,$4,$5)
+        `insert into students (${mappedStudent.columns.join(',')})
+         values (${placeholders})
          returning id`,
-        [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
+        mappedStudent.values
       );
 
       return rows[0];
@@ -163,6 +175,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         .on('error', reject);
     });
 
+    const availableColumns = await getStudentTableColumns();
     let inserted = 0;
 
     for (const row of rows) {
@@ -177,11 +190,20 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         continue;
       }
 
+      const mappedStudent = mapStudentUploadToColumns(
+        { lrn, full_name: fullName, age: Number.isNaN(age) ? null : age, grade, section, strand },
+        availableColumns
+      );
+      if (!mappedStudent.columns.length) {
+        continue;
+      }
+      const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
+      const hasLrnColumn = mappedStudent.columns.includes('lrn');
       const { rowCount } = await query(
-        `insert into students (lrn, full_name, age, grade, section, strand)
-         values ($1, $2, $3, $4, $5, $6)
-         on conflict (lrn) do nothing`,
-        [lrn, fullName, Number.isNaN(age) ? null : age, grade, section, strand]
+        `insert into students (${mappedStudent.columns.join(',')})
+         values (${placeholders})
+         ${hasLrnColumn ? 'on conflict (lrn) do nothing' : ''}`,
+        mappedStudent.values
       );
 
       inserted += rowCount;
