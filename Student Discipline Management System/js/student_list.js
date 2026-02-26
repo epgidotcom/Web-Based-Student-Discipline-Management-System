@@ -1,5 +1,8 @@
 (() => {
-  const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '';
+  const rawApiBase = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '';
+  const API_BASE = window.SDMSUrlSanitize?.stripWebsiteContentWrappers
+    ? window.SDMSUrlSanitize.stripWebsiteContentWrappers(rawApiBase)
+    : rawApiBase;
   const API_ROOT = `${API_BASE.replace(/\/+$/, '')}/api`;
 
   let students = [];
@@ -162,13 +165,29 @@
     return DATE_FMT.format(d);
   }
 
+  function splitFullName(fullName) {
+    const value = (fullName || '').toString().trim().replace(/\s+/g, ' ');
+    if (!value) return { firstName: '', middleName: '', lastName: '' };
+    const parts = value.split(' ');
+    if (parts.length === 1) return { firstName: parts[0], middleName: '', lastName: '' };
+    if (parts.length === 2) return { firstName: parts[0], middleName: '', lastName: parts[1] };
+    return { firstName: parts[0], middleName: parts.slice(1, -1).join(' '), lastName: parts[parts.length - 1] };
+  }
+
+  function composeFullName(firstName, middleName, lastName) {
+    return [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
   function normalizeStudent(row){
+    const fullName = (row.full_name || '').toString().trim();
+    const split = splitFullName(fullName);
     return {
       id: row.id,
       lrn: row.lrn || '',
-      firstName: row.first_name || '',
-      middleName: row.middle_name || '',
-      lastName: row.last_name || '',
+      fullName,
+      firstName: row.first_name || split.firstName,
+      middleName: row.middle_name || split.middleName,
+      lastName: row.last_name || split.lastName,
       age: (() => {
         if (row.age == null) return null;
         const parsed = Number(row.age);
@@ -176,6 +195,7 @@
       })(),
       grade: row.grade || '',
       section: row.section || '',
+      strand: row.strand || '',
       parentContact: row.parent_contact || '',
       createdAt: row.created_at || ''
     };
@@ -211,7 +231,7 @@
       const nameCell = document.createElement('td');
       const nameWrap = document.createElement('div');
       nameWrap.className = 'name-cell';
-      const fullName = `${s.firstName} ${s.middleName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
+      const fullName = s.fullName || composeFullName(s.firstName, s.middleName, s.lastName);
       const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
       if (photo) {
@@ -362,7 +382,7 @@
 
   function openView(index){
     const s = students[index];
-    const fullName = `${s.firstName} ${s.middleName} ${s.lastName}`.replace(/\s+/g, ' ').trim();
+    const fullName = s.fullName || composeFullName(s.firstName, s.middleName, s.lastName);
     const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
 
     viewLRN.textContent = s.lrn;
@@ -445,11 +465,16 @@
 
     const idx = editIndex.value === '' ? null : Number(editIndex.value);
     const existing = idx !== null ? students[idx] : null;
+    const firstName = firstNameField?.value?.trim() || '';
+    const middleName = middleNameField?.value?.trim() || null;
+    const lastName = lastNameField?.value?.trim() || '';
     const payload = {
       lrn: lrnField?.value?.trim() || null,
-      first_name: firstNameField?.value?.trim() || '',
-      middle_name: middleNameField?.value?.trim() || null,
-      last_name: lastNameField?.value?.trim() || '',
+      full_name: composeFullName(firstName, middleName, lastName),
+      // Keep legacy keys for backward compatibility with older backend deployments.
+      first_name: firstName,
+      middle_name: middleName,
+      last_name: lastName,
       age: (() => {
         if (!ageInput) return null;
         const value = ageInput.value.trim();
@@ -698,9 +723,7 @@
               const row = normalizeStudent({
                 id: payload.id,
                 lrn: payload.lrn,
-                first_name: payload.first_name || payload.full_name || '',
-                middle_name: payload.middle_name || null,
-                last_name: payload.last_name || '',
+                full_name: payload.full_name || [payload.first_name, payload.middle_name, payload.last_name].filter(Boolean).join(' '),
                 age: payload.age ?? null,
                 grade: payload.grade || '',
                 section: payload.section || '',
@@ -731,9 +754,7 @@
             const row = normalizeStudent({
               id: payload.id,
               lrn: payload.lrn,
-              first_name: payload.first_name || payload.full_name || '',
-              middle_name: payload.middle_name || null,
-              last_name: payload.last_name || '',
+              full_name: payload.full_name || [payload.first_name, payload.middle_name, payload.last_name].filter(Boolean).join(' '),
               age: payload.age ?? null,
               grade: payload.grade || '',
               section: payload.section || '',

@@ -1,5 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API_BASE = window.SDMS_CONFIG?.API_BASE || "";
+  const rawApiBase = window.SDMS_CONFIG?.API_BASE || "";
+  const API_BASE = window.SDMSUrlSanitize?.stripWebsiteContentWrappers
+    ? window.SDMSUrlSanitize.stripWebsiteContentWrappers(rawApiBase)
+    : rawApiBase;
   const API_ROOT = window.API_BASE || `${API_BASE.replace(/\/+$/, '')}/api`;
   const DATE_FMT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
@@ -66,19 +69,30 @@ document.addEventListener("DOMContentLoaded", () => {
     return ct.includes('application/json') ? res.json() : null;
   }
 
+  function splitFullName(fullName) {
+    const value = (fullName || '').toString().trim().replace(/\s+/g, ' ');
+    if (!value) return { firstName: '', middleName: '', lastName: '' };
+    const parts = value.split(' ');
+    if (parts.length === 1) return { firstName: parts[0], middleName: '', lastName: '' };
+    if (parts.length === 2) return { firstName: parts[0], middleName: '', lastName: parts[1] };
+    return { firstName: parts[0], middleName: parts.slice(1, -1).join(' '), lastName: parts[parts.length - 1] };
+  }
+
   function buildStudentName(student) {
     if (!student) return '';
-    const parts = [student.lastName, student.firstName, student.middleName].filter(Boolean);
-    return parts.join(', ').replace(/\s+/g, ' ').trim();
+    return student.fullName || [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   }
 
   function normalizeStudent(row) {
+    const fullName = (row.full_name || '').toString().trim();
+    const split = splitFullName(fullName);
     return {
       id: row.id,
       lrn: row.lrn || '',
-      firstName: row.first_name || '',
-      middleName: row.middle_name || '',
-      lastName: row.last_name || '',
+      fullName,
+      firstName: row.first_name || split.firstName,
+      middleName: row.middle_name || split.middleName,
+      lastName: row.last_name || split.lastName,
       grade: row.grade !== undefined && row.grade !== null ? Number(row.grade) : null,
       section: row.section || '',
       createdAt: row.created_at || null,
