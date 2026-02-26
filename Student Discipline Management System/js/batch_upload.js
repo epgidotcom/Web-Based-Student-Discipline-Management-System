@@ -250,7 +250,20 @@
   async function uploadStudentCSV(file) {
     const formData = new FormData();
     formData.append('file', file);
-    return apiRequestFormData(BATCH_UPLOAD_URL, { method: 'POST', formData });
+    const res = await fetch('/api/students/batch-upload', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData
+    });
+    const ct = res.headers.get('content-type') || '';
+    const data = ct.includes('application/json') ? await res.json() : {};
+    if (!res.ok) {
+      const message = data.error || data.message || `Request failed (${res.status})`;
+      console.error('[BatchUpload] uploadStudentCSV failed:', message);
+      throw new Error(message);
+    }
+    console.log('[BatchUpload] uploadStudentCSV success:', data.inserted);
+    return Number(data.inserted) || 0;
   }
 
   openBtn?.addEventListener('click', openModal);
@@ -302,16 +315,8 @@
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
       if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
-      const result = await uploadStudentCSV(selectedFile);
-      let msg = `Upload complete!\n✅ Inserted: ${result.inserted}`;
-      if (result.skipped > 0) msg += `\n⏭️ Skipped (duplicate LRN): ${result.skipped}`;
-      if (result.failed > 0) msg += `\n❌ Failed: ${result.failed}`;
-      if (result.warnings?.length) msg += `\n⚠️ Warnings: ${result.warnings.length}`;
-      if (result.errors?.length) {
-        const sample = result.errors.slice(0, 5).map(e => `  Row ${e.row}: ${e.field} ${e.error}`).join('\n');
-        msg += `\n\nFirst errors:\n${sample}`;
-      }
-      alert(msg);
+      const inserted = await uploadStudentCSV(selectedFile);
+      alert(`Upload complete!\n✅ Inserted: ${inserted}`);
       closeModal();
       if (typeof window.SDMS_refreshStudents === 'function') window.SDMS_refreshStudents();
       else window.location.reload();
