@@ -10,6 +10,15 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const NUMERIC_ID_REGEX = /^\d+$/;
+
+export function getStudentLookup(rawId) {
+  const id = String(rawId ?? '').trim();
+  if (!id) return null;
+  if (UUID_V4_REGEX.test(id)) return { column: 'id', value: id };
+  if (NUMERIC_ID_REGEX.test(id)) return { column: 'id', value: Number.parseInt(id, 10) };
+  return null;
+}
 
 async function getStudentTableColumns() {
   const { rows } = await query(
@@ -200,7 +209,8 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
 
 // Get one student
 router.get('/:id', async (req, res) => {
-  if (!UUID_V4_REGEX.test(req.params.id)) {
+  const lookup = getStudentLookup(req.params.id);
+  if (!lookup) {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
@@ -223,10 +233,6 @@ router.put('/:id', async (req, res) => {
   const lookup = getStudentLookup(req.params.id);
 
   if (!lookup) {
-    return res.status(400).json({ error: 'Invalid student id format' });
-  }
-
-  if (!UUID_V4_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
@@ -254,7 +260,8 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  if (!UUID_V4_REGEX.test(req.params.id)) {
+  const lookup = getStudentLookup(req.params.id);
+  if (!lookup) {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
