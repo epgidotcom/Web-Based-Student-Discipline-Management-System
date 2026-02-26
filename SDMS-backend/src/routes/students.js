@@ -185,16 +185,30 @@ router.get('/', async (req, res) => {
               });
             }
           }
-          const listResult  = await query(selectWithoutAgeLegacy, [limit, offset]);
-          const countResult = await query('select count(*)::int as total from students');
-          const total = countResult.rows[0]?.total ?? 0;
-          return res.json({
-            data: listResult.rows.map(row => ({ ...row, age: null })),
-            currentPage: page,
-            limit,
-            totalItems: total,
-            totalPages: Math.max(1, Math.ceil(total / limit))
-          });
+          try {
+            const listResult  = await query(selectWithoutAgeLegacy, [limit, offset]);
+            const countResult = await query('select count(*)::int as total from students');
+            const total = countResult.rows[0]?.total ?? 0;
+            return res.json({
+              data: listResult.rows.map(row => ({ ...row, age: null })),
+              currentPage: page,
+              limit,
+              totalItems: total,
+              totalPages: Math.max(1, Math.ceil(total / limit))
+            });
+          } catch (err3) {
+            if (!isMissingColumnError(err3, 'last_name')) throw err3;
+            const listResult  = await query(selectWithoutAgeNoLastLegacy, [limit, offset]);
+            const countResult = await query('select count(*)::int as total from students');
+            const total = countResult.rows[0]?.total ?? 0;
+            return res.json({
+              data: listResult.rows.map(row => ({ ...row, age: null })),
+              currentPage: page,
+              limit,
+              totalItems: total,
+              totalPages: Math.max(1, Math.ceil(total / limit))
+            });
+          }
         }
       }
       // 'age' column absent – use no-age variant but keep active filter
