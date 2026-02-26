@@ -62,8 +62,8 @@ router.get('/:id', async (req, res) => {
 
   try {
     const { rows } = await query(
-      `select ${STUDENT_COLUMNS} from students where id = $1`,
-      [req.params.id]
+      `select ${STUDENT_COLUMNS} from students where ${lookup.column} = $1`,
+      [lookup.value]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
@@ -198,6 +198,11 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
 router.put('/:id', async (req, res) => {
   // Removed legacy payload fields including last_name; update only current schema columns.
   const { lrn, full_name, grade, section, strand } = req.body ?? {};
+  const lookup = getStudentLookup(req.params.id);
+
+  if (!lookup) {
+    return res.status(400).json({ error: 'Invalid student id format' });
+  }
 
   if (!UUID_V4_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: 'Invalid student id format' });
@@ -211,9 +216,9 @@ router.put('/:id', async (req, res) => {
               grade = coalesce($3, grade),
               section = coalesce($4, section),
               strand = coalesce($5, strand)
-        where id = $6
+        where ${lookup.column} = $6
         returning ${STUDENT_COLUMNS}`,
-      [lrn ?? null, full_name ?? null, grade ?? null, section ?? null, strand ?? null, req.params.id]
+      [lrn ?? null, full_name ?? null, grade ?? null, section ?? null, strand ?? null, lookup.value]
     );
 
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -232,7 +237,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
-    const { rowCount } = await query('DELETE FROM students WHERE id = $1', [req.params.id]);
+    const { rowCount } = await query(`DELETE FROM students WHERE ${lookup.column} = $1`, [lookup.value]);
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
 
     res.status(200).json({ message: 'Student deleted successfully.' });
