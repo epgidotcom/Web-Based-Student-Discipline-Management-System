@@ -64,18 +64,15 @@ router.get('/:id', async (req, res) => {
 // Create student
 router.post('/', async (req, res) => {
   // Removed legacy payload fields (first_name/middle_name/last_name/etc.); schema now uses full_name.
-  const { lrn, full_name, first_name, middle_name, last_name, grade, section, strand } = req.body ?? {};
-  // Backward-compatible name handling: older clients may still send first/middle/last fields.
-  const resolvedFullName = (full_name && String(full_name).trim())
-    || [first_name, middle_name, last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  if (!resolvedFullName) return res.status(400).json({ error: 'full_name is required' });
+  const { lrn, full_name, grade, section, strand } = req.body ?? {};
+  if (!full_name) return res.status(400).json({ error: 'full_name is required' });
 
   try {
     const { rows } = await query(
       `insert into students (lrn, full_name, grade, section, strand)
        values ($1,$2,$3,$4,$5)
        returning ${STUDENT_COLUMNS}`,
-      [lrn ?? null, resolvedFullName, grade ?? null, section ?? null, strand ?? null]
+      [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
     );
     res.status(201).json(rows[0]);
   } catch (e) {
@@ -105,11 +102,9 @@ router.post('/batch', async (req, res) => {
   for (let i = 0; i < students.length; i++) {
     const student = students[i] ?? {};
     // Removed legacy per-row fields including last_name.
-    const { lrn, full_name, first_name, middle_name, last_name, grade, section, strand } = student;
-    const resolvedFullName = (full_name && String(full_name).trim())
-      || [first_name, middle_name, last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const { lrn, full_name, grade, section, strand } = student;
 
-    if (!resolvedFullName) {
+    if (!full_name) {
       results.failed++;
       results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'full_name is required' });
       results.details.push({ row: i + 1, status: 'failed', lrn, reason: 'Missing required fields' });
@@ -121,7 +116,7 @@ router.post('/batch', async (req, res) => {
         `insert into students (lrn, full_name, grade, section, strand)
          values ($1,$2,$3,$4,$5)
          returning id`,
-        [lrn ?? null, resolvedFullName, grade ?? null, section ?? null, strand ?? null]
+        [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
       );
 
       results.inserted++;
@@ -150,10 +145,7 @@ router.post('/batch', async (req, res) => {
 // Update student
 router.put('/:id', async (req, res) => {
   // Removed legacy payload fields including last_name; update only current schema columns.
-  const { lrn, full_name, first_name, middle_name, last_name, grade, section, strand } = req.body ?? {};
-  const resolvedFullName = (full_name && String(full_name).trim())
-    || [first_name, middle_name, last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
-    || null;
+  const { lrn, full_name, grade, section, strand } = req.body ?? {};
 
   try {
     const { rows } = await query(
@@ -165,7 +157,7 @@ router.put('/:id', async (req, res) => {
               strand = coalesce($5, strand)
         where id = $6
         returning ${STUDENT_COLUMNS}`,
-      [lrn ?? null, resolvedFullName, grade ?? null, section ?? null, strand ?? null, req.params.id]
+      [lrn ?? null, full_name ?? null, grade ?? null, section ?? null, strand ?? null, req.params.id]
     );
 
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -180,20 +172,10 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    // Preserve legacy behavior when `active` exists; fallback to physical delete on simplified schema.
-    try {
-      const { rowCount } = await query(
-        `UPDATE students SET active = FALSE WHERE id = $1 RETURNING id`,
-        [req.params.id]
-      );
-      if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
-      return res.status(200).json({ message: 'Student deactivated successfully.' });
-    } catch (err) {
-      if (!(err?.message || '').toLowerCase().includes('column "active"')) throw err;
-      const { rowCount } = await query('DELETE FROM students WHERE id = $1', [req.params.id]);
-      if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
-      return res.status(200).json({ message: 'Student deleted successfully.' });
-    }
+    const { rowCount } = await query('DELETE FROM students WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
+
+    res.status(200).json({ message: 'Student deleted successfully.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
