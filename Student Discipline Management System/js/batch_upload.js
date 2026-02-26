@@ -250,7 +250,7 @@
   async function uploadStudentCSV(file) {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/students/batch-upload', {
+    const res = await fetch(BATCH_UPLOAD_URL, {
       method: 'POST',
       headers: authHeaders(),
       body: formData
@@ -271,8 +271,9 @@
     if (data.inserted == null) throw new Error('Invalid upload response: inserted count is missing.');
     const inserted = Number(data.inserted);
     if (!Number.isInteger(inserted) || inserted < 0) throw new Error('Invalid upload response: inserted count must be a non-negative integer.');
-    console.log('[BatchUpload] uploadStudentCSV success:', inserted);
-    return inserted;
+    const errors = Array.isArray(data.errors) ? data.errors : [];
+    console.log('[BatchUpload] uploadStudentCSV success:', { inserted, errors });
+    return { inserted, errors };
   }
 
   openBtn?.addEventListener('click', openModal);
@@ -324,8 +325,21 @@
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
       if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
-      const inserted = await uploadStudentCSV(selectedFile);
-      alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+      const { inserted, errors } = await uploadStudentCSV(selectedFile);
+      if (errors.length) {
+        const formatted = errors.slice(0, 5).map((err) => {
+          if (typeof err === 'string') return err;
+          if (err && typeof err === 'object') {
+            const row = err.row != null ? `Row ${err.row}: ` : '';
+            const message = err.error || err.message || JSON.stringify(err);
+            return `${row}${message}`;
+          }
+          return String(err);
+        }).join('\n');
+        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
+      } else {
+        alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+      }
       closeModal();
       if (typeof window.SDMS_refreshStudents === 'function') window.SDMS_refreshStudents();
       else window.location.reload();
