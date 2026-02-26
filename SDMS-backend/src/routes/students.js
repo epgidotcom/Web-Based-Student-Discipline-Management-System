@@ -45,7 +45,7 @@ async function hasStudentUniqueConstraint(columnName) {
     );
     return rows.length > 0;
   } catch (error) {
-    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint; proceeding without conflict handling', {
+    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint; duplicates may now fail inserts', {
       columnName,
       error: error?.message
     });
@@ -193,9 +193,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
     });
 
     const availableColumns = await getStudentTableColumns();
-    const hasLrnUniqueConstraint = availableColumns.includes('lrn')
-      ? await hasStudentUniqueConstraint('lrn')
-      : false;
+    const hasLrnUniqueConstraint = await hasStudentUniqueConstraint('lrn');
     const conflictClause = hasLrnUniqueConstraint ? 'on conflict (lrn) do nothing' : '';
     let inserted = 0;
 
