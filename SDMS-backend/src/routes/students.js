@@ -45,7 +45,7 @@ async function hasStudentUniqueConstraint(columnName) {
     );
     return rows.length > 0;
   } catch (error) {
-    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint on column; ON CONFLICT clause will be skipped', {
+    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint; duplicate entries may cause insertion failures', {
       columnName,
       error: error.message
     });
@@ -219,8 +219,8 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
       const rowConflictClause = hasLrnUniqueConstraint && mappedStudent.columns.includes('lrn')
         ? ' on conflict (lrn) do nothing'
         : '';
-      const insertQuery = `insert into students (${mappedStudent.columns.join(',')})
-         values (${placeholders})${rowConflictClause}`;
+      const insertQuery = `INSERT INTO students (${mappedStudent.columns.join(',')})
+         VALUES (${placeholders})${rowConflictClause}`;
       const { rowCount } = await query(insertQuery, mappedStudent.values);
 
       inserted += rowCount;
