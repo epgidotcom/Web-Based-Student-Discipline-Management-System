@@ -217,10 +217,10 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
       }
       const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
       const rowConflictClause = hasLrnUniqueConstraint && mappedStudent.columns.includes('lrn')
-        ? 'on conflict (lrn) do nothing'
+        ? ' on conflict (lrn) do nothing'
         : '';
       const finalSql = `insert into students (${mappedStudent.columns.join(',')})
-         values (${placeholders})${rowConflictClause ? ` ${rowConflictClause}` : ''}`;
+         values (${placeholders})${rowConflictClause}`;
       const { rowCount } = await query(finalSql, mappedStudent.values);
 
       inserted += rowCount;
