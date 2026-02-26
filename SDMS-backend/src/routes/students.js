@@ -189,11 +189,10 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         continue;
       }
       const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
-      const hasLrnColumn = mappedStudent.columns.includes('lrn');
       const { rowCount } = await query(
         `insert into students (${mappedStudent.columns.join(',')})
          values (${placeholders})
-         ${hasLrnColumn ? 'on conflict (lrn) do nothing' : ''}`,
+         on conflict do nothing`,
         mappedStudent.values
       );
 
