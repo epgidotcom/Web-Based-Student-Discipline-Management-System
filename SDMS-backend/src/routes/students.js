@@ -27,6 +27,32 @@ async function getStudentTableColumns() {
   return rows.map((row) => row.column_name);
 }
 
+// Falls back to false when the constraint lookup fails to avoid invalid conflict targets.
+async function hasStudentUniqueConstraint(columnName) {
+  try {
+    const { rows } = await query(
+      `SELECT 1
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.constraint_column_usage ccu
+           ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+        WHERE tc.table_name = 'students'
+          AND tc.table_schema = current_schema()
+          AND tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY')
+          AND ccu.column_name = $1
+        LIMIT 1`,
+      [columnName]
+    );
+    return rows.length > 0;
+  } catch (error) {
+    console.warn('[hasStudentUniqueConstraint] failed to verify unique constraint on column; duplicate entries may fail', {
+      columnName,
+      error: error.message
+    });
+    return false;
+  }
+}
+
 
 // List students (paginated)
 router.get('/', async (req, res) => {
@@ -167,6 +193,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
     });
 
     const availableColumns = await getStudentTableColumns();
+    const hasLrnUniqueConstraint = await hasStudentUniqueConstraint('lrn');
     let inserted = 0;
 
     for (const row of rows) {
@@ -189,13 +216,12 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         continue;
       }
       const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
-      const hasLrnColumn = mappedStudent.columns.includes('lrn');
-      const { rowCount } = await query(
-        `insert into students (${mappedStudent.columns.join(',')})
-         values (${placeholders})
-         ${hasLrnColumn ? 'on conflict (lrn) do nothing' : ''}`,
-        mappedStudent.values
-      );
+      const rowConflictClause = hasLrnUniqueConstraint && mappedStudent.columns.includes('lrn')
+        ? ' on conflict (lrn) do nothing'
+        : '';
+      const insertQuery = `INSERT INTO students (${mappedStudent.columns.join(',')})
+         VALUES (${placeholders})${rowConflictClause}`;
+      const { rowCount } = await query(insertQuery, mappedStudent.values);
 
       inserted += rowCount;
     }
