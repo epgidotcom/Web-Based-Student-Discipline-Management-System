@@ -247,7 +247,7 @@
     }
   }
 
-  async function uploadBatchCsv(file) {
+  async function uploadStudentCSV(file) {
     const formData = new FormData();
     formData.append('file', file);
     return apiRequestFormData(BATCH_UPLOAD_URL, { method: 'POST', formData });
@@ -302,7 +302,7 @@
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
       if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
-      const result = await uploadBatchCsv(selectedFile);
+      const result = await uploadStudentCSV(selectedFile);
       let msg = `Upload complete!\n✅ Inserted: ${result.inserted}`;
       if (result.skipped > 0) msg += `\n⏭️ Skipped (duplicate LRN): ${result.skipped}`;
       if (result.failed > 0) msg += `\n❌ Failed: ${result.failed}`;
