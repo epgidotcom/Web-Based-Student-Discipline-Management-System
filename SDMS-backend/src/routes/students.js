@@ -158,7 +158,33 @@ router.get('/', async (req, res) => {
             totalPages: Math.max(1, Math.ceil(total / limit))
           });
         } catch (err2) {
-          if (!isMissingColumnError(err2, 'age')) throw err2;
+          if (!isMissingColumnError(err2, 'age') && !isMissingColumnError(err2, 'last_name')) throw err2;
+          if (isMissingColumnError(err2, 'last_name')) {
+            try {
+              const listResult  = await query(selectWithAgeNoLastLegacy, [limit, offset]);
+              const countResult = await query('select count(*)::int as total from students');
+              const total = countResult.rows[0]?.total ?? 0;
+              return res.json({
+                data: listResult.rows,
+                currentPage: page,
+                limit,
+                totalItems: total,
+                totalPages: Math.max(1, Math.ceil(total / limit))
+              });
+            } catch (err3) {
+              if (!isMissingColumnError(err3, 'age')) throw err3;
+              const listResult  = await query(selectWithoutAgeNoLastLegacy, [limit, offset]);
+              const countResult = await query('select count(*)::int as total from students');
+              const total = countResult.rows[0]?.total ?? 0;
+              return res.json({
+                data: listResult.rows.map(row => ({ ...row, age: null })),
+                currentPage: page,
+                limit,
+                totalItems: total,
+                totalPages: Math.max(1, Math.ceil(total / limit))
+              });
+            }
+          }
           const listResult  = await query(selectWithoutAgeLegacy, [limit, offset]);
           const countResult = await query('select count(*)::int as total from students');
           const total = countResult.rows[0]?.total ?? 0;
