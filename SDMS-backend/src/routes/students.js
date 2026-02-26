@@ -44,7 +44,7 @@ async function hasStudentUniqueConstraint(columnName) {
     );
     return rows.length > 0;
   } catch (error) {
-    console.warn('[students.batch-upload] unique constraint lookup failed', { columnName, error: error?.message });
+    console.warn('[hasStudentUniqueConstraint] lookup failed', { columnName, error: error?.message });
     return false;
   }
 }
@@ -189,7 +189,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
     });
 
     const availableColumns = await getStudentTableColumns();
-    const hasLrnConflictTarget = availableColumns.includes('lrn')
+    const hasLrnUniqueConstraint = availableColumns.includes('lrn')
       ? await hasStudentUniqueConstraint('lrn')
       : false;
     let inserted = 0;
@@ -214,7 +214,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         continue;
       }
       const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
-      const conflictClause = hasLrnConflictTarget ? 'on conflict (lrn) do nothing' : '';
+      const conflictClause = hasLrnUniqueConstraint ? 'on conflict (lrn) do nothing' : '';
       const { rowCount } = await query(
         `insert into students (${mappedStudent.columns.join(',')})
          values (${placeholders})
