@@ -1,6 +1,28 @@
 (() => {
   const API_BASE = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || window.API_BASE || '';
   const API_ROOT = `${API_BASE.replace(/\/+$/, '')}/api`;
+  const stripWebsiteContentTags = window.SDMSUrlSanitize?.stripWebsiteContentTags || ((value) => {
+    if (value == null) return '';
+    return String(value)
+      .replace(/^<WebsiteContent_[^>]+>/, '')
+      .replace(/<\/WebsiteContent_[^>]+>$/, '')
+      .trim();
+  });
+  const BATCH_CHUNK_SIZE = 200;
+  const EXPECTED_HEADERS = ['lrn', 'full_name', 'age', 'grade', 'section', 'strand'];
+  const HEADER_ALIASES = {
+    fullname: 'full_name',
+    full_name: 'full_name',
+    'full name': 'full_name',
+    first_name: 'first_name',
+    middle_name: 'middle_name',
+    last_name: 'last_name',
+    lrn: 'lrn',
+    age: 'age',
+    grade: 'grade',
+    section: 'section',
+    strand: 'strand'
+  };
 
   function authHeaders() {
     const token = window.SDMSAuth?.getToken?.();
@@ -43,6 +65,7 @@
 
   let parsedStudents = [];
   let selectedFile   = null;
+  let parseResult = null;
 
   // ── Modal open / close ──────────────────────────────────────────────────
   function openModal() {
@@ -66,6 +89,7 @@
     if (validationErrors) validationErrors.style.display = 'none';
     if (errorList)       errorList.innerHTML = '';
     if (previewTbody)    previewTbody.innerHTML = '';
+    parseResult = null;
   }
 
   // ── File handling ───────────────────────────────────────────────────────
@@ -126,65 +150,104 @@
   });
 
   // ── CSV parsing ─────────────────────────────────────────────────────────
-  function parseCSVText(text) {
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (!lines.length) return [];
-
-    // Detect header row
-    const first = lines[0].toLowerCase();
-    const hasHeader = /lrn|fullname|full.name|name/.test(first);
-    const dataLines = hasHeader ? lines.slice(1) : lines;
-
-    return dataLines.map((line, idx) => {
-      // Basic CSV split (handles simple unquoted values)
-      const parts = line.split(',').map(p => p.trim());
-      const lrn      = parts[0] || '';
-      const fullName = parts[1] || '';
-      const ageRaw   = parts[2] || '';
-      const grade    = parts[3] || '';
-      const section  = parts[4] || '';
-      const strand   = parts[5] || '';
-
-      // Split FullName → first / middle / last
-      const nameParts = fullName.split(/\s+/).filter(Boolean);
-      let first_name = '', middle_name = null, last_name = '';
-      if (nameParts.length === 0) {
-        // nothing
-      } else if (nameParts.length === 1) {
-        first_name = nameParts[0];
-      } else if (nameParts.length === 2) {
-        first_name = nameParts[0];
-        last_name  = nameParts[1];
+  function parseCsvLine(line) {
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        cells.push(current);
+        current = '';
       } else {
-        first_name  = nameParts[0];
-        last_name   = nameParts[nameParts.length - 1];
-        middle_name = nameParts.slice(1, -1).join(' ');
+        current += char;
       }
+    }
+    cells.push(current);
+    return cells.map(cell => stripWebsiteContentTags(cell));
+  }
 
+  function normalizeHeaders(headerRow) {
+    return headerRow.map(h => HEADER_ALIASES[(h || '').toLowerCase().trim()] || null);
+  }
+
+  function buildFullName(firstName, middleName, lastName, fallbackFullName) {
+    const composed = [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    return composed || fallbackFullName || '';
+  }
+
+  function parseCSVText(text) {
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (!lines.length) return { students: [], errors: ['CSV is empty.'] };
+
+    const firstRow = parseCsvLine(lines[0]);
+    const normalizedHeaders = normalizeHeaders(firstRow);
+    const headerLooksValid = normalizedHeaders.some(Boolean);
+    const parseErrors = [];
+
+    if (headerLooksValid) {
+      const unknown = firstRow.filter((_, idx) => !normalizedHeaders[idx]);
+      if (unknown.length) {
+        parseErrors.push(`Unsupported header(s): ${unknown.join(', ')}.`);
+      }
+    }
+
+    const students = [];
+    const dataLines = headerLooksValid ? lines.slice(1) : lines;
+    const startRow = headerLooksValid ? 2 : 1;
+
+    dataLines.forEach((line, index) => {
+      const cells = parseCsvLine(line);
+      const row = startRow + index;
+      const record = headerLooksValid
+        ? normalizedHeaders.reduce((acc, header, i) => {
+            if (header) acc[header] = cells[i] || '';
+            return acc;
+          }, {})
+        : {
+            lrn: cells[0] || '',
+            full_name: cells[1] || '',
+            age: cells[2] || '',
+            grade: cells[3] || '',
+            section: cells[4] || '',
+            strand: cells[5] || ''
+          };
+
+      const fullName = stripWebsiteContentTags(record.full_name || '');
+      const firstName = stripWebsiteContentTags(record.first_name || '');
+      const middleName = stripWebsiteContentTags(record.middle_name || '');
+      const lastName = stripWebsiteContentTags(record.last_name || '');
+      const ageRaw = stripWebsiteContentTags(record.age || '');
       const age = ageRaw !== '' ? Number(ageRaw) : null;
 
-      return {
-        _row:        hasHeader ? idx + 2 : idx + 1,
-        lrn:         lrn  || null,
-        first_name,
-        middle_name: middle_name || null,
-        last_name,
-        age:         (age !== null && !Number.isNaN(age)) ? age : null,
-        grade:       grade   || null,
-        section:     section || null,
-        strand:      strand  || null,
-        parent_contact: '09000000000',
-        // Display helpers
-        _fullName: fullName,
-        _ageRaw:   ageRaw
-      };
+      students.push({
+        _row: row,
+        lrn: stripWebsiteContentTags(record.lrn || '') || null,
+        full_name: buildFullName(firstName, middleName, lastName, fullName),
+        age: Number.isFinite(age) ? age : null,
+        grade: stripWebsiteContentTags(record.grade || '') || null,
+        section: stripWebsiteContentTags(record.section || '') || null,
+        strand: stripWebsiteContentTags(record.strand || '') || null,
+        last_name: lastName || null,
+        _fullName: buildFullName(firstName, middleName, lastName, fullName),
+        _ageRaw: ageRaw
+      });
     });
+
+    return { students, errors: parseErrors };
   }
 
   function validateStudents(students) {
     const errors = [];
     students.forEach(s => {
-      if (!s.first_name || !s.last_name) {
+      if (!s.full_name) {
         errors.push(`Row ${s._row}: Full Name is required (got "${s._fullName || ''}")`);
       }
       if (s.lrn && !/^\d{1,12}$/.test(s.lrn)) {
@@ -229,12 +292,13 @@
     const reader = new FileReader();
     reader.onload = e => {
       const text = e.target.result;
-      parsedStudents = parseCSVText(text);
+      parseResult = parseCSVText(text);
+      parsedStudents = parseResult.students;
       if (!parsedStudents.length) {
         alert('No valid data rows found in the CSV file.');
         return;
       }
-      const errors = validateStudents(parsedStudents);
+      const errors = [...(parseResult.errors || []), ...validateStudents(parsedStudents)];
       showValidationErrors(errors);
       renderPreview(parsedStudents);
       if (previewCount)  previewCount.textContent = String(parsedStudents.length);
@@ -249,6 +313,24 @@
   });
 
   // ── Confirm upload ──────────────────────────────────────────────────────
+  async function uploadInChunks(students) {
+    const aggregate = { inserted: 0, skipped: 0, failed: 0, errors: [] };
+    const totalChunks = Math.ceil(students.length / BATCH_CHUNK_SIZE);
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * BATCH_CHUNK_SIZE;
+      const chunk = students.slice(start, start + BATCH_CHUNK_SIZE);
+      if (confirmUploadBtn) {
+        confirmUploadBtn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Uploading chunk ${chunkIndex + 1}/${totalChunks}...`;
+      }
+      const result = await api('/students/batch', { method: 'POST', body: { students: chunk } });
+      aggregate.inserted += result.inserted || 0;
+      aggregate.skipped += result.skipped || 0;
+      aggregate.failed += result.failed || 0;
+      aggregate.errors.push(...(result.errors || []));
+    }
+    return aggregate;
+  }
+
   confirmUploadBtn?.addEventListener('click', async () => {
     if (!parsedStudents.length) {
       alert('No students to upload. Please parse a CSV file first.');
@@ -262,17 +344,16 @@
 
     try {
       const payload = parsedStudents.map(s => ({
-        lrn:           s.lrn   || null,
-        first_name:    s.first_name,
-        middle_name:   s.middle_name || null,
-        last_name:     s.last_name,
-        age:           s.age,
-        grade:         s.grade   || null,
-        section:       s.section || null,
-        parent_contact: s.parent_contact || '09000000000'
+        lrn: s.lrn || null,
+        full_name: s.full_name,
+        last_name: s.last_name || null,
+        age: s.age,
+        grade: s.grade || null,
+        section: s.section || null,
+        strand: s.strand || null
       }));
 
-      const result = await api('/students/batch', { method: 'POST', body: { students: payload } });
+      const result = await uploadInChunks(payload);
 
       let msg = `Upload complete!\n\u2705 Inserted: ${result.inserted}`;
       if (result.skipped > 0) msg += `\n\u23ED\uFE0F Skipped (duplicate LRN): ${result.skipped}`;

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { query } from '../db.js';
+import { processBatchStudents } from '../utils/studentUpload.js';
 
 const router = Router();
 
 const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
+
 
 // List students (paginated)
 router.get('/', async (req, res) => {
@@ -91,25 +93,9 @@ router.post('/batch', async (req, res) => {
     return res.status(400).json({ error: 'students array is required and must not be empty' });
   }
 
-  const results = {
-    inserted: 0,
-    skipped: 0,
-    failed: 0,
-    errors: [],
-    details: []
-  };
-
-  for (let i = 0; i < students.length; i++) {
-    const student = students[i] ?? {};
-    // Removed legacy per-row fields including last_name.
+  const results = await processBatchStudents(students, async (student) => {
+    const requestId = req.headers['x-request-id'] || `batch-${Date.now()}`;
     const { lrn, full_name, grade, section, strand } = student;
-
-    if (!full_name) {
-      results.failed++;
-      results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'full_name is required' });
-      results.details.push({ row: i + 1, status: 'failed', lrn, reason: 'Missing required fields' });
-      continue;
-    }
 
     try {
       const { rows } = await query(
@@ -119,20 +105,17 @@ router.post('/batch', async (req, res) => {
         [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
       );
 
-      results.inserted++;
-      results.details.push({ row: i + 1, status: 'inserted', lrn, id: rows[0]?.id });
+      return rows[0];
     } catch (e) {
-      if (e && e.code === '23505' && /lrn/i.test(e.detail || '')) {
-        results.skipped++;
-        results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: 'LRN already exists (skipped)' });
-        results.details.push({ row: i + 1, status: 'skipped', lrn, reason: 'Duplicate LRN' });
-      } else {
-        results.failed++;
-        results.errors.push({ row: i + 1, lrn: lrn || 'unknown', error: e.message });
-        results.details.push({ row: i + 1, status: 'failed', lrn, reason: e.message });
-      }
+      console.error('[students.batch] row_insert_error', {
+        requestId,
+        sanitized: student,
+        error: e.message,
+        time: new Date().toISOString()
+      });
+      throw e;
     }
-  }
+  });
 
   let statusCode;
   if (results.failed === students.length) statusCode = 400;
