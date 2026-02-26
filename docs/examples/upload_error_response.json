@@ -1,0 +1,17 @@
+{
+  "inserted": 2,
+  "skipped": 1,
+  "failed": 2,
+  "errors": [
+    { "row": 2, "field": "lrn", "error": "invalid_format" },
+    { "row": 4, "field": "full_name", "error": "required" },
+    { "row": 5, "field": "lrn", "error": "duplicate" }
+  ],
+  "details": [
+    { "row": 1, "status": "inserted", "lrn": "123456789012", "id": 101 },
+    { "row": 2, "status": "failed", "lrn": "BAD-LRN", "reason": "Validation failed" },
+    { "row": 3, "status": "inserted", "lrn": "223456789012", "id": 102 },
+    { "row": 4, "status": "failed", "lrn": "333333333333", "reason": "Validation failed" },
+    { "row": 5, "status": "skipped", "lrn": "123456789012", "reason": "Duplicate LRN" }
+  ]
+}

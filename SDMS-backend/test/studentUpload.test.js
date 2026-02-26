@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { normalizeStudentUploadRow, validateStudentUploadRow } from '../src/utils/studentUpload.js';
+
+test('normalizeStudentUploadRow strips WebsiteContent wrappers and composes full_name from legacy name fields', () => {
+  const row = normalizeStudentUploadRow({
+    lrn: '<WebsiteContent_a>123456789012</WebsiteContent_a>',
+    first_name: '<WebsiteContent_a>John</WebsiteContent_a>',
+    middle_name: 'P.',
+    last_name: '<WebsiteContent_a>Doe</WebsiteContent_a>',
+    grade: '11',
+    section: 'A',
+    strand: 'STEM'
+  });
+
+  assert.equal(row.lrn, '123456789012');
+  assert.equal(row.full_name, 'John P. Doe');
+  assert.equal(row.grade, '11');
+  assert.equal(row.section, 'A');
+  assert.equal(row.strand, 'STEM');
+});
+
+test('normalizeStudentUploadRow preserves full_name and ignores invalid age values', () => {
+  const row = normalizeStudentUploadRow({
+    full_name: '<WebsiteContent_a>Jane Smith</WebsiteContent_a>',
+    age: 'abc'
+  });
+
+  assert.equal(row.full_name, 'Jane Smith');
+  assert.equal(row.age, null);
+});
+
+test('validateStudentUploadRow returns structured errors for invalid rows', () => {
+  const errors = validateStudentUploadRow({
+    lrn: 'ABC123',
+    full_name: null,
+    age: 200
+  }, 4);
+
+  assert.deepEqual(errors, [
+    { row: 4, field: 'full_name', error: 'required' },
+    { row: 4, field: 'lrn', error: 'invalid_format' },
+    { row: 4, field: 'age', error: 'invalid_range' }
+  ]);
+});
