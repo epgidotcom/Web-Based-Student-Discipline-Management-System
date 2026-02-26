@@ -250,7 +250,7 @@
   async function uploadStudentCSV(file) {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/students/batch-upload', {
+    const res = await fetch(BATCH_UPLOAD_URL, {
       method: 'POST',
       headers: authHeaders(),
       body: formData
@@ -271,8 +271,38 @@
     if (data.inserted == null) throw new Error('Invalid upload response: inserted count is missing.');
     const inserted = Number(data.inserted);
     if (!Number.isInteger(inserted) || inserted < 0) throw new Error('Invalid upload response: inserted count must be a non-negative integer.');
-    console.log('[BatchUpload] uploadStudentCSV success:', inserted);
-    return inserted;
+    const errors = Array.isArray(data.errors) ? data.errors : [];
+    console.log('[BatchUpload] uploadStudentCSV success:', { inserted, errors });
+    return { inserted, errors };
+  }
+
+  async function handleBatchUploadInputChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setFile(file);
+
+    // When the modal parse/preview flow is present, upload happens on "Save All Students".
+    if (parseCSVBtn && confirmUploadBtn) return;
+
+    try {
+      const { inserted, errors } = await uploadStudentCSV(file);
+      if (errors.length) {
+        const formatted = errors.slice(0, 5).map((err) => {
+          if (typeof err === 'string') return err;
+          if (err && typeof err === 'object') {
+            const row = err.row != null ? `Row ${err.row}: ` : '';
+            const message = err.error || err.message || JSON.stringify(err);
+            return `${row}${message}`;
+          }
+          return String(err);
+        }).join('\n');
+        alert(`Uploaded with warnings.\n✅ Inserted: ${inserted}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
+      } else {
+        alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+      }
+    } catch (err) {
+      alert(`Upload failed: ${err.message || 'Unknown error'}`);
+    }
   }
 
   openBtn?.addEventListener('click', openModal);
@@ -281,7 +311,7 @@
   ['dragenter', 'dragover'].forEach(ev => dropZone?.addEventListener(ev, e => { e.preventDefault(); dropZone.style.borderColor = '#3b82f6'; dropZone.style.background = '#eff6ff'; }));
   ['dragleave', 'drop'].forEach(ev => dropZone?.addEventListener(ev, e => { e.preventDefault(); dropZone.style.borderColor = '#d1d5db'; dropZone.style.background = '#f9fafb'; }));
   dropZone?.addEventListener('drop', e => { e.preventDefault(); const file = e.dataTransfer?.files?.[0]; if (file) setFile(file); });
-  csvFileInput?.addEventListener('change', e => { const file = e.target.files?.[0]; if (file) setFile(file); });
+  csvFileInput?.addEventListener('change', handleBatchUploadInputChange);
   clearFileBtn?.addEventListener('click', () => { selectedFile = null; if (csvFileInput) csvFileInput.value = ''; if (fileInfo) fileInfo.style.display = 'none'; if (previewSection) previewSection.style.display = 'none'; });
   downloadTplBtn?.addEventListener('click', () => {
     const csv = 'LRN,FullName,Age,Grade,Section,Strand\r\n123456789012,Juan Dela Cruz,16,11,A,STEM\r\n';
@@ -324,8 +354,21 @@
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
       if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
-      const inserted = await uploadStudentCSV(selectedFile);
-      alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+      const { inserted, errors } = await uploadStudentCSV(selectedFile);
+      if (errors.length) {
+        const formatted = errors.slice(0, 5).map((err) => {
+          if (typeof err === 'string') return err;
+          if (err && typeof err === 'object') {
+            const row = err.row != null ? `Row ${err.row}: ` : '';
+            const message = err.error || err.message || JSON.stringify(err);
+            return `${row}${message}`;
+          }
+          return String(err);
+        }).join('\n');
+        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
+      } else {
+        alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+      }
       closeModal();
       if (typeof window.SDMS_refreshStudents === 'function') window.SDMS_refreshStudents();
       else window.location.reload();
