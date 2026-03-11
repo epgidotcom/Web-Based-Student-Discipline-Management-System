@@ -19,7 +19,7 @@ async function insertStudentFlexible(acctId, fullName, lrn, section, grade, age)
   // helper to push column and value
   const colsToInsert = [];
   const vals = [];
-
+  //AWTS GEGE
   function add(col, val) {
     if (cols.has(col)) {
       colsToInsert.push(col);
