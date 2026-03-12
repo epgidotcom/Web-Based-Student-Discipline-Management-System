@@ -29,6 +29,43 @@ function normalizeEvidence(raw) {
   return { value: raw };
 }
 
+//VIOLATION TYPES
+router.get('/type', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT DISTINCT category FROM norm_offenses ORDER BY category`
+    );
+
+    res.json(rows.map(r => r.category));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch offenses' });
+  }
+});
+
+// get descriptions for specific violation category
+router.get('/description/:category', async (req, res) => {
+  try {
+    const category = decodeURIComponent(req.params.category);
+    const { rows } = await query(
+      `SELECT id, code, description
+       FROM norm_offenses
+       WHERE category = $1
+       ORDER BY code`,
+      [category]
+    );
+
+    if (rows.length === 0)
+      return res.status(404).json({ error: 'No descriptions found' });
+
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 // === List with optional filters (student_id, q)
 router.get('/', async (req, res) => {
   try {
@@ -333,5 +370,7 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+
 
 export default router;

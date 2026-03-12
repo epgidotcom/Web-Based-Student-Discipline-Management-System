@@ -233,6 +233,11 @@
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
   const violationTypeField = document.getElementById('violationType');
+
+  //added for "normalized table"
+  const violationType2Field = document.getElementById('violationType2');
+  const descriptionField = document.getElementById('description');
+  
   const sanctionField = document.getElementById('sanction');
   const remarksField = document.getElementById('remarks');
 
@@ -330,6 +335,57 @@
       container.appendChild(wrapper);
     });
   }
+
+  //for getting violation type
+  async function loadViolationTypes() {
+  try {
+    const types = await api('/violations/type');
+
+    const dropdown = document.getElementById('violationType2');
+
+    types.forEach(type => {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = type;
+      dropdown.appendChild(option);
+    });
+
+  } catch (err) {
+    console.error("Failed to load violation types:", err);
+  }
+}
+// When violation type changes, load descriptions for that type
+violationType2Field.addEventListener('change', async function () {
+
+  const category = this.value;
+  const descriptionDropdown = document.getElementById('violationDescription');
+
+  // reset dropdown
+  descriptionDropdown.innerHTML =
+    '<option value="">Select Description</option>';
+
+  if (!category) return;
+
+  try {
+
+    const encoded = encodeURIComponent(category);
+
+    const descriptions = await api(`/violations/description/${encoded}`);
+
+    descriptions.forEach(item => {
+      const option = document.createElement('option');
+
+      option.value = item.id;
+      option.textContent = `${item.code} - ${item.description}`;
+
+      descriptionDropdown.appendChild(option);
+    });
+
+  } catch (err) {
+    console.error("Failed to load descriptions:", err);
+  }
+
+});
 
   function resetEvidence() {
     evidenceState = [];
@@ -586,6 +642,7 @@
     remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
     resetEvidence();
+    loadViolationTypes();
     displayPastOffensesFor(null);
     openModal(violationModal);
   }
