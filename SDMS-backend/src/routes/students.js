@@ -60,41 +60,6 @@ async function hasStudentUniqueConstraint(columnName) {
     return false;
   }
 }
-async function loadStudentTable() {
-  const tableBody = document.querySelector('#studentTable tbody');
-  if (!tableBody) return;
-
-  tableBody.innerHTML = '<tr><td colspan="4">Loading students...</td></tr>';
-
-  try {
-    // DYNAMIC CALL: Tumatawag sa backend API (HINDI HARDCODED)
-    const response = await fetch(`${window.SDMS_API_BASE}/api/students`);
-    const result = await response.json();
-    const students = result.data; // Kinukuha ang 'data' array mula sa backend response
-
-    tableBody.innerHTML = ''; // clean ang table
-
-    if (students.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="4">No students found.</td></tr>';
-        return;
-    }
-
-    // Dynamic rendering ng rows mula sa Normalized Data
-    students.forEach(s => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${s.lrn}</td>
-        <td><strong>${s.full_name}</strong></td> <td>Grade ${s.grade || 'N/A'}</td>
-        <td>${s.active ? '<span class="status active">Active</span>' : '<span class="status inactive">Inactive</span>'}</td>
-      `;
-      tableBody.appendChild(row);
-    });
-
-  } catch (err) {
-    console.error("Error loading students:", err);
-    tableBody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${err.message}</td></tr>`;
-  }
-}
 // js/student_list.js
 function renderStudents(students) {
   const tbody = document.querySelector('#studentTable tbody');
