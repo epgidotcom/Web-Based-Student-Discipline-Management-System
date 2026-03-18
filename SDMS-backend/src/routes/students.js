@@ -12,9 +12,11 @@ const STUDENT_COLUMNS = `id,
   lrn, 
   TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name)) AS full_name, 
   age, 
-  grade, 
-  section_id AS section, 
-  created_at AS added_date
+  sec.grade_level AS grade, 
+  sec.section_name AS section, 
+  sec.strand, 
+  s.active AS status,
+  s.added_date
 `;
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -83,8 +85,6 @@ function renderStudents(students) {
   });
 }
 
-document.addEventListener('DOMContentLoaded', loadStudentTable);
-
 // List students (paginated)
 router.get('/', async (req, res) => {
   const lrnQuery = req.query.lrn;
@@ -100,6 +100,12 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: e.message });
     }
   }
+  const queryStr = `
+  SELECT ${STUDENT_COLUMNS} 
+  FROM norm_students s
+  LEFT JOIN norm_sections sec ON s.section_id = sec.id
+  ORDER BY s.last_name ASC
+`;
 
   const pageRaw = Number.parseInt(req.query.page, 10);
   const limitRaw = Number.parseInt(req.query.limit, 10);
