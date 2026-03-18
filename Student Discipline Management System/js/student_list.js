@@ -589,7 +589,7 @@
     }
 
     function getSectionFromRow(row){
-      if (row.dataset && row.dataset.grade) return normalize(row.dataset.grade);
+      if (row.dataset && row.dataset.section) return normalize(row.dataset.section);
       try {
         var cell = row.cells && row.cells[4];
         if (cell) return normalize(cell.textContent || cell.innerText);
@@ -614,7 +614,7 @@
     }
 
     function applyDropdownFilters(){
-      var selSection = normalize(document.getElementById('filterSection') && document.getElementById('filterSection').value);
+      var selSection = normalize(document.getElementById('filterStrand') && document.getElementById('filterStrand').value);
       var selGrade  = normalize(document.getElementById('filterGrade') && document.getElementById('filterGrade').value);
 
       var table = document.getElementById('studentTable');
@@ -659,7 +659,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function(){
-      var filterSection = document.getElementById('filterSection');
+      var filterSection = document.getElementById('filterStrand');
       var filterGrade  = document.getElementById('filterGrade');
 
       if (filterSection) filterSection.addEventListener('change', applyDropdownFilters);

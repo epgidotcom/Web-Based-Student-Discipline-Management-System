@@ -8,7 +8,15 @@ import { processBatchStudents, mapStudentUploadToColumns } from '../utils/studen
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const STUDENT_COLUMNS = 'id, lrn, full_name, grade, section, strand';
+const STUDENT_COLUMNS = `id, 
+  lrn, 
+  TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name)) AS full_name, 
+  age, 
+  grade, 
+  section_id AS section, 
+  created_at AS added_date
+`;
+
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NUMERIC_ID_REGEX = /^\d+$/;
 
@@ -52,7 +60,65 @@ async function hasStudentUniqueConstraint(columnName) {
     return false;
   }
 }
+async function loadStudentTable() {
+  const tableBody = document.querySelector('#studentTable tbody');
+  if (!tableBody) return;
 
+  tableBody.innerHTML = '<tr><td colspan="4">Loading students...</td></tr>';
+
+  try {
+    // DYNAMIC CALL: Tumatawag sa backend API (HINDI HARDCODED)
+    const response = await fetch(`${window.SDMS_API_BASE}/api/students`);
+    const result = await response.json();
+    const students = result.data; // Kinukuha ang 'data' array mula sa backend response
+
+    tableBody.innerHTML = ''; // clean ang table
+
+    if (students.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="4">No students found.</td></tr>';
+        return;
+    }
+
+    // Dynamic rendering ng rows mula sa Normalized Data
+    students.forEach(s => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${s.lrn}</td>
+        <td><strong>${s.full_name}</strong></td> <td>Grade ${s.grade || 'N/A'}</td>
+        <td>${s.active ? '<span class="status active">Active</span>' : '<span class="status inactive">Inactive</span>'}</td>
+      `;
+      tableBody.appendChild(row);
+    });
+
+  } catch (err) {
+    console.error("Error loading students:", err);
+    tableBody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${err.message}</td></tr>`;
+  }
+}
+// js/student_list.js
+function renderStudents(students) {
+  const tbody = document.querySelector('#studentTable tbody');
+  tbody.innerHTML = '';
+
+  students.forEach(s => {
+    const row = `
+      <tr>
+        <td>${s.lrn}</td>
+        <td><strong>${s.full_name}</strong></td> <td>${s.age}</td>
+        <td>Grade ${s.grade}</td>
+        <td>${s.section}</td>
+        <td>${new Date(s.added_date).toLocaleDateString()}</td>
+        <td>
+          <button class="btn-view" onclick="viewStudent('${s.id}')"><i class="fa fa-eye"></i></button>
+          <button class="btn-edit" onclick="editStudent('${s.id}')"><i class="fa fa-edit"></i></button>
+        </td>
+      </tr>
+    `;
+    tbody.innerHTML += row;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadStudentTable);
 
 // List students (paginated)
 router.get('/', async (req, res) => {
@@ -60,9 +126,9 @@ router.get('/', async (req, res) => {
   if (lrnQuery) {
     try {
       const { rows } = await query(
-        `select ${STUDENT_COLUMNS} from norm_students where lrn = $1 limit 1`,
-        [lrnQuery]
-      );
+        `SELECT ${STUDENT_COLUMNS} FROM norm_students ORDER BY last_name ASC LIMIT $1 OFFSET $2`,
+      [limitRaw, offset]
+    );
       if (rows.length === 0) return res.json([]);
       return res.json(rows);
     } catch (e) {
@@ -264,7 +330,7 @@ router.put('/:id', async (req, res) => {
 
   try {
     const { rows } = await query(
-      `update students
+      `update norm_students
           set lrn = coalesce($1, lrn),
               full_name = coalesce($2, full_name),
               grade = coalesce($3, grade),
@@ -292,7 +358,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
-    const { rowCount } = await query(`DELETE FROM students WHERE ${lookup.column} = $1`, [lookup.value]);
+    const { rowCount } = await query(`DELETE FROM norm_students WHERE ${lookup.column} = $1`, [lookup.value]);
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
 
     res.status(200).json({ message: 'Student deleted successfully.' });
