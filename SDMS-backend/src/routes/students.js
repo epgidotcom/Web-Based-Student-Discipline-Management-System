@@ -36,7 +36,7 @@ async function hasStudentUniqueConstraint(columnName) {
          JOIN information_schema.constraint_column_usage ccu
            ON ccu.constraint_name = tc.constraint_name
           AND ccu.table_schema = tc.table_schema
-        WHERE tc.table_name = 'students'
+        WHERE tc.table_name = 'norm_students'
           AND tc.table_schema = current_schema()
           AND tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY')
           AND ccu.column_name = $1
@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
   if (lrnQuery) {
     try {
       const { rows } = await query(
-        `select ${STUDENT_COLUMNS} from students where lrn = $1 limit 1`,
+        `select ${STUDENT_COLUMNS} from norm_students where lrn = $1 limit 1`,
         [lrnQuery]
       );
       if (rows.length === 0) return res.json([]);
@@ -78,10 +78,10 @@ router.get('/', async (req, res) => {
 
   try {
     const listResult = await query(
-      `select ${STUDENT_COLUMNS} from students order by full_name asc limit $1 offset $2`,
+      `select ${STUDENT_COLUMNS} from norm_students order by full_name asc limit $1 offset $2`,
       [limit, offset]
     );
-    const countResult = await query('select count(*)::int as total from students');
+    const countResult = await query('select count(*)::int as total from norm_students');
     const total = countResult.rows[0]?.total ?? 0;
 
     res.json({
@@ -104,7 +104,7 @@ router.post('/', async (req, res) => {
 
   try {
     const { rows } = await query(
-      `insert into students (lrn, full_name, grade, section, strand)
+      `insert into norm_students (lrn, full_name, grade, section, strand)
        values ($1,$2,$3,$4,$5)
        returning ${STUDENT_COLUMNS}`,
       [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
