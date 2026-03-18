@@ -8,15 +8,14 @@ import { processBatchStudents, mapStudentUploadToColumns } from '../utils/studen
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const STUDENT_COLUMNS = `id, 
-  lrn, 
-  TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name)) AS full_name, 
-  age, 
-  sec.grade_level AS grade, 
+const STUDENT_COLUMNS = `
+ s.id, 
+  s.lrn, 
+  TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name)) AS full_name, 
+  sec.grade_level, 
   sec.section_name AS section, 
   sec.strand, 
-  s.active AS status,
-  s.added_date
+  s.active
 `;
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -32,7 +31,7 @@ export function getStudentLookup(rawId) {
 
 async function getStudentTableColumns() {
   const { rows } = await query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = 'students' ORDER BY ordinal_position`
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'norm_students' ORDER BY ordinal_position`
   );
   return rows.map((row) => row.column_name);
 }
@@ -87,26 +86,27 @@ function renderStudents(students) {
 
 // List students (paginated)
 router.get('/', async (req, res) => {
-  const lrnQuery = req.query.lrn;
+  const lrnQuery = String(req.query.lrn ?? '').trim();
+
+  
   if (lrnQuery) {
     try {
       const { rows } = await query(
-        `SELECT ${STUDENT_COLUMNS} FROM norm_students ORDER BY last_name ASC LIMIT $1 OFFSET $2`,
-      [limitRaw, offset]
-    );
-      if (rows.length === 0) return res.json([]);
-      return res.json(rows);
+        `SELECT ${STUDENT_COLUMNS}
+         FROM norm_students s
+         LEFT JOIN norm_sections sec ON s.section_id = sec.id
+         WHERE s.lrn = $1
+         LIMIT 1`,
+        [lrnQuery]
+      );
+      
+      return res.json({ data: rows }); 
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
   }
-  const queryStr = `
-  SELECT ${STUDENT_COLUMNS} 
-  FROM norm_students s
-  LEFT JOIN norm_sections sec ON s.section_id = sec.id
-  ORDER BY s.last_name ASC
-`;
 
+  
   const pageRaw = Number.parseInt(req.query.page, 10);
   const limitRaw = Number.parseInt(req.query.limit, 10);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
@@ -115,12 +115,18 @@ router.get('/', async (req, res) => {
 
   try {
     const listResult = await query(
-      `select ${STUDENT_COLUMNS} from norm_students order by full_name asc limit $1 offset $2`,
+      `SELECT ${STUDENT_COLUMNS}
+       FROM norm_students s
+       LEFT JOIN norm_sections sec ON s.section_id = sec.id
+       ORDER BY full_name ASC
+       LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    const countResult = await query('select count(*)::int as total from norm_students');
+
+    const countResult = await query('SELECT count(*)::int AS total FROM norm_students');
     const total = countResult.rows[0]?.total ?? 0;
 
+    
     res.json({
       data: listResult.rows,
       currentPage: page,
@@ -133,17 +139,17 @@ router.get('/', async (req, res) => {
   }
 });
 
+
 // Create student
 router.post('/', async (req, res) => {
-  // Removed legacy payload fields (first_name/middle_name/last_name/etc.); schema now uses full_name.
   const { lrn, full_name, grade, section, strand } = req.body ?? {};
   if (!full_name) return res.status(400).json({ error: 'full_name is required' });
 
   try {
     const { rows } = await query(
-      `insert into norm_students (lrn, full_name, grade, section, strand)
-       values ($1,$2,$3,$4,$5)
-       returning ${STUDENT_COLUMNS}`,
+      `INSERT INTO norm_students (lrn, full_name, grade, section, strand)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING ${STUDENT_COLUMNS}`,
       [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
     );
     res.status(201).json(rows[0]);
@@ -168,15 +174,15 @@ router.post('/batch', async (req, res) => {
   const results = await processBatchStudents(students, async (student, rowNumber, rawStudent) => {
     const mappedStudent = mapStudentUploadToColumns(student, availableColumns);
     if (!mappedStudent.columns.length) {
-      throw new Error('No compatible students columns found');
+      throw new Error('No compatible norm_students columns found');
     }
     const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
 
     try {
       const { rows } = await query(
-        `insert into students (${mappedStudent.columns.join(',')})
-         values (${placeholders})
-         returning id`,
+        `INSERT INTO norm_students (${mappedStudent.columns.join(',')})
+         VALUES (${placeholders})
+         RETURNING id`,
         mappedStudent.values
       );
 
@@ -239,24 +245,20 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
       const grade = row.Grade?.trim() || null;
       const section = row.Section?.trim() || null;
       const strand = row.Strand?.trim() || null;
-      const age = Number.parseInt(row.Age, 10);
 
-      if (!fullName) {
-        continue;
-      }
+      if (!fullName) continue;
 
       const mappedStudent = mapStudentUploadToColumns(
-        { lrn, full_name: fullName, age: Number.isNaN(age) ? null : age, grade, section, strand },
+        { lrn, full_name: fullName, grade, section, strand },
         availableColumns
       );
-      if (!mappedStudent.columns.length) {
-        continue;
-      }
+      if (!mappedStudent.columns.length) continue;
+
       const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
       const rowConflictClause = hasLrnUniqueConstraint && mappedStudent.columns.includes('lrn')
-        ? ' on conflict (lrn) do nothing'
+        ? ' ON CONFLICT (lrn) DO NOTHING'
         : '';
-      const insertQuery = `INSERT INTO students (${mappedStudent.columns.join(',')})
+      const insertQuery = `INSERT INTO norm_students (${mappedStudent.columns.join(',')})
          VALUES (${placeholders})${rowConflictClause}`;
       const { rowCount } = await query(insertQuery, mappedStudent.values);
 
@@ -279,7 +281,7 @@ router.get('/:id', async (req, res) => {
 
   try {
     const { rows } = await query(
-      `select ${STUDENT_COLUMNS} from students where ${lookup.column} = $1`,
+      `SELECT ${STUDENT_COLUMNS} FROM norm_students WHERE ${lookup.column} = $1`,
       [lookup.value]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -291,7 +293,6 @@ router.get('/:id', async (req, res) => {
 
 // Update student
 router.put('/:id', async (req, res) => {
-  // Removed legacy payload fields including last_name; update only current schema columns.
   const { lrn, full_name, grade, section, strand } = req.body ?? {};
   const lookup = getStudentLookup(req.params.id);
 
@@ -301,14 +302,14 @@ router.put('/:id', async (req, res) => {
 
   try {
     const { rows } = await query(
-      `update norm_students
-          set lrn = coalesce($1, lrn),
-              full_name = coalesce($2, full_name),
-              grade = coalesce($3, grade),
-              section = coalesce($4, section),
-              strand = coalesce($5, strand)
-        where ${lookup.column} = $6
-        returning ${STUDENT_COLUMNS}`,
+      `UPDATE norm_students
+          SET lrn = COALESCE($1, lrn),
+              full_name = COALESCE($2, full_name),
+              grade = COALESCE($3, grade),
+              section = COALESCE($4, section),
+              strand = COALESCE($5, strand)
+        WHERE ${lookup.column} = $6
+        RETURNING ${STUDENT_COLUMNS}`,
       [lrn ?? null, full_name ?? null, grade ?? null, section ?? null, strand ?? null, lookup.value]
     );
 
@@ -322,6 +323,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Delete student
 router.delete('/:id', async (req, res) => {
   const lookup = getStudentLookup(req.params.id);
   if (!lookup) {
