@@ -4,6 +4,9 @@
   const BATCH_UPLOAD_URL = API_BASE.endsWith('/api')
     ? `${API_BASE}/students/batch-upload`
     : `${API_BASE}/api/students/batch-upload`;
+  const BATCH_CREATE_URL = API_BASE.endsWith('/api')
+    ? `${API_BASE}/students/batch`
+    : `${API_BASE}/api/students/batch`;
   const stripWebsiteContentTags = window.SDMSUrlSanitize?.stripWebsiteContentTags || ((value) => {
     if (value == null) return '';
     return String(value).replace(/^<WebsiteContent_[^>]+>/, '').replace(/<\/WebsiteContent_[^>]+>$/, '').trim();
@@ -276,6 +279,30 @@
     return { inserted, errors };
   }
 
+  async function uploadParsedStudents(students) {
+    const payload = {
+      students: (Array.isArray(students) ? students : []).map((s) => ({
+        lrn: s.lrn || null,
+        full_name: s.full_name || null,
+        age: s.age ?? null,
+        grade: s.grade || null,
+        section: s.section || null,
+        strand: s.strand || null,
+        email: s.email || null,
+        phone: s.phone || null,
+        profile_url: s.profile_url || null
+      }))
+    };
+
+    const response = await apiRequest(BATCH_CREATE_URL, { method: 'POST', body: payload });
+    return {
+      inserted: Number(response?.inserted || 0),
+      skipped: Number(response?.skipped || 0),
+      failed: Number(response?.failed || 0),
+      errors: Array.isArray(response?.errors) ? response.errors : []
+    };
+  }
+
   async function handleBatchUploadInputChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -353,8 +380,7 @@
 
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
-      if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
-      const { inserted, errors } = await uploadStudentCSV(selectedFile);
+      const { inserted, skipped, failed, errors } = await uploadParsedStudents(parsedStudents);
       if (errors.length) {
         const formatted = errors.slice(0, 5).map((err) => {
           if (typeof err === 'string') return err;
@@ -365,9 +391,9 @@
           }
           return String(err);
         }).join('\n');
-        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
+        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⏭️ Skipped: ${skipped}\n❌ Failed: ${failed}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
       } else {
-        alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⏭️ Skipped: ${skipped}\n❌ Failed: ${failed}`);
       }
       closeModal();
       if (typeof window.SDMS_refreshStudents === 'function') window.SDMS_refreshStudents();
