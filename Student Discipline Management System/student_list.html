@@ -113,6 +113,7 @@
             <th>Birthdate</th>
             <th>Grade</th>
             <th>Section</th>
+            <th>Strand</th>
             <th>Added Date</th>
             <th>Actions</th>
           </tr>
@@ -120,7 +121,7 @@
         <tbody>
           <!-- rows injected by JS -->
           <tr>
-            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td>
+            <td colspan="8" style="text-align:center;color:#6b7280;">No data</td>
           </tr>
         </tbody>
       </table>
@@ -164,22 +165,22 @@
         </div>
       </div>
 
-      <label>LRN:</label>
+      <label for="lrn">LRN:</label>
       <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
 
-      <label>First Name:</label>
+      <label for="firstName">First Name:</label>
       <input type="text" id="firstName" name="firstName" required>
 
-      <label>Middle Name:</label>
+      <label for="middleName">Middle Name:</label>
       <input type="text" id="middleName" name="middleName">
 
-      <label>Last Name:</label>
+      <label for="lastName">Last Name:</label>
       <input type="text" id="lastName" name="lastName" required>
 
-      <label>Age:</label>
+      <label for="age">Age:</label>
       <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
 
-      <label>Grade:</label>
+      <label for="grade">Grade:</label>
       <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
         <option value="7">Grade 7</option>
@@ -190,10 +191,21 @@
         <option value="12">Grade 12</option>
       </select>
 
-      <label>Section:</label>
+      <label for="section">Section:</label>
       <input type="text" id="section" name="section" placeholder="e.g. A" required>
 
-      <label>Parent's Contact Number:</label>
+      <label for="strand">Strand:</label>
+      <select id="strand" name="strand">
+        <option value="">-- Select Strand --</option>
+        <option value="ABM">ABM</option>
+        <option value="HUMSS">HUMSS</option>
+        <option value="STEM">STEM</option>
+        <option value="HE">HE</option>
+        <option value="ICT">ICT</option>
+        <option value="GAS">GAS</option>
+      </select>
+
+      <label for="parentContact">Parent's Contact Number:</label>
       <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
 
       <button type="submit" class="save-btn">Save</button>
@@ -239,6 +251,10 @@
         <div class="detail-row">
           <span class="label">Section</span>
           <span class="value" id="viewSection"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Strand</span>
+          <span class="value" id="viewStrand"></span>
         </div>
         <div class="detail-row">
           <span class="label">Parent’s Contact</span>

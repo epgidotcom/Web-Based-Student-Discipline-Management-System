@@ -59,6 +59,7 @@ function getStudentSelectClause(columns) {
     s.lrn,
     TRIM(CONCAT_WS(' ', s.first_name, s.middle_name, s.last_name)) AS full_name,
     ${birthdateExpr},
+    s.parent_contact,
     sec.grade_level AS grade,
     sec.section_name AS section,
     sec.strand,
@@ -112,7 +113,36 @@ async function fetchStudentByLookup(lookup) {
 
   return rows[0] ?? null;
 }
+async function getOrCreateSectionId(grade, section, strand) {
+  const sectionName = String(section ?? '').trim();
+  if (!sectionName) return null;
 
+  // Try to find existing section
+  const existing = await resolveSectionId(grade, section, strand);
+  if (existing) return existing;
+
+  // Section not found, create it
+  try {
+    const gradeLevel = String(grade ?? '').trim() || null;
+    const strandName = String(strand ?? '').trim() || null;
+    const { rows } = await query(
+      `INSERT INTO norm_sections (grade_level, section_name, strand)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (section_name) DO UPDATE SET grade_level = COALESCE($1, grade_level), strand = COALESCE($3, strand)
+       RETURNING id`,
+      [gradeLevel, sectionName, strandName]
+    );
+    return rows[0]?.id ?? null;
+  } catch (error) {
+    console.warn('[getOrCreateSectionId] failed to create section', {
+      grade,
+      section,
+      strand,
+      error: error.message
+    });
+    return null;
+  }
+}
 export function getStudentLookup(rawId) {
   const id = String(rawId ?? '').trim();
   if (!id) return null;
@@ -155,6 +185,7 @@ async function insertNormStudentRow({
   lastName,
   sectionId,
   birthdate,
+  parent_contact,
   onConflictLrn = false,
   returningId = true
 }) {
@@ -164,6 +195,11 @@ async function insertNormStudentRow({
   if (columns.has('birthdate')) {
     baseColumns.push('birthdate');
     baseValues.push(parseDateOrNull(birthdate));
+  }
+
+  if (columns.has('parent_contact')) {
+    baseColumns.push('parent_contact');
+    baseValues.push(parent_contact ?? null);
   }
 
   const conflictClause = onConflictLrn ? ' ON CONFLICT (lrn) DO NOTHING' : '';
@@ -185,7 +221,13 @@ async function insertNormStudentRow({
   const resyncStudentIdSequence = async (client = null) => {
     const executor = client ?? { query };
     const { rows } = await executor.query(
-      `SELECT pg_get_serial_sequence('norm_students', 'student_id') AS seq_name`
+      `SELECT COALESCE(
+          pg_get_serial_sequence('norm_students', 'student_id'),
+          pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'student_id')
+       ) AS seq_name
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.oid = to_regclass('norm_students')`     
     );
     const sequenceName = rows[0]?.seq_name;
     if (!sequenceName) return false;
@@ -196,6 +238,11 @@ async function insertNormStudentRow({
     );
     return true;
   };
+
+  // Keep the sequence aligned even when rows were imported manually.
+  if (columns.has('student_id')) {
+    await resyncStudentIdSequence();
+  }
 
   try {
     return await executeInsert(baseColumns, baseValues);
@@ -263,14 +310,14 @@ router.get('/', async (req, res) => {
 
 // Create student
 router.post('/', async (req, res) => {
-  const { lrn, full_name, grade, section, strand, birthdate } = req.body ?? {};
+  const { lrn, full_name, grade, section, strand, birthdate, parent_contact } = req.body ?? {};
   const { firstName, middleName, lastName } = splitFullName(full_name);
 
   if (!firstName) return res.status(400).json({ error: 'full_name is required' });
 
   try {
     const columns = await getNormStudentColumnSet();
-    const sectionId = await resolveSectionId(grade, section, strand);
+    const sectionId = await getOrCreateSectionId(grade, section, strand);
 
     const { rows } = await insertNormStudentRow({
       columns,
@@ -280,6 +327,7 @@ router.post('/', async (req, res) => {
       lastName,
       sectionId,
       birthdate,
+      parent_contact,
       returningId: true
     });
 
@@ -312,7 +360,7 @@ router.post('/batch', async (req, res) => {
       }
 
       try {
-        const sectionId = await resolveSectionId(student.grade, student.section, student.strand);
+        const sectionId = await getOrCreateSectionId(student.grade, student.section, student.strand);
         const { rows } = await insertNormStudentRow({
           columns,
           lrn: student.lrn,
@@ -321,6 +369,7 @@ router.post('/batch', async (req, res) => {
           lastName,
           sectionId,
           birthdate: student.birthdate,
+          parent_contact: student.parent_contact || null,
           returningId: true
         });
 
@@ -390,7 +439,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
       const { firstName, middleName, lastName } = splitFullName(fullName);
       if (!firstName) continue;
 
-      const sectionId = await resolveSectionId(grade, section, strand);
+      const sectionId = await getOrCreateSectionId(grade, section, strand);
       const { rowCount } = await insertNormStudentRow({
         columns,
         lrn,
@@ -399,6 +448,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         lastName,
         sectionId,
         birthdate: row.Birthdate,
+        parent_contact: row.ParentContact || null,
         onConflictLrn: hasLrnUniqueConstraint,
         returningId: false
       });
@@ -430,7 +480,7 @@ router.get('/:id', async (req, res) => {
 
 // Update student
 router.put('/:id', async (req, res) => {
-  const { lrn, full_name, grade, section, strand, birthdate } = req.body ?? {};
+  const { lrn, full_name, grade, section, strand, birthdate, parent_contact } = req.body ?? {};
   const lookup = getStudentLookup(req.params.id);
 
   if (!lookup) {
@@ -444,7 +494,7 @@ router.put('/:id', async (req, res) => {
     const columns = await getNormStudentColumnSet();
     let nextSectionId = null;
     if (grade != null || section != null || strand != null) {
-      nextSectionId = await resolveSectionId(grade, section, strand);
+      nextSectionId = await getOrCreateSectionId(grade, section, strand);
     }
 
     const assignments = [
@@ -463,6 +513,11 @@ router.put('/:id', async (req, res) => {
     if (columns.has('birthdate')) {
       assignments.push(`birthdate = COALESCE($${values.length + 1}, birthdate)`);
       values.push(parseDateOrNull(birthdate));
+    }
+
+    if (columns.has('parent_contact')) {
+      assignments.push(`parent_contact = COALESCE($${values.length + 1}, parent_contact)`);
+      values.push(parent_contact ?? null);
     }
 
     assignments.push(`section_id = COALESCE($${values.length + 1}, section_id)`);
