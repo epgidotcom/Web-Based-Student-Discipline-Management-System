@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
+  <meta name="sdms-api-base" content="http://localhost:3000" />
   <title>SDMS - Student List</title>
 
   <!-- Global + Page CSS -->
@@ -228,7 +228,10 @@
           <span class="label">Age</span>
           <span class="value" id="viewAge"></span>
         </div>
-        <!-- 🧹 Birthdate row removed -->
+        <div class="detail-row">
+          <span class="label">Birthdate</span>
+          <span class="value" id="viewBirthdate"></span>
+        </div>
         <div class="detail-row">
           <span class="label">Grade</span>
           <span class="value" id="viewGrade"></span>
@@ -349,7 +352,7 @@
 <script>
   (function(){
     const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
-    const fallback = isLocal ? 'http://localhost:3000' : 'https://web-based-student-discipline-management.onrender.com';
+    const fallback = 'http://localhost:3000';
     window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
   })();
 </script>

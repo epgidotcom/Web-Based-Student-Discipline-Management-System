@@ -3,23 +3,115 @@ import multer from 'multer';
 import csv from 'csv-parser';
 import { Readable } from 'node:stream';
 import { query } from '../db.js';
-import { processBatchStudents, mapStudentUploadToColumns } from '../utils/studentUpload.js';
+import { processBatchStudents } from '../utils/studentUpload.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const STUDENT_COLUMNS = `
- s.id, 
-  s.lrn, 
-  TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name)) AS full_name, 
-  sec.grade_level, 
-  sec.section_name AS section, 
-  sec.strand, 
-  s.active
-`;
-
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NUMERIC_ID_REGEX = /^\d+$/;
+
+function parseDateOrNull(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function splitFullName(fullName) {
+  const name = String(fullName ?? '').trim();
+  if (!name) {
+    return { firstName: null, middleName: null, lastName: null };
+  }
+
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return { firstName: parts[0], middleName: null, lastName: null };
+  }
+
+  return {
+    firstName: parts[0],
+    middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
+    lastName: parts[parts.length - 1]
+  };
+}
+
+async function getNormStudentColumnSet() {
+  const { rows } = await query(
+    `SELECT a.attname AS column_name
+       FROM pg_attribute a
+      WHERE a.attrelid = to_regclass('norm_students')
+        AND a.attnum > 0
+        AND NOT a.attisdropped`
+  );
+  return new Set(rows.map((row) => row.column_name));
+}
+
+function getStudentSelectClause(columns) {
+  const birthdateExpr = columns.has('birthdate') ? 's.birthdate' : 'NULL::date AS birthdate';
+  const statusExpr = columns.has('active') ? 's.active AS status' : 'NULL::boolean AS status';
+  const createdExpr = columns.has('created_at')
+    ? 's.created_at'
+    : (columns.has('added_date') ? 's.added_date AS created_at' : 'NULL::timestamp AS created_at');
+
+  return `
+    s.id,
+    s.lrn,
+    TRIM(CONCAT_WS(' ', s.first_name, s.middle_name, s.last_name)) AS full_name,
+    ${birthdateExpr},
+    sec.grade_level AS grade,
+    sec.section_name AS section,
+    sec.strand,
+    ${statusExpr},
+    ${createdExpr}
+  `;
+}
+
+async function resolveSectionId(grade, section, strand) {
+  const sectionName = String(section ?? '').trim();
+  if (!sectionName) return null;
+
+  const values = [sectionName];
+  const whereParts = ['section_name = $1'];
+
+  const gradeLevel = String(grade ?? '').trim();
+  if (gradeLevel) {
+    values.push(gradeLevel);
+    whereParts.push(`grade_level = $${values.length}`);
+  }
+
+  const strandName = String(strand ?? '').trim();
+  if (strandName) {
+    values.push(strandName);
+    whereParts.push(`strand = $${values.length}`);
+  }
+
+  const { rows } = await query(
+    `SELECT id
+       FROM norm_sections
+      WHERE ${whereParts.join(' AND ')}
+      ORDER BY id ASC
+      LIMIT 1`,
+    values
+  );
+
+  return rows[0]?.id ?? null;
+}
+
+async function fetchStudentByLookup(lookup) {
+  const columns = await getNormStudentColumnSet();
+  const selectClause = getStudentSelectClause(columns);
+  const { rows } = await query(
+    `SELECT ${selectClause}
+       FROM norm_students s
+       LEFT JOIN norm_sections sec ON s.section_id = sec.id
+      WHERE s.${lookup.column} = $1
+      LIMIT 1`,
+    [lookup.value]
+  );
+
+  return rows[0] ?? null;
+}
 
 export function getStudentLookup(rawId) {
   const id = String(rawId ?? '').trim();
@@ -29,26 +121,19 @@ export function getStudentLookup(rawId) {
   return null;
 }
 
-async function getStudentTableColumns() {
-  const { rows } = await query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = 'norm_students' ORDER BY ordinal_position`
-  );
-  return rows.map((row) => row.column_name);
-}
-
-// Falls back to false when the constraint lookup fails to avoid invalid conflict targets.
 async function hasStudentUniqueConstraint(columnName) {
   try {
     const { rows } = await query(
       `SELECT 1
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.constraint_column_usage ccu
-           ON ccu.constraint_name = tc.constraint_name
-          AND ccu.table_schema = tc.table_schema
-        WHERE tc.table_name = 'norm_students'
-          AND tc.table_schema = current_schema()
-          AND tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY')
-          AND ccu.column_name = $1
+         FROM pg_constraint c
+         JOIN pg_class t ON t.oid = c.conrelid
+         JOIN pg_namespace n ON n.oid = t.relnamespace
+         JOIN pg_attribute a
+           ON a.attrelid = t.oid
+          AND a.attnum = ANY (c.conkey)
+        WHERE t.oid = to_regclass('norm_students')
+          AND c.contype IN ('u', 'p')
+          AND a.attname = $1
         LIMIT 1`,
       [columnName]
     );
@@ -61,73 +146,110 @@ async function hasStudentUniqueConstraint(columnName) {
     return false;
   }
 }
-// js/student_list.js
-function renderStudents(students) {
-  const tbody = document.querySelector('#studentTable tbody');
-  tbody.innerHTML = '';
 
-  students.forEach(s => {
-    const row = `
-      <tr>
-        <td>${s.lrn}</td>
-        <td><strong>${s.full_name}</strong></td> <td>${s.age}</td>
-        <td>Grade ${s.grade}</td>
-        <td>${s.section}</td>
-        <td>${new Date(s.added_date).toLocaleDateString()}</td>
-        <td>
-          <button class="btn-view" onclick="viewStudent('${s.id}')"><i class="fa fa-eye"></i></button>
-          <button class="btn-edit" onclick="editStudent('${s.id}')"><i class="fa fa-edit"></i></button>
-        </td>
-      </tr>
-    `;
-    tbody.innerHTML += row;
-  });
+async function insertNormStudentRow({
+  columns,
+  lrn,
+  firstName,
+  middleName,
+  lastName,
+  sectionId,
+  birthdate,
+  onConflictLrn = false,
+  returningId = true
+}) {
+  const baseColumns = ['lrn', 'first_name', 'middle_name', 'last_name', 'section_id'];
+  const baseValues = [lrn ?? null, firstName, middleName ?? null, lastName ?? null, sectionId];
+
+  if (columns.has('birthdate')) {
+    baseColumns.push('birthdate');
+    baseValues.push(parseDateOrNull(birthdate));
+  }
+
+  const conflictClause = onConflictLrn ? ' ON CONFLICT (lrn) DO NOTHING' : '';
+  const returningClause = returningId ? ' RETURNING id' : '';
+
+  const executeInsert = async (insertColumns, insertValues, client = null) => {
+    const executor = client ?? { query };
+    const placeholders = insertColumns.map((_, index) => `$${index + 1}`).join(', ');
+    return executor.query(
+      `INSERT INTO norm_students (${insertColumns.join(', ')})
+       VALUES (${placeholders})${conflictClause}${returningClause}`,
+      insertValues
+    );
+  };
+
+  const isStudentIdDuplicate = (error) =>
+    error?.code === '23505' && /norm_students_student_id_key/i.test(String(error?.constraint || error?.message || ''));
+
+  const resyncStudentIdSequence = async (client = null) => {
+    const executor = client ?? { query };
+    const { rows } = await executor.query(
+      `SELECT pg_get_serial_sequence('norm_students', 'student_id') AS seq_name`
+    );
+    const sequenceName = rows[0]?.seq_name;
+    if (!sequenceName) return false;
+
+    await executor.query(
+      `SELECT setval($1, COALESCE((SELECT MAX(student_id) FROM norm_students), 0) + 1, false)`,
+      [sequenceName]
+    );
+    return true;
+  };
+
+  try {
+    return await executeInsert(baseColumns, baseValues);
+  } catch (error) {
+    if (!columns.has('student_id') || !isStudentIdDuplicate(error)) {
+      throw error;
+    }
+
+    const fixed = await resyncStudentIdSequence();
+    if (!fixed) {
+      throw error;
+    }
+
+    return executeInsert(baseColumns, baseValues);
+  }
 }
 
-// List students (paginated)
+// List students (paginated) and support LRN lookup.
 router.get('/', async (req, res) => {
   const lrnQuery = String(req.query.lrn ?? '').trim();
 
-  
-  if (lrnQuery) {
-    try {
+  try {
+    const columns = await getNormStudentColumnSet();
+    const selectClause = getStudentSelectClause(columns);
+
+    if (lrnQuery) {
       const { rows } = await query(
-        `SELECT ${STUDENT_COLUMNS}
-         FROM norm_students s
-         LEFT JOIN norm_sections sec ON s.section_id = sec.id
-         WHERE s.lrn = $1
-         LIMIT 1`,
+        `SELECT ${selectClause}
+           FROM norm_students s
+           LEFT JOIN norm_sections sec ON s.section_id = sec.id
+          WHERE s.lrn = $1`,
         [lrnQuery]
       );
-      
-      return res.json({ data: rows }); 
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return res.json(rows);
     }
-  }
 
-  
-  const pageRaw = Number.parseInt(req.query.page, 10);
-  const limitRaw = Number.parseInt(req.query.limit, 10);
-  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
-  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 100;
-  const offset = (page - 1) * limit;
+    const pageRaw = Number.parseInt(req.query.page, 10);
+    const limitRaw = Number.parseInt(req.query.limit, 10);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 100;
+    const offset = (page - 1) * limit;
 
-  try {
     const listResult = await query(
-      `SELECT ${STUDENT_COLUMNS}
-       FROM norm_students s
-       LEFT JOIN norm_sections sec ON s.section_id = sec.id
-       ORDER BY full_name ASC
-       LIMIT $1 OFFSET $2`,
+      `SELECT ${selectClause}
+         FROM norm_students s
+         LEFT JOIN norm_sections sec ON s.section_id = sec.id
+        ORDER BY s.last_name ASC NULLS LAST, s.first_name ASC NULLS LAST
+        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-
     const countResult = await query('SELECT count(*)::int AS total FROM norm_students');
     const total = countResult.rows[0]?.total ?? 0;
 
-    
-    res.json({
+    return res.json({
       data: listResult.rows,
       currentPage: page,
       limit,
@@ -135,29 +257,39 @@ router.get('/', async (req, res) => {
       totalPages: Math.max(1, Math.ceil(total / limit))
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
-
 // Create student
 router.post('/', async (req, res) => {
-  const { lrn, full_name, grade, section, strand } = req.body ?? {};
-  if (!full_name) return res.status(400).json({ error: 'full_name is required' });
+  const { lrn, full_name, grade, section, strand, birthdate } = req.body ?? {};
+  const { firstName, middleName, lastName } = splitFullName(full_name);
+
+  if (!firstName) return res.status(400).json({ error: 'full_name is required' });
 
   try {
-    const { rows } = await query(
-      `INSERT INTO norm_students (lrn, full_name, grade, section, strand)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING ${STUDENT_COLUMNS}`,
-      [lrn ?? null, full_name, grade ?? null, section ?? null, strand ?? null]
-    );
-    res.status(201).json(rows[0]);
+    const columns = await getNormStudentColumnSet();
+    const sectionId = await resolveSectionId(grade, section, strand);
+
+    const { rows } = await insertNormStudentRow({
+      columns,
+      lrn,
+      firstName,
+      middleName,
+      lastName,
+      sectionId,
+      birthdate,
+      returningId: true
+    });
+
+    const created = await fetchStudentByLookup({ column: 'id', value: rows[0].id });
+    return res.status(201).json(created);
   } catch (e) {
     if (e && e.code === '23505' && /lrn/i.test(e.detail || '')) {
       return res.status(409).json({ error: 'LRN already exists' });
     }
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -170,50 +302,59 @@ router.post('/batch', async (req, res) => {
     return res.status(400).json({ error: 'students array is required and must not be empty', requestId });
   }
 
-  const availableColumns = await getStudentTableColumns();
-  const results = await processBatchStudents(students, async (student, rowNumber, rawStudent) => {
-    const mappedStudent = mapStudentUploadToColumns(student, availableColumns);
-    if (!mappedStudent.columns.length) {
-      throw new Error('No compatible norm_students columns found');
-    }
-    const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
+  try {
+    const columns = await getNormStudentColumnSet();
 
-    try {
-      const { rows } = await query(
-        `INSERT INTO norm_students (${mappedStudent.columns.join(',')})
-         VALUES (${placeholders})
-         RETURNING id`,
-        mappedStudent.values
-      );
+    const results = await processBatchStudents(students, async (student, rowNumber, rawStudent) => {
+      const { firstName, middleName, lastName } = splitFullName(student.full_name);
+      if (!firstName) {
+        throw new Error('full_name is required');
+      }
 
-      return rows[0];
-    } catch (e) {
-      console.error('[students.batch] row_insert_error', {
-        requestId,
-        row: rowNumber,
-        raw: rawStudent,
-        sanitized: student,
-        error: e.message,
-        time: new Date().toISOString()
-      });
-      throw e;
-    }
-  });
+      try {
+        const sectionId = await resolveSectionId(student.grade, student.section, student.strand);
+        const { rows } = await insertNormStudentRow({
+          columns,
+          lrn: student.lrn,
+          firstName,
+          middleName,
+          lastName,
+          sectionId,
+          birthdate: student.birthdate,
+          returningId: true
+        });
 
-  let statusCode;
-  if (results.failed === students.length) statusCode = 400;
-  else if (results.inserted === students.length) statusCode = 201;
-  else statusCode = 207;
+        return rows[0];
+      } catch (e) {
+        console.error('[students.batch] row_insert_error', {
+          requestId,
+          row: rowNumber,
+          raw: rawStudent,
+          sanitized: student,
+          error: e.message,
+          time: new Date().toISOString()
+        });
+        throw e;
+      }
+    });
 
-  res.status(statusCode).json({
-    requestId,
-    inserted: results.inserted,
-    skipped: results.skipped,
-    failed: results.failed,
-    errors: results.errors,
-    warnings: results.warnings,
-    details: results.details
-  });
+    let statusCode;
+    if (results.failed === students.length) statusCode = 400;
+    else if (results.inserted === students.length) statusCode = 201;
+    else statusCode = 207;
+
+    return res.status(statusCode).json({
+      requestId,
+      inserted: results.inserted,
+      skipped: results.skipped,
+      failed: results.failed,
+      errors: results.errors,
+      warnings: results.warnings,
+      details: results.details
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 // Batch upload students from CSV
@@ -235,7 +376,7 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         .on('error', reject);
     });
 
-    const availableColumns = await getStudentTableColumns();
+    const columns = await getNormStudentColumnSet();
     const hasLrnUniqueConstraint = await hasStudentUniqueConstraint('lrn');
     let inserted = 0;
 
@@ -246,22 +387,21 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
       const section = row.Section?.trim() || null;
       const strand = row.Strand?.trim() || null;
 
-      if (!fullName) continue;
+      const { firstName, middleName, lastName } = splitFullName(fullName);
+      if (!firstName) continue;
 
-      const mappedStudent = mapStudentUploadToColumns(
-        { lrn, full_name: fullName, grade, section, strand },
-        availableColumns
-      );
-      if (!mappedStudent.columns.length) continue;
-
-      const placeholders = mappedStudent.columns.map((_, index) => `$${index + 1}`).join(',');
-      const rowConflictClause = hasLrnUniqueConstraint && mappedStudent.columns.includes('lrn')
-        ? ' ON CONFLICT (lrn) DO NOTHING'
-        : '';
-      const insertQuery = `INSERT INTO norm_students (${mappedStudent.columns.join(',')})
-         VALUES (${placeholders})${rowConflictClause}`;
-      const { rowCount } = await query(insertQuery, mappedStudent.values);
-
+      const sectionId = await resolveSectionId(grade, section, strand);
+      const { rowCount } = await insertNormStudentRow({
+        columns,
+        lrn,
+        firstName,
+        middleName,
+        lastName,
+        sectionId,
+        birthdate: row.Birthdate,
+        onConflictLrn: hasLrnUniqueConstraint,
+        returningId: false
+      });
       inserted += rowCount;
     }
 
@@ -280,46 +420,72 @@ router.get('/:id', async (req, res) => {
   }
 
   try {
-    const { rows } = await query(
-      `SELECT ${STUDENT_COLUMNS} FROM norm_students WHERE ${lookup.column} = $1`,
-      [lookup.value]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
+    const found = await fetchStudentByLookup(lookup);
+    if (!found) return res.status(404).json({ error: 'Not found' });
+    return res.json(found);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
 // Update student
 router.put('/:id', async (req, res) => {
-  const { lrn, full_name, grade, section, strand } = req.body ?? {};
+  const { lrn, full_name, grade, section, strand, birthdate } = req.body ?? {};
   const lookup = getStudentLookup(req.params.id);
 
   if (!lookup) {
     return res.status(400).json({ error: 'Invalid student id format' });
   }
 
+  const hasNameUpdate = full_name != null && String(full_name).trim() !== '';
+  const nameParts = hasNameUpdate ? splitFullName(full_name) : { firstName: null, middleName: null, lastName: null };
+
   try {
+    const columns = await getNormStudentColumnSet();
+    let nextSectionId = null;
+    if (grade != null || section != null || strand != null) {
+      nextSectionId = await resolveSectionId(grade, section, strand);
+    }
+
+    const assignments = [
+      'lrn = COALESCE($1, lrn)',
+      'first_name = COALESCE($2, first_name)',
+      'middle_name = COALESCE($3, middle_name)',
+      'last_name = COALESCE($4, last_name)'
+    ];
+    const values = [
+      lrn ?? null,
+      hasNameUpdate ? nameParts.firstName : null,
+      hasNameUpdate ? nameParts.middleName : null,
+      hasNameUpdate ? nameParts.lastName : null
+    ];
+
+    if (columns.has('birthdate')) {
+      assignments.push(`birthdate = COALESCE($${values.length + 1}, birthdate)`);
+      values.push(parseDateOrNull(birthdate));
+    }
+
+    assignments.push(`section_id = COALESCE($${values.length + 1}, section_id)`);
+    values.push((grade != null || section != null || strand != null) ? nextSectionId : null);
+    values.push(lookup.value);
+
     const { rows } = await query(
       `UPDATE norm_students
-          SET lrn = COALESCE($1, lrn),
-              full_name = COALESCE($2, full_name),
-              grade = COALESCE($3, grade),
-              section = COALESCE($4, section),
-              strand = COALESCE($5, strand)
-        WHERE ${lookup.column} = $6
-        RETURNING ${STUDENT_COLUMNS}`,
-      [lrn ?? null, full_name ?? null, grade ?? null, section ?? null, strand ?? null, lookup.value]
+          SET ${assignments.join(', ')}
+        WHERE ${lookup.column} = $${values.length}
+        RETURNING id`,
+      values
     );
 
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
+
+    const updated = await fetchStudentByLookup({ column: 'id', value: rows[0].id });
+    return res.json(updated);
   } catch (e) {
     if (e && e.code === '23505' && /lrn/i.test(e.detail || '')) {
       return res.status(409).json({ error: 'LRN already exists' });
     }
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -334,9 +500,9 @@ router.delete('/:id', async (req, res) => {
     const { rowCount } = await query(`DELETE FROM norm_students WHERE ${lookup.column} = $1`, [lookup.value]);
     if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
 
-    res.status(200).json({ message: 'Student deleted successfully.' });
+    return res.status(200).json({ message: 'Student deleted successfully.' });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 

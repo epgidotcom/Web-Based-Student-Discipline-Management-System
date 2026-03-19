@@ -26,6 +26,7 @@
   const viewLRN = document.getElementById('viewLRN');
   const viewName = document.getElementById('viewName');
   const viewAge = document.getElementById('viewAge');
+  const viewBirthdate = document.getElementById('viewBirthdate');
   const viewGrade = document.getElementById('viewGrade');
   const viewSection = document.getElementById('viewSection');
   const viewParent = document.getElementById('viewParent');
@@ -193,12 +194,23 @@
         const parsed = Number(row.age);
         return Number.isNaN(parsed) ? null : parsed;
       })(),
+      birthdate: row.birthdate || null,
       grade: row.grade || '',
       section: row.section || '',
       strand: row.strand || '',
       parentContact: row.parent_contact || '',
-      createdAt: row.created_at || ''
+      createdAt: row.created_at || row.added_date || ''
     };
+  }
+
+  function deriveBirthdateFromAge(ageValue) {
+    const age = Number(ageValue);
+    if (!Number.isFinite(age) || age < 0) return null;
+    const today = new Date();
+    const year = today.getFullYear() - Math.floor(age);
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   function initialsFromName(name) {
@@ -253,10 +265,10 @@
       nameCell.appendChild(nameWrap);
       row.appendChild(nameCell);
 
-      // Age
-      const ageCell = document.createElement('td');
-      ageCell.textContent = (age !== '' && age != null) ? String(age) : '';
-      row.appendChild(ageCell);
+      // Birthdate
+      const birthdateCell = document.createElement('td');
+      birthdateCell.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
+      row.appendChild(birthdateCell);
 
       // Grade
       const gradeCell = document.createElement('td');
@@ -388,6 +400,9 @@
     viewLRN.textContent = s.lrn;
     viewName.textContent = fullName;
     viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
+    if (viewBirthdate) {
+      viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
+    }
     viewGrade.textContent = s.grade || '—';
     viewSection.textContent = s.section || '—';
     viewParent.textContent = s.parentContact || '—';
@@ -468,6 +483,13 @@
     const firstName = firstNameField?.value?.trim() || '';
     const middleName = middleNameField?.value?.trim() || null;
     const lastName = lastNameField?.value?.trim() || '';
+    const normalizedAge = (() => {
+      if (!ageInput) return null;
+      const value = ageInput.value.trim();
+      if (value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    })();
     const payload = {
       lrn: lrnField?.value?.trim() || null,
       full_name: composeFullName(firstName, middleName, lastName),
@@ -475,13 +497,8 @@
       first_name: firstName,
       middle_name: middleName,
       last_name: lastName,
-      age: (() => {
-        if (!ageInput) return null;
-        const value = ageInput.value.trim();
-        if (value === '') return null;
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : null;
-      })(),
+      age: normalizedAge,
+      birthdate: normalizedAge != null ? deriveBirthdateFromAge(normalizedAge) : (existing?.birthdate || null),
       grade: gradeField?.value || null,
       section: sectionField?.value?.trim() || null,
       parent_contact: parentContactField?.value?.trim() || null
