@@ -233,6 +233,11 @@
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
   const violationTypeField = document.getElementById('violationType');
+  const previousOffensesAccordion = document.getElementById('previousOffensesAccordion');
+  const previousOffensesMessage = document.getElementById('previousOffensesMessage');
+  const previousOffensesData = document.getElementById('previousOffensesData');
+  const previousOffensesStudentMeta = document.getElementById('previousOffensesStudentMeta');
+  const previousOffensesList = document.getElementById('previousOffensesList');
 
   //added for "normalized table"
   const violationType2Field = document.getElementById('violationType2');
@@ -266,6 +271,8 @@
   const viewEvidenceWrap = document.getElementById('viewEvidenceWrap');
   const viewEvidence = document.getElementById('viewEvidence');
   const viewRemarks = document.getElementById('viewRemarks');
+
+  let previousOffensesLoadedStudentId = '';
 
   const imagePreviewModal = document.getElementById('imagePreviewModal');
   const imagePreviewClose = document.getElementById('imagePreviewClose');
@@ -629,6 +636,104 @@ violationType2Field.addEventListener('change', async function () {
     updatePastOffenseDisplay(items);
   }
 
+  function renderPreviousOffensesMessage(message, { isError = false } = {}) {
+    if (!previousOffensesMessage || !previousOffensesData || !previousOffensesList || !previousOffensesStudentMeta) return;
+    previousOffensesMessage.textContent = message;
+    previousOffensesMessage.style.color = isError ? '#b91c1c' : '#374151';
+    previousOffensesData.classList.add('is-hidden');
+    previousOffensesStudentMeta.innerHTML = '';
+    previousOffensesList.innerHTML = '';
+  }
+
+  function resetPreviousOffensesSection() {
+    previousOffensesLoadedStudentId = '';
+    if (previousOffensesAccordion) previousOffensesAccordion.open = false;
+    renderPreviousOffensesMessage('Select a student first to view previous offenses.');
+  }
+
+  async function loadPreviousOffensesForSelectedStudent() {
+    if (!previousOffensesAccordion?.open) return;
+    const studentId = String(violationForm?.dataset?.studentId || '').trim();
+    if (!studentId) {
+      renderPreviousOffensesMessage('Select a student first to view previous offenses.');
+      return;
+    }
+
+    if (studentId === previousOffensesLoadedStudentId && previousOffensesList?.children?.length) return;
+
+    renderPreviousOffensesMessage('Loading previous offenses...');
+    try {
+      const params = new URLSearchParams({ student_id: studentId, page: '1', limit: '100' });
+      const payload = await api(`/violations?${params.toString()}`);
+      const raw = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+      const items = raw
+        .slice()
+        .sort((a, b) => {
+          const aTime = new Date(a.incident_date || 0).getTime();
+          const bTime = new Date(b.incident_date || 0).getTime();
+          return aTime - bTime;
+        });
+
+      if (!items.length) {
+        previousOffensesLoadedStudentId = studentId;
+        renderPreviousOffensesMessage('No previous offenses found for this student.');
+        return;
+      }
+
+      const studentName = studentNameField?.value?.trim() || items[0]?.student_name || '—';
+      const gradeSection = gradeSectionField?.value?.trim() || items[0]?.grade_section || '—';
+
+      previousOffensesMessage.textContent = '';
+      previousOffensesData.classList.remove('is-hidden');
+      previousOffensesStudentMeta.innerHTML = `
+        <div><strong>Student Name:</strong> ${studentName}</div>
+        <div><strong>Grade & Section:</strong> ${gradeSection}</div>
+        <div><strong>Total previous cases:</strong> ${items.length}</div>
+      `;
+
+      if (!document.getElementById('sdms-status-badge-style')) {
+        const style = document.createElement('style');
+        style.id = 'sdms-status-badge-style';
+        style.textContent = `
+          .status-badge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:600; }
+          .status-pending  { background:#FEF3C7; color:#92400E; }
+          .status-approved { background:#DCFCE7; color:#166534; }
+          .status-rejected { background:#FEE2E2; color:#991B1B; }
+        `;
+        document.head.appendChild(style);
+      }
+
+      previousOffensesList.innerHTML = '';
+      items.forEach((off, i) => {
+        const card = document.createElement('div');
+        card.className = 'offense-card';
+
+        const rawStatus = (off.status || 'pending').toString().trim().toLowerCase();
+        const statusNorm = ['approved', 'rejected', 'pending'].includes(rawStatus) ? rawStatus : 'pending';
+        const badgeClass = `status-badge status-${statusNorm}`;
+        const statusLabel = statusNorm.charAt(0).toUpperCase() + statusNorm.slice(1);
+
+        card.innerHTML = `
+          <div class="offense-header">
+            <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
+          </div>
+          <div class="offense-body">
+            <div><strong>Violation Type:</strong> ${off.description || '—'}</div>
+            <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
+            <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
+            <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
+            <div><strong>Remarks:</strong> ${off.remarks || '—'}</div>
+          </div>
+        `;
+        previousOffensesList.appendChild(card);
+      });
+      previousOffensesLoadedStudentId = studentId;
+    } catch (err) {
+      console.error('[violations] previous offenses fetch failed', err);
+      renderPreviousOffensesMessage('Failed to load previous offenses. Please try again.', { isError: true });
+    }
+  }
+
   function prepareCreateModal() {
     violationForm?.reset();
     violationForm.dataset.studentId = '';
@@ -644,6 +749,7 @@ violationType2Field.addEventListener('change', async function () {
     resetEvidence();
     loadViolationTypes();
     displayPastOffensesFor(null);
+    resetPreviousOffensesSection();
     openModal(violationModal);
   }
 
@@ -675,6 +781,7 @@ violationType2Field.addEventListener('change', async function () {
     renderEvidencePreview(evidencePreview, evidenceState, { selectable: true });
 
     displayPastOffensesFor(item.student_id, item.id);
+    resetPreviousOffensesSection();
     openModal(violationModal);
   }
 
@@ -814,6 +921,7 @@ violationType2Field.addEventListener('change', async function () {
       gradeSectionField.value = '';
       resetEvidence();
       displayPastOffensesFor(null);
+      resetPreviousOffensesSection();
     } catch (err) {
       console.error('[violations] save failed', err);
       alert(err.message || 'Failed to save violation.');
@@ -1261,10 +1369,16 @@ violationType2Field.addEventListener('change', async function () {
     // LRN lookup
     studentLRNField?.addEventListener('blur', () => {
       const lrn = studentLRNField.value.trim();
+      previousOffensesLoadedStudentId = '';
       if (!lrn) {
         violationForm.dataset.studentId = '';
         studentNameField.value = '';
         displayPastOffensesFor(null);
+        if (previousOffensesAccordion?.open) {
+          loadPreviousOffensesForSelectedStudent();
+        } else {
+          renderPreviousOffensesMessage('Select a student first to view previous offenses.');
+        }
         return;
       }
       const match = findStudentByLRN(lrn);
@@ -1276,11 +1390,26 @@ violationType2Field.addEventListener('change', async function () {
           gradeSectionField.value = composed || gradeSectionField.value;
         }
         displayPastOffensesFor(match.id);
+        if (previousOffensesAccordion?.open) {
+          loadPreviousOffensesForSelectedStudent();
+        } else {
+          renderPreviousOffensesMessage('Click to view previous offenses for this student.');
+        }
       } else {
         violationForm.dataset.studentId = '';
         displayPastOffensesFor(null);
+        if (previousOffensesAccordion?.open) {
+          loadPreviousOffensesForSelectedStudent();
+        } else {
+          renderPreviousOffensesMessage('Select a student first to view previous offenses.');
+        }
         alert('No student found for that LRN. Please ensure the student exists in the system.');
       }
+    });
+
+    previousOffensesAccordion?.addEventListener('toggle', () => {
+      if (!previousOffensesAccordion.open) return;
+      loadPreviousOffensesForSelectedStudent();
     });
 
     evidenceChoose?.addEventListener('click', () => evidenceInput?.click());
