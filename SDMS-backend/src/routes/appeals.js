@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 const PRIVILEGED_ROLES = new Set(['Admin', 'Teacher']);
+const VIOLATIONS_TABLE = 'norm_violations';
 
 function isPrivileged(user) {
   return Boolean(user && PRIVILEGED_ROLES.has(user.role));
@@ -59,13 +60,14 @@ function mapMessageRow(row) {
 
 async function loadAppealRow(appealId) {
   const { rows } = await query(
-    `SELECT a.*, s.lrn AS student_lrn, s.section AS student_section, v.offense_type,
+    `SELECT a.*, s.lrn AS student_lrn, sec.section_name AS student_section, COALESCE(v.offense_type, v.description) AS offense_type,
             lm.body AS latest_message_body,
             lm.created_at AS latest_message_created_at,
             lm.sender_role AS latest_message_sender_role
        FROM appeals a
-       LEFT JOIN students s ON s.id = a.student_id
-       LEFT JOIN violations v ON v.id = a.violation_id
+       LEFT JOIN norm_students s ON s.id = a.student_id
+       LEFT JOIN norm_sections sec ON sec.id = s.section_id
+       LEFT JOIN ${VIOLATIONS_TABLE} v ON v.id = a.violation_id
        LEFT JOIN LATERAL (
          SELECT body, created_at, sender_role
            FROM appeal_messages am
@@ -82,7 +84,15 @@ async function loadAppealRow(appealId) {
 async function fetchStudentById(id) {
   if (!id) return null;
   const { rows } = await query(
-    'SELECT id, lrn, full_name, grade, section, strand FROM students WHERE id = $1',
+    `SELECT s.id,
+            s.lrn,
+            TRIM(CONCAT_WS(' ', s.first_name, s.middle_name, s.last_name)) AS full_name,
+            sec.grade_level AS grade,
+            sec.section_name AS section,
+            sec.strand
+       FROM norm_students s
+       LEFT JOIN norm_sections sec ON sec.id = s.section_id
+      WHERE s.id = $1`,
     [id]
   );
   return rows[0] || null;
@@ -91,7 +101,15 @@ async function fetchStudentById(id) {
 async function fetchStudentByLrn(lrn) {
   if (!lrn) return null;
   const { rows } = await query(
-    'SELECT id, lrn, full_name, grade, section, strand FROM students WHERE lrn = $1',
+    `SELECT s.id,
+            s.lrn,
+            TRIM(CONCAT_WS(' ', s.first_name, s.middle_name, s.last_name)) AS full_name,
+            sec.grade_level AS grade,
+            sec.section_name AS section,
+            sec.strand
+       FROM norm_students s
+       LEFT JOIN norm_sections sec ON sec.id = s.section_id
+      WHERE s.lrn = $1`,
     [lrn]
   );
   return rows[0] || null;
@@ -146,13 +164,14 @@ router.get('/', requireAuth, async (req, res) => {
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const sql = `
-      SELECT a.*, s.lrn AS student_lrn, s.section AS student_section, v.offense_type,
+      SELECT a.*, s.lrn AS student_lrn, sec.section_name AS student_section, COALESCE(v.offense_type, v.description) AS offense_type,
              lm.body AS latest_message_body,
              lm.created_at AS latest_message_created_at,
              lm.sender_role AS latest_message_sender_role
         FROM appeals a
-        LEFT JOIN students s ON s.id = a.student_id
-        LEFT JOIN violations v ON v.id = a.violation_id
+        LEFT JOIN norm_students s ON s.id = a.student_id
+        LEFT JOIN norm_sections sec ON sec.id = s.section_id
+        LEFT JOIN ${VIOLATIONS_TABLE} v ON v.id = a.violation_id
         LEFT JOIN LATERAL (
           SELECT body, created_at, sender_role
             FROM appeal_messages am
@@ -253,7 +272,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     let violationId = null;
     if (violationIdInput) {
-      const { rows } = await query('SELECT id, offense_type FROM violations WHERE id = $1', [violationIdInput]);
+      const { rows } = await query(`SELECT id, COALESCE(offense_type, description) AS offense_type FROM ${VIOLATIONS_TABLE} WHERE id = $1`, [violationIdInput]);
       if (rows.length) {
         violationId = rows[0].id;
         if (!violationText) violationText = rows[0].offense_type || violationText;
