@@ -129,10 +129,12 @@
       const ct = res.headers.get('content-type') || '';
       return ct.includes('application/json') ? res.json() : res.text();
     } catch (err) {
-      // If the primary fetch failed (network error or CORS/asset server), attempt a local backend fallback
-      // This is a development convenience when the frontend is served from a static server (eg. Live Server)
+      // In production we should not auto-switch to localhost. Local fallback is only a dev convenience.
+      const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (!isLocalHost) throw err;
+
       try {
-        const fallbackHost = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || 'http://localhost:3000';
+        const fallbackHost = (window.SDMS_CONFIG && window.SDMS_CONFIG.API_BASE) || window.SDMS_API_BASE || API_BASE || 'http://localhost:3000';
         const fallbackRoot = `${fallbackHost.replace(/\/+$/, '')}/api`;
         const res2 = await fetch(`${fallbackRoot}${path}`, init);
         if (!res2.ok) {
