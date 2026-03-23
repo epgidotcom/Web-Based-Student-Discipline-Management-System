@@ -37,6 +37,26 @@
       backdrop.dataset.bound = "1";
     }
 
+    const settingsBtn = document.getElementById("settingsBtn");
+    const settingsMenu = document.getElementById("settingsMenu");
+    if (settingsBtn && !settingsBtn.dataset.bound) {
+      settingsBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const hasMenuItems = !!settingsMenu?.children?.length;
+        if (settingsMenu && hasMenuItems) {
+          const willOpen = settingsMenu.hasAttribute("hidden");
+          settingsMenu.toggleAttribute("hidden");
+          settingsBtn.setAttribute("aria-expanded", String(willOpen));
+          return;
+        }
+
+        window.location.href = "settings.html";
+      });
+      settingsBtn.dataset.bound = "1";
+    }
+
     window.addEventListener("keydown", (e)=>{ if (e.key === "Escape") setOpen(false); });
     window.addEventListener("resize", ()=>{ if (window.innerWidth >= 769) setOpen(false); });
 

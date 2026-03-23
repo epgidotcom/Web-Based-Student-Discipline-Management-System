@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
+  <meta name="sdms-api-base" content="http://localhost:3000" />
   <title>SDMS - Settings</title>
 
+  <!-- Global + Page CSS -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/settings.css">
+
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -39,6 +42,7 @@
   </div>
 </nav>
 
+<!-- Backdrop for drawer -->
 <div class="backdrop" id="backdrop" aria-hidden="true"></div>
 
 <!-- Main -->
@@ -66,14 +70,17 @@
 
     <!-- Tabs -->
     <div class="settings-tabs">
-      <button class="tab-btn active" data-tab="violations">
+      <button type="button" class="tab-btn active" data-tab="violations">
         <i class="fa fa-exclamation-triangle"></i> Violation Types
       </button>
-      <button class="tab-btn" data-tab="sanctions">
+      <button type="button" class="tab-btn" data-tab="sanctions">
         <i class="fa fa-gavel"></i> Sanction Types
       </button>
-      <button class="tab-btn" data-tab="grades">
-        <i class="fa fa-graduation-cap"></i> Grade & Sections
+      <button type="button" class="tab-btn" data-tab="grades">
+        <i class="fa fa-graduation-cap"></i> Grades & Sections
+      </button>
+      <button type="button" class="tab-btn" data-tab="data-management">
+        <i class="fa fa-trash-alt"></i> Data Management
       </button>
     </div>
 
@@ -86,8 +93,8 @@
         <div class="widget-body">
           <form id="violationForm">
             <div class="form-group">
-              <label for="violationTypeName">Violation Type</label>
-              <input type="text" id="violationTypeName" placeholder="e.g., Bullying" required>
+              <label for="violationType">Violation Type</label>
+              <input type="text" id="violationType" placeholder="e.g., Bullying" required>
             </div>
 
             <div class="form-actions">
@@ -121,8 +128,8 @@
         <div class="widget-body">
           <form id="sanctionForm">
             <div class="form-group">
-              <label for="sanctionTypeName">Sanction Type</label>
-              <input type="text" id="sanctionTypeName" placeholder="e.g., Verbal Warning" required>
+              <label for="sanctionType">Sanction Type</label>
+              <input type="text" id="sanctionType" placeholder="e.g., Written Warning" required>
             </div>
 
             <div class="form-actions">
@@ -193,15 +200,138 @@
         </div>
       </div>
     </div>
+
+    <!-- TAB 4: Data Management -->
+    <div id="data-management-tab" class="tab-content">
+      <!-- Students Section -->
+      <div class="widget">
+        <div class="widget-head">
+          <h3><i class="fa fa-users"></i> Students</h3>
+          <p class="widget-subtext">Select students to delete.</p>
+        </div>
+        <div class="widget-body">
+          <!-- Search Bar -->
+          <div class="search-filter-bar">
+            <div class="search-wrapper">
+              <i class="fa fa-search"></i>
+              <input type="text" id="studentSearchInput" class="search-input" placeholder="Search by name or LRN...">
+              <button type="button" class="btn-clear-search" id="clearStudentSearchBtn" style="display:none;">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="bulk-actions-toolbar">
+            <div class="select-all-container">
+              <input type="checkbox" id="selectAllStudents" class="select-all-checkbox">
+              <label for="selectAllStudents">Select All (Visible)</label>
+              <span class="selected-count" id="studentsSelectedCount">(0 selected)</span>
+            </div>
+            <div class="action-buttons">
+              <button type="button" class="btn btn-danger" id="deleteSelectedStudentsBtn" disabled>
+                <i class="fa fa-trash"></i> Delete Selected
+              </button>
+              <button type="button" class="btn btn-danger btn-danger-outline" id="deleteAllStudentsBtn">
+                <i class="fa fa-exclamation-circle"></i> Delete All Students
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Header (Sticky) -->
+          <div class="bulk-items-table">
+            <div class="table-header">
+              <div class="col-checkbox"></div>
+              <div class="col-name">Name</div>
+              <div class="col-lrn">LRN</div>
+              <div class="col-grade">Grade/Section</div>
+            </div>
+            <div id="studentsList" class="table-body">
+              <p class="empty-state"><i class="fa fa-inbox"></i> Loading students...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Violations Section -->
+      <div class="widget">
+        <div class="widget-head">
+          <h3><i class="fa fa-exclamation-triangle"></i> Violations</h3>
+          <p class="widget-subtext">Select violations to delete.</p>
+        </div>
+        <div class="widget-body">
+          <!-- Search & Filter Bar -->
+          <div class="search-filter-bar">
+            <div class="search-wrapper">
+              <i class="fa fa-search"></i>
+              <input type="text" id="violationSearchInput" class="search-input" placeholder="Search by student name or violation type...">
+              <button type="button" class="btn-clear-search" id="clearViolationSearchBtn" style="display:none;">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+            <select id="violationFilterDropdown" class="filter-dropdown">
+              <option value="">All Violations</option>
+              <option value="status:pending">Pending</option>
+              <option value="status:resolved">Resolved</option>
+            </select>
+          </div>
+
+          <div class="bulk-actions-toolbar">
+            <div class="select-all-container">
+              <input type="checkbox" id="selectAllViolations" class="select-all-checkbox">
+              <label for="selectAllViolations">Select All (Visible)</label>
+              <span class="selected-count" id="violationsSelectedCount">(0 selected)</span>
+            </div>
+            <div class="action-buttons">
+              <button type="button" class="btn btn-danger" id="deleteSelectedViolationsBtn" disabled>
+                <i class="fa fa-trash"></i> Delete Selected
+              </button>
+              <button type="button" class="btn btn-danger btn-danger-outline" id="deleteAllViolationsBtn">
+                <i class="fa fa-exclamation-circle"></i> Delete All Violations
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Header (Sticky) -->
+          <div class="bulk-items-table">
+            <div class="table-header">
+              <div class="col-checkbox"></div>
+              <div class="col-student">Student</div>
+              <div class="col-type">Violation Type</div>
+              <div class="col-date">Date</div>
+              <div class="col-sanction">Sanction</div>
+            </div>
+            <div id="violationsList" class="table-body">
+              <p class="empty-state"><i class="fa fa-inbox"></i> Loading violations...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
+<!-- Notification Toast -->
 <div id="toast" class="toast"></div>
 
 <!-- Scripts -->
 <script type="module" src="js/config.js"></script>
 <script type="module" src="js/main.js"></script>
 <script type="module" src="js/settings.js"></script>
+
+<script>
+  // Toggle settings submenu on this page (matches behavior in other pages)
+  document.addEventListener('DOMContentLoaded', function () {
+    var settingsBtn = document.getElementById('settingsBtn');
+    var settingsMenu = document.getElementById('settingsMenu');
+    if (settingsBtn && settingsMenu) {
+      settingsBtn.addEventListener('click', function () {
+        var open = settingsMenu.hasAttribute('hidden');
+        settingsMenu.toggleAttribute('hidden');
+        settingsBtn.setAttribute('aria-expanded', String(open));
+      });
+    }
+  });
+</script>
 
 </body>
 </html>
