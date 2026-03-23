@@ -87,14 +87,7 @@ router.get('/grades-sections', async (req, res) => {
        FROM norm_sections
        ORDER BY grade_level, section_name`
     );
-    res.json(rows.map(r => ({
-      id: r.id,
-      grade: r.grade_level,
-      section: r.section_name,
-      strand: r.strand,
-      created_at: r.created_at,
-      updated_at: r.updated_at
-    })));
+    res.json(rows);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to fetch grades and sections' });
@@ -104,26 +97,39 @@ router.get('/grades-sections', async (req, res) => {
 // POST create grade & section
 router.post('/grades-sections', async (req, res) => {
   try {
-    const { grade, section, strand } = req.body || {};
-    if (!section) return res.status(400).json({ error: 'section is required' });
+    const { grade_level, section_name, strand } = req.body || {};
+    if (!section_name) return res.status(400).json({ error: 'section_name is required' });
 
     const { rows } = await query(
       `INSERT INTO norm_sections (grade_level, section_name, strand)
        VALUES ($1, $2, $3)
-       ON CONFLICT (section_name)
-       DO UPDATE SET
-         grade_level = COALESCE($1, norm_sections.grade_level),
-         strand = COALESCE($3, norm_sections.strand)
        RETURNING id, grade_level, section_name, strand, created_at, updated_at`,
-      [String(grade || '').trim() || null, String(section).trim(), String(strand || '').trim() || null]
+      [String(grade_level || '').trim() || null, String(section_name).trim(), String(strand || '').trim() || null]
     );
 
-    res.status(201).json({
-      id: rows[0].id,
-      grade: rows[0].grade_level,
-      section: rows[0].section_name,
-      strand: rows[0].strand
-    });
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT update grade & section
+router.put('/grades-sections/:id', async (req, res) => {
+  try {
+    const { grade_level, section_name, strand } = req.body || {};
+    if (!section_name) return res.status(400).json({ error: 'section_name is required' });
+
+    const { rows } = await query(
+      `UPDATE norm_sections
+       SET grade_level = $1, section_name = $2, strand = $3, updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, grade_level, section_name, strand, created_at, updated_at`,
+      [String(grade_level || '').trim() || null, String(section_name).trim(), String(strand || '').trim() || null, req.params.id]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message });

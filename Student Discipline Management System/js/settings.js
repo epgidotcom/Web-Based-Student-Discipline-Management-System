@@ -424,6 +424,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="list-item-header">
             <h4>${s.sanction || 'Sanction'}</h4>
           </div>
+          <p class="list-item-description"><strong>Added:</strong> ${s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}</p>
           <div class="list-item-actions">
             <button class="btn btn-primary btn-sm edit-sanction" data-id="${s.id}" data-sanction="${s.sanction || ''}">
               <i class="fa fa-edit"></i> Edit
@@ -481,19 +482,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   gradeForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const gradeName = (document.getElementById('gradeName') || {}).value?.trim();
-    const sectionName = (document.getElementById('sectionName') || {}).value?.trim();
-    const adviser = (document.getElementById('adviser') || {}).value?.trim() || null;
+    const grade_level = (document.getElementById('gradeName') || {}).value?.trim();
+    const section_name = (document.getElementById('sectionName') || {}).value?.trim();
+    const strand = (document.getElementById('strandName') || {}).value?.trim() || null;
+    const editId = gradeForm.dataset.editId;
 
-    if (!gradeName || !sectionName) {
+    if (!grade_level || !section_name) {
       showToast('Please fill in Grade Level and Section', 'error');
       return;
     }
 
     try {
-      const payload = { grade: gradeName, section: sectionName, adviser };
-      const res = await fetch(`${API_BASE}/api/settings/grades-sections`, {
-        method: 'POST',
+      const payload = { grade_level, section_name, strand };
+      const isEdit = !!editId;
+      const method = isEdit ? 'PUT' : 'POST';
+      const endpoint = isEdit ? `${API_BASE}/api/settings/grades-sections/${encodeURIComponent(editId)}` : `${API_BASE}/api/settings/grades-sections`;
+
+      const res = await fetch(endpoint, {
+        method,
         headers: authHeaders(),
         body: JSON.stringify(payload)
       });
@@ -504,10 +510,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       gradeForm.reset();
-      showToast('Grade & Section added successfully!', 'success');
+      delete gradeForm.dataset.editId;
+      document.querySelector('#gradeForm button[type="submit"]').textContent = 'Add Grade & Section';
+      showToast(isEdit ? 'Grade & Section updated successfully!' : 'Grade & Section added successfully!', 'success');
       await loadGrades();
     } catch (err) {
-      console.error('Error adding grade & section:', err);
+      console.error('Error saving grade & section:', err);
       showToast(`Error: ${err.message}`, 'error');
     }
   });
@@ -529,17 +537,48 @@ document.addEventListener("DOMContentLoaded", async () => {
       gradesList.innerHTML = grades.map(g => `
         <div class="list-item">
           <div class="list-item-header">
-            <h4>${g.grade || 'Grade'} - ${g.section || 'Section'}</h4>
+            <h4>${g.grade_level || 'Grade'} - ${g.section_name || 'Section'}</h4>
+            ${g.strand ? `<span class="list-item-level">${g.strand}</span>` : ''}
           </div>
-          ${g.roomNumber ? `<p class="list-item-description"><strong>Room:</strong> ${g.roomNumber}</p>` : ''}
-          ${g.adviser ? `<p class="list-item-description"><strong>Adviser:</strong> ${g.adviser}</p>` : ''}
+          <p class="list-item-description"><strong>Added:</strong> ${g.created_at ? new Date(g.created_at).toLocaleDateString() : '—'}</p>
           <div class="list-item-actions">
+            <button class="btn btn-secondary btn-sm view-grade-descriptions" data-id="${g.id}" data-section="${g.section_name || ''}">
+              <i class="fa fa-eye"></i> View Descriptions
+            </button>
+            <button class="btn btn-primary btn-sm edit-grade" data-id="${g.id}" data-grade_level="${g.grade_level || ''}" data-section_name="${g.section_name || ''}" data-strand="${g.strand || ''}">
+              <i class="fa fa-edit"></i> Edit
+            </button>
             <button class="btn btn-danger btn-sm delete-grade" data-id="${g.id}">
               <i class="fa fa-trash"></i> Delete
             </button>
           </div>
         </div>
       `).join('');
+
+      // Attach view descriptions handlers
+      gradesList.querySelectorAll('.view-grade-descriptions').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const sectionName = e.currentTarget.dataset.section;
+          alert(`Descriptions for: ${sectionName}\n\n(Feature coming soon)`);
+        });
+      });
+
+      // Attach edit handlers
+      gradesList.querySelectorAll('.edit-grade').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.dataset.id;
+          const grade_level = e.currentTarget.dataset.grade_level;
+          const section_name = e.currentTarget.dataset.section_name;
+          const strand = e.currentTarget.dataset.strand;
+          
+          gradeForm.dataset.editId = id;
+          document.getElementById('gradeName').value = grade_level;
+          document.getElementById('sectionName').value = section_name;
+          if (document.getElementById('strandName')) document.getElementById('strandName').value = strand;
+          document.querySelector('#gradeForm button[type="submit"]').textContent = 'Update Grade & Section';
+          document.getElementById('gradeName').focus();
+        });
+      });
 
       // Attach delete handlers
       gradesList.querySelectorAll('.delete-grade').forEach(btn => {
