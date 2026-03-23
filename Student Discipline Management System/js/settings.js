@@ -485,6 +485,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const grade_level = (document.getElementById('gradeName') || {}).value?.trim();
     const section_name = (document.getElementById('sectionName') || {}).value?.trim();
     const strand = (document.getElementById('strandName') || {}).value?.trim() || null;
+    const adviser = (document.getElementById('adviser') || {}).value?.trim() || null;
     const editId = gradeForm.dataset.editId;
 
     if (!grade_level || !section_name) {
@@ -493,7 +494,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-      const payload = { grade_level, section_name, strand };
+      const adviser = (document.getElementById('adviser') || {}).value?.trim() || null;
+
+      const payload = { grade_level, section_name, strand, adviser };
       const isEdit = !!editId;
       const method = isEdit ? 'PUT' : 'POST';
       const endpoint = isEdit ? `${API_BASE}/api/settings/grades-sections/${encodeURIComponent(editId)}` : `${API_BASE}/api/settings/grades-sections`;
@@ -540,12 +543,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             <h4>${g.grade_level || 'Grade'} - ${g.section_name || 'Section'}</h4>
             ${g.strand ? `<span class="list-item-level">${g.strand}</span>` : ''}
           </div>
-          <p class="list-item-description"><strong>Added:</strong> ${g.created_at ? new Date(g.created_at).toLocaleDateString() : '—'}</p>
+          <p class="list-item-description"><strong>Adviser:</strong> ${g.adviser || ''}</p>
           <div class="list-item-actions">
-            <button class="btn btn-secondary btn-sm view-grade-descriptions" data-id="${g.id}" data-section="${g.section_name || ''}">
-              <i class="fa fa-eye"></i> View Descriptions
-            </button>
-            <button class="btn btn-primary btn-sm edit-grade" data-id="${g.id}" data-grade_level="${g.grade_level || ''}" data-section_name="${g.section_name || ''}" data-strand="${g.strand || ''}">
+            <button class="btn btn-primary btn-sm edit-grade" data-id="${g.id}" data-grade_level="${g.grade_level || ''}" data-section_name="${g.section_name || ''}" data-strand="${g.strand || ''}" data-adviser="${g.adviser || ''}">
               <i class="fa fa-edit"></i> Edit
             </button>
             <button class="btn btn-danger btn-sm delete-grade" data-id="${g.id}">
@@ -570,10 +570,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           const grade_level = e.currentTarget.dataset.grade_level;
           const section_name = e.currentTarget.dataset.section_name;
           const strand = e.currentTarget.dataset.strand;
+          const adviser = e.currentTarget.dataset.adviser;
           
           gradeForm.dataset.editId = id;
           document.getElementById('gradeName').value = grade_level;
           document.getElementById('sectionName').value = section_name;
+          document.getElementById('strandName').value = strand;
+          document.getElementById('adviser').value = adviser;
           if (document.getElementById('strandName')) document.getElementById('strandName').value = strand;
           document.querySelector('#gradeForm button[type="submit"]').textContent = 'Update Grade & Section';
           document.getElementById('gradeName').focus();
@@ -708,9 +711,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       return `
         <div class="bulk-item">
-          <input type="checkbox" class="student-checkbox" data-id="${student.id}" data-name="${name}">
+          <input type="checkbox" class="student-checkbox" data-id="${student.id}" data-name="${student.full_name || name}" />
           <div class="bulk-item-content">
-            <p class="bulk-item-title">${name}</p>
+            <p class="bulk-item-title">${student.full_name}</p>
           </div>
           <div class="bulk-item-content">
             <p class="bulk-item-subtitle">${lrn}</p>

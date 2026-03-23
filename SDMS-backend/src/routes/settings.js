@@ -83,9 +83,9 @@ router.delete('/sanctions/:id', async (req, res) => {
 router.get('/grades-sections', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT id, grade_level, section_name, strand, created_at, updated_at
+      `SELECT id, grade_level, section_name, strand, adviser, created_at, updated_at
        FROM norm_sections
-       ORDER BY grade_level, section_name`
+       ORDER BY grade_level, section_name, updated_at`
     );
     res.json(rows);
   } catch (e) {
@@ -97,14 +97,14 @@ router.get('/grades-sections', async (req, res) => {
 // POST create grade & section
 router.post('/grades-sections', async (req, res) => {
   try {
-    const { grade_level, section_name, strand } = req.body || {};
+    const { grade_level, section_name, strand, adviser } = req.body || {};
     if (!section_name) return res.status(400).json({ error: 'section_name is required' });
 
     const { rows } = await query(
-      `INSERT INTO norm_sections (grade_level, section_name, strand)
-       VALUES ($1, $2, $3)
-       RETURNING id, grade_level, section_name, strand, created_at, updated_at`,
-      [String(grade_level || '').trim() || null, String(section_name).trim(), String(strand || '').trim() || null]
+      `INSERT INTO norm_sections (grade_level, section_name, strand, adviser)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, grade_level, section_name, strand, adviser, created_at, updated_at`,
+      [String(grade_level || '').trim() || null, String(section_name).trim(), String(strand || '').trim() || null, String(adviser || '').trim() || null]
     );
 
     res.status(201).json(rows[0]);
@@ -117,15 +117,15 @@ router.post('/grades-sections', async (req, res) => {
 // PUT update grade & section
 router.put('/grades-sections/:id', async (req, res) => {
   try {
-    const { grade_level, section_name, strand } = req.body || {};
+    const { grade_level, section_name, strand, adviser } = req.body || {};
     if (!section_name) return res.status(400).json({ error: 'section_name is required' });
 
     const { rows } = await query(
       `UPDATE norm_sections
-       SET grade_level = $1, section_name = $2, strand = $3, updated_at = NOW()
-       WHERE id = $4
-       RETURNING id, grade_level, section_name, strand, created_at, updated_at`,
-      [String(grade_level || '').trim() || null, String(section_name).trim(), String(strand || '').trim() || null, req.params.id]
+       SET grade_level = $1, section_name = $2, strand = $3, adviser = $4, updated_at = NOW()
+       WHERE id = $5
+       RETURNING id, grade_level, section_name, strand, adviser, created_at, updated_at`,
+      [String(grade_level || '').trim() || null, String(section_name).trim(), String(strand || '').trim() || null, String(adviser || '').trim() || null, req.params.id]
     );
 
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
