@@ -232,7 +232,8 @@
   const studentNameField = document.getElementById('studentName');
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
-  const violationTypeField = document.getElementById('violationType');
+  const violationTypeField = document.getElementById('violationType2');
+  const violationDescriptionField = document.getElementById('violationDescription');
   const previousOffensesAccordion = document.getElementById('previousOffensesAccordion');
   const previousOffensesMessage = document.getElementById('previousOffensesMessage');
   const previousOffensesData = document.getElementById('previousOffensesData');
@@ -737,7 +738,7 @@ violationTypeField?.addEventListener('change', async function () {
     }
   }
 
-  function prepareCreateModal() {
+  async function prepareCreateModal() {
     violationForm?.reset();
     violationForm.dataset.studentId = '';
     editIndexField.value = '';
@@ -745,7 +746,6 @@ violationTypeField?.addEventListener('change', async function () {
     studentNameField.value = '';
     gradeSectionField.value = '';
     incidentDateField.value = '';
-    violationTypeField.value = '';
     sanctionField.value = '';
     remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
