@@ -387,9 +387,12 @@
     if (birthdateInput) birthdateInput.value = '';
     editIndex.value = '';
     modalTitle.textContent = 'Add Student';
+    loadGradeLevels();
     resetUploader();
     studentModal.style.display = 'flex';
   }
+
+  
 
   function openView(index){
     const s = students[index];
@@ -421,21 +424,133 @@
     viewModal.style.display = 'flex';
   }
 
-  function openEdit(index){
+   //for getting grade level
+  async function loadGradeLevels() {
+    try {
+      const types = await api('/settings/grades');
+      const gradeField = document.getElementById('grade');
+      const dropdown = gradeField;
+      if (!dropdown) return;
+      dropdown.innerHTML = '<option value="" disabled selected>Select Grade</option>';
+
+      types.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type.grade_level;
+        option.textContent = type.grade_level;
+        dropdown.appendChild(option);
+      });
+
+    } catch (err) {
+      console.error("Failed to load grade levels:", err);
+    }
+  }
+
+  async function loadSections(grade, selectedValue = null) {
+    const sectionDropdown = document.getElementById('section');
+    if (!sectionDropdown) return;
+
+    sectionDropdown.innerHTML = '<option value="">Select Section</option>';
+    if (!grade) return;
+
+    try {
+      const encoded = encodeURIComponent(grade);
+      const sections = await api(`/settings/grades/${encoded}/sections`);
+      (Array.isArray(sections) ? sections : []).forEach(item => {
+        const option = document.createElement('option');
+        option.value = String(item.section_name);
+        option.textContent = `${item.section_name}`;
+        sectionDropdown.appendChild(option);
+      });
+
+      if (selectedValue != null && selectedValue !== '') {
+        sectionDropdown.value = String(selectedValue);
+        if (sectionDropdown.value !== String(selectedValue)) {
+          const custom = document.createElement('option');
+          custom.value = String(selectedValue);
+          custom.textContent = String(selectedValue);
+          sectionDropdown.appendChild(custom);
+          sectionDropdown.value = String(selectedValue);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load sections:", err);
+    }
+  }
+
+  
+// When grade level changes, load sections for that grade
+   document.getElementById('grade')?.addEventListener('change', async function () {
+    const grade = this.value;
+    await loadSections(grade);
+  });
+
+  //for strand
+  async function loadStrand(section, grade, selectedValue = null) {
+    const strandDropdown = document.getElementById('strand');
+    if (!strandDropdown) return;
+
+    strandDropdown.innerHTML = '<option value="">Select Strand</option>';
+    if (!grade) return;
+
+    try {
+      const encodedSection = encodeURIComponent(section);
+      const encodedGrade = encodeURIComponent(grade);
+      const sections = await api(`/settings/grades/${encodedGrade}/${encodedSection}/strand`);
+      (Array.isArray(sections) ? sections : []).forEach(item => {
+        const option = document.createElement('option');
+        option.value = String(item.id);
+        option.textContent = `${item.strand}`;
+        strandDropdown.appendChild(option);
+      });
+
+      if (selectedValue != null && selectedValue !== '') {
+        strandDropdown.value = String(selectedValue);
+        if (strandDropdown.value !== String(selectedValue)) {
+          const custom = document.createElement('option');
+          custom.value = String(selectedValue);
+          custom.textContent = String(selectedValue);
+          strandDropdown.appendChild(custom);
+          strandDropdown.value = String(selectedValue);
+        }
+      }
+    } catch (err) { 
+      console.error("Failed to load strands:", err);
+    }
+  }
+// When section changes, load strand for that section
+   document.getElementById('section')?.addEventListener('change', async function () {
+    const section = this.value;
+    const grade = document.getElementById('grade').value;
+    await loadStrand(section, grade);
+  });
+
+
+  async function openEdit(index){
     const s = students[index];
     document.getElementById('lrn').value = s.lrn;
     document.getElementById('firstName').value = s.firstName;
     document.getElementById('middleName').value = s.middleName;
     document.getElementById('lastName').value = s.lastName;
-    document.getElementById('grade').value = s.grade;
-    document.getElementById('section').value = s.section;
-    if (strandInput) strandInput.value = s.strand || '';
     document.getElementById('parentContact').value = s.parentContact;
     if (birthdateInput) {
       birthdateInput.value = s.birthdate ? String(s.birthdate).slice(0, 10) : '';
     }
     editIndex.value = index;
     modalTitle.textContent = 'Edit Student';
+
+    // Load grades dynamically
+    await loadGradeLevels();
+    document.getElementById('grade').value = s.grade;
+
+    // Load sections for the student's grade
+    if (s.grade) {
+      await loadSections(s.grade, s.section);
+    }
+
+    // Load strands for the student's section and grade
+    if (s.section && s.grade) {
+      await loadStrand(s.section, s.grade, s.strand);
+    }
 
     const photo = StudentPhotos.get(s.lrn);
     if (photo) {
@@ -464,6 +579,7 @@
     const lastNameField = document.getElementById('lastName');
     const gradeField = document.getElementById('grade');
     const sectionField = document.getElementById('section');
+    const strandField = document.getElementById('strand');
     const parentContactField = document.getElementById('parentContact');
 
     const missingControls = [
@@ -472,6 +588,7 @@
       ['lastName', lastNameField],
       ['grade', gradeField],
       ['section', sectionField],
+      ['strand', strandField],
       ['parentContact', parentContactField]
     ].filter(([, el]) => !el);
     if (missingControls.length) {

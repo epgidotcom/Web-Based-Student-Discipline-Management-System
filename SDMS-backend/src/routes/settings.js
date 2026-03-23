@@ -94,6 +94,61 @@ router.get('/grades-sections', async (req, res) => {
   }
 });
 
+// GET all grades for dropdown
+router.get('/grades', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT DISTINCT grade_level
+       FROM norm_sections
+       ORDER BY grade_level`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch grades and sections' });
+  }
+});
+
+// GET all sections for dropdown
+router.get('/grades/:grade_level/sections', async (req, res) => {
+  try {
+    const grade_level = decodeURIComponent(req.params.grade_level || '').trim();
+    const { rows } = await query(
+      `SELECT DISTINCT section_name
+       FROM norm_sections
+       WHERE grade_level = $1
+       ORDER BY section_name`,
+      [grade_level]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET all strands for dropdown
+router.get('/grades/:grade_level/:section_name/strand', async (req, res) => {
+  try {
+    const grade_level = decodeURIComponent(req.params.grade_level || '').trim();
+    const section_name = decodeURIComponent(req.params.section_name || '').trim();
+    // console.log("PARAMS:", { grade_level, section_name });
+    const { rows } = await query(
+      `SELECT id, strand
+       FROM norm_sections
+       WHERE grade_level = $1 AND section_name = $2
+       ORDER BY strand`,
+      [grade_level, section_name]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+
 // POST create grade & section
 router.post('/grades-sections', async (req, res) => {
   try {
