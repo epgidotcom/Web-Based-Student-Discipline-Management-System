@@ -18,6 +18,32 @@ export function normalizeStudentUploadRow(student = {}) {
 
   const ageValue = sanitizedStudent.age ?? sanitizedStudent.Age;
   const ageRaw = ageValue == null || ageValue === '' ? null : Number(ageValue);
+  const birthdateRaw = sanitizeText(
+    sanitizedStudent.birthdate
+    ?? sanitizedStudent.Birthdate
+    ?? sanitizedStudent.date_of_birth
+    ?? sanitizedStudent.DateOfBirth
+    ?? sanitizedStudent.dob
+    ?? sanitizedStudent.DOB
+  );
+  const birthdateParsed = birthdateRaw ? new Date(birthdateRaw) : null;
+  const birthdate = birthdateParsed && !Number.isNaN(birthdateParsed.getTime())
+    ? `${birthdateParsed.getFullYear()}-${String(birthdateParsed.getMonth() + 1).padStart(2, '0')}-${String(birthdateParsed.getDate()).padStart(2, '0')}`
+    : null;
+
+  // Keep age for compatibility when clients still provide it; derive from birthdate when omitted.
+  let age = Number.isFinite(ageRaw) ? ageRaw : null;
+  if (age == null && birthdate) {
+    const dob = new Date(birthdate);
+    const today = new Date();
+    let computed = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      computed -= 1;
+    }
+    age = Number.isFinite(computed) && computed >= 0 ? computed : null;
+  }
+
   return {
     lrn: sanitizeText(sanitizedStudent.lrn ?? sanitizedStudent.LRN),
     full_name: fullName,
@@ -27,7 +53,9 @@ export function normalizeStudentUploadRow(student = {}) {
     email: sanitizeText(sanitizedStudent.email),
     phone: sanitizeText(sanitizedStudent.phone),
     profile_url: sanitizeText(sanitizedStudent.profile_url),
-    age: Number.isFinite(ageRaw) ? ageRaw : null,
+    age,
+    birthdate,
+    _birthdate_raw: birthdateRaw,
     compat: {
       ignored_last_name: Boolean(lastName && fallbackFullName),
       strict_mode: STRICT_UPLOAD_SCHEMA
@@ -39,6 +67,7 @@ export function validateStudentUploadRow(student = {}, row = 1) {
   const issues = [];
   if (!student.full_name) issues.push({ row, field: 'full_name', error: 'required' });
   if (student.lrn && !/^\d{1,12}$/.test(student.lrn)) issues.push({ row, field: 'lrn', error: 'invalid_format' });
+  if (!student.birthdate) issues.push({ row, field: 'birthdate', error: student._birthdate_raw ? 'invalid_format' : 'required' });
   if (student.age != null && (student.age < 0 || student.age > 120)) issues.push({ row, field: 'age', error: 'invalid_range' });
   if (student.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) issues.push({ row, field: 'email', error: 'invalid_format' });
   if (student.phone && !/^\+?[0-9()\-\s]{7,20}$/.test(student.phone)) issues.push({ row, field: 'phone', error: 'invalid_format' });
@@ -83,6 +112,7 @@ export function mapStudentUploadToColumns(student = {}, availableColumns = []) {
   add('section', sanitizeText(student.section));
   add('strand', sanitizeText(student.strand));
   add('age', age);
+  add('birthdate', sanitizeText(student.birthdate));
 
   return { columns, values };
 }

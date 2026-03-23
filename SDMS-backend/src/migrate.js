@@ -58,4 +58,48 @@ export async function runMigrations() {
      WHERE full_name IS NULL
        AND (first_name IS NOT NULL OR last_name IS NOT NULL)
   `);
+
+  // --- norm_students compatibility ---
+  // Keep a compatibility full_name column available for older queries while
+  // allowing newer routes to use split name columns.
+  const normStudentColumns = [
+    `ALTER TABLE IF EXISTS norm_students ADD COLUMN IF NOT EXISTS first_name VARCHAR`,
+    `ALTER TABLE IF EXISTS norm_students ADD COLUMN IF NOT EXISTS middle_name VARCHAR`,
+    `ALTER TABLE IF EXISTS norm_students ADD COLUMN IF NOT EXISTS last_name VARCHAR`,
+    `ALTER TABLE IF EXISTS norm_students ADD COLUMN IF NOT EXISTS full_name VARCHAR`,
+    `ALTER TABLE IF EXISTS norm_students ADD COLUMN IF NOT EXISTS birthdate DATE`,
+  ];
+
+  for (const sql of normStudentColumns) {
+    await query(sql);
+  }
+
+  await query(`
+    UPDATE norm_students
+       SET first_name = trim(split_part(full_name, ' ', 1))
+     WHERE first_name IS NULL
+       AND full_name IS NOT NULL
+       AND trim(full_name) <> ''
+  `);
+
+  await query(`
+    UPDATE norm_students
+       SET last_name = trim(
+             CASE
+               WHEN array_length(string_to_array(trim(full_name), ' '), 1) > 1
+               THEN (string_to_array(trim(full_name), ' '))[array_length(string_to_array(trim(full_name), ' '), 1)]
+               ELSE trim(full_name)
+             END
+           )
+     WHERE last_name IS NULL
+       AND full_name IS NOT NULL
+       AND trim(full_name) <> ''
+  `);
+
+  await query(`
+    UPDATE norm_students
+       SET full_name = trim(concat_ws(' ', first_name, middle_name, last_name))
+     WHERE full_name IS NULL
+       AND (first_name IS NOT NULL OR last_name IS NOT NULL)
+  `);
 }

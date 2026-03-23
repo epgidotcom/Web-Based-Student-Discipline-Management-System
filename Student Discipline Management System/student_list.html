@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
+  <meta name="sdms-api-base" content="http://localhost:3000" />
   <title>SDMS - Student List</title>
 
   <!-- Global + Page CSS -->
@@ -110,9 +110,10 @@
           <tr>
             <th>LRN</th>
             <th>Full Name</th>
-            <th>Age</th>
+            <th>Birthdate</th>
             <th>Grade</th>
             <th>Section</th>
+            <th>Strand</th>
             <th>Added Date</th>
             <th>Actions</th>
           </tr>
@@ -120,7 +121,7 @@
         <tbody>
           <!-- rows injected by JS -->
           <tr>
-            <td colspan="7" style="text-align:center;color:#6b7280;">No data</td>
+            <td colspan="8" style="text-align:center;color:#6b7280;">No data</td>
           </tr>
         </tbody>
       </table>
@@ -164,22 +165,22 @@
         </div>
       </div>
 
-      <label>LRN:</label>
+      <label for="lrn">LRN:</label>
       <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
 
-      <label>First Name:</label>
+      <label for="firstName">First Name:</label>
       <input type="text" id="firstName" name="firstName" required>
 
-      <label>Middle Name:</label>
+      <label for="middleName">Middle Name:</label>
       <input type="text" id="middleName" name="middleName">
 
-      <label>Last Name:</label>
+      <label for="lastName">Last Name:</label>
       <input type="text" id="lastName" name="lastName" required>
 
-      <label>Age:</label>
-      <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
+      <label for="birthdate">Birthdate:</label>
+      <input type="date" id="birthdate" name="birthdate" required>
 
-      <label>Grade:</label>
+      <label for="grade">Grade:</label>
       <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
         <option value="7">Grade 7</option>
@@ -190,10 +191,21 @@
         <option value="12">Grade 12</option>
       </select>
 
-      <label>Section:</label>
+      <label for="section">Section:</label>
       <input type="text" id="section" name="section" placeholder="e.g. A" required>
 
-      <label>Parent's Contact Number:</label>
+      <label for="strand">Strand:</label>
+      <select id="strand" name="strand">
+        <option value="">-- Select Strand --</option>
+        <option value="ABM">ABM</option>
+        <option value="HUMSS">HUMSS</option>
+        <option value="STEM">STEM</option>
+        <option value="HE">HE</option>
+        <option value="ICT">ICT</option>
+        <option value="GAS">GAS</option>
+      </select>
+
+      <label for="parentContact">Parent's Contact Number:</label>
       <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
 
       <button type="submit" class="save-btn">Save</button>
@@ -225,10 +237,9 @@
           <span class="value" id="viewName"></span>
         </div>
         <div class="detail-row">
-          <span class="label">Age</span>
-          <span class="value" id="viewAge"></span>
+          <span class="label">Birthdate</span>
+          <span class="value" id="viewBirthdate"></span>
         </div>
-        <!-- 🧹 Birthdate row removed -->
         <div class="detail-row">
           <span class="label">Grade</span>
           <span class="value" id="viewGrade"></span>
@@ -236,6 +247,10 @@
         <div class="detail-row">
           <span class="label">Section</span>
           <span class="value" id="viewSection"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Strand</span>
+          <span class="value" id="viewStrand"></span>
         </div>
         <div class="detail-row">
           <span class="label">Parent’s Contact</span>
@@ -258,13 +273,13 @@
       <div class="upload-section">
         <p style="margin-bottom: 15px; color: #6b7280;">
           Upload a CSV file with the following headers (in exact order):
-          <strong>LRN, FullName, Age, Grade, Section, Strand</strong>
+          <strong>LRN, FullName, Birthdate, Grade, Section, Strand</strong>
         </p>
         
         <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <p style="margin: 0; font-size: 14px; color: #374151;">
             <strong>Example format:</strong><br>
-            <code style="background: white; padding: 2px 6px; border-radius: 4px;">123456789012,Juan Dela Cruz,16,11,A,STEM</code>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px;">123456789012,Juan Dela Cruz,2009-04-03,11,A,STEM</code>
           </p>
           <p style="margin: 10px 0 0 0; font-size: 13px; color: #6b7280;">
             <em>Note: Parent contact will default to 09000000000. You can edit individual records later.</em>
@@ -320,7 +335,7 @@
               <tr>
                 <th>LRN</th>
                 <th>Full Name</th>
-                <th>Age</th>
+                <th>Birthdate</th>
                 <th>Grade</th>
                 <th>Section</th>
                 <th>Strand</th>
@@ -349,7 +364,7 @@
 <script>
   (function(){
     const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
-    const fallback = isLocal ? 'http://localhost:3000' : 'https://web-based-student-discipline-management.onrender.com';
+    const fallback = 'http://localhost:3000';
     window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
   })();
 </script>

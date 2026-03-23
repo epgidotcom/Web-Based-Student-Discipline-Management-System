@@ -6,6 +6,7 @@
   const API_ROOT = `${API_BASE.replace(/\/+$/, '')}/api`;
 
   let students = [];
+  let allStudents = [];
 
   const studentTable = document.querySelector('#studentTable tbody');
   const addStudentBtn = document.getElementById('addStudentBtn');
@@ -25,14 +26,16 @@
 
   const viewLRN = document.getElementById('viewLRN');
   const viewName = document.getElementById('viewName');
-  const viewAge = document.getElementById('viewAge');
+  const viewBirthdate = document.getElementById('viewBirthdate');
   const viewGrade = document.getElementById('viewGrade');
   const viewSection = document.getElementById('viewSection');
+  const viewStrand = document.getElementById('viewStrand');
   const viewParent = document.getElementById('viewParent');
   const viewAvatar = document.getElementById('viewAvatar');
   const viewInitials = document.getElementById('viewInitials');
 
-  const ageInput = document.getElementById('age');
+  const birthdateInput = document.getElementById('birthdate');
+  const strandInput = document.getElementById('strand');
 
   /* =================== Photo storage (front-end) =================== */
   const StudentPhotos = {
@@ -193,11 +196,12 @@
         const parsed = Number(row.age);
         return Number.isNaN(parsed) ? null : parsed;
       })(),
+      birthdate: row.birthdate || null,
       grade: row.grade || '',
       section: row.section || '',
       strand: row.strand || '',
       parentContact: row.parent_contact || '',
-      createdAt: row.created_at || ''
+      createdAt: row.created_at || row.added_date || ''
     };
   }
 
@@ -208,13 +212,11 @@
   function renderTable(list = students){
     if (!studentTable) return;
     const source = Array.isArray(list) ? list : [];
-    if (list !== students) {
-      students = source;
-    }
+    students = source;
     studentTable.innerHTML = '';
     if (!source.length) {
       const row = document.createElement('tr');
-      row.innerHTML = '<td colspan="7" style="text-align:center;color:#6b7280;">No records found.</td>';
+      row.innerHTML = '<td colspan="8" style="text-align:center;color:#6b7280;">No records found.</td>';
       studentTable.appendChild(row);
       return;
     }
@@ -232,7 +234,6 @@
       const nameWrap = document.createElement('div');
       nameWrap.className = 'name-cell';
       const fullName = s.fullName || composeFullName(s.firstName, s.middleName, s.lastName);
-      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
       if (photo) {
         const img = document.createElement('img');
@@ -253,10 +254,10 @@
       nameCell.appendChild(nameWrap);
       row.appendChild(nameCell);
 
-      // Age
-      const ageCell = document.createElement('td');
-      ageCell.textContent = (age !== '' && age != null) ? String(age) : '';
-      row.appendChild(ageCell);
+      // Birthdate
+      const birthdateCell = document.createElement('td');
+      birthdateCell.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
+      row.appendChild(birthdateCell);
 
       // Grade
       const gradeCell = document.createElement('td');
@@ -267,6 +268,11 @@
       const sectionCell = document.createElement('td');
       sectionCell.textContent = s.section || '';
       row.appendChild(sectionCell);
+
+      // Strand
+      const strandCell = document.createElement('td');
+      strandCell.textContent = s.strand || '';
+      row.appendChild(strandCell);
 
       // Added Date
       const dateCell = document.createElement('td');
@@ -314,6 +320,7 @@
     },
     onData(rows) {
       students = Array.isArray(rows) ? rows.map(normalizeStudent) : [];
+      allStudents = students.slice();
       renderTable(students);
     },
     onError(err) {
@@ -321,6 +328,7 @@
       const detail = err?.message ? `\n\nDetails: ${err.message}` : '';
       alert(`Failed to load students. Please refresh or try again.${detail}`);
       students = [];
+      allStudents = [];
       renderTable(students);
     }
   });
@@ -333,6 +341,7 @@
     const payload = await api(`/students?${params.toString()}`);
     const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
     students = Array.isArray(data) ? data.map(normalizeStudent) : [];
+    allStudents = students.slice();
     renderTable(students);
     if (paginationSummary) {
       const count = students.length;
@@ -373,7 +382,7 @@
 
   function openCreateModal(){
     studentForm?.reset();
-    if (ageInput) ageInput.value = '';
+    if (birthdateInput) birthdateInput.value = '';
     editIndex.value = '';
     modalTitle.textContent = 'Add Student';
     resetUploader();
@@ -383,13 +392,17 @@
   function openView(index){
     const s = students[index];
     const fullName = s.fullName || composeFullName(s.firstName, s.middleName, s.lastName);
-    const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
 
     viewLRN.textContent = s.lrn;
     viewName.textContent = fullName;
-    viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
+    if (viewBirthdate) {
+      viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
+    }
     viewGrade.textContent = s.grade || '—';
     viewSection.textContent = s.section || '—';
+    if (viewStrand) {
+      viewStrand.textContent = s.strand || '—';
+    }
     viewParent.textContent = s.parentContact || '—';
 
     const photo = StudentPhotos.get(s.lrn);
@@ -414,10 +427,10 @@
     document.getElementById('lastName').value = s.lastName;
     document.getElementById('grade').value = s.grade;
     document.getElementById('section').value = s.section;
+    if (strandInput) strandInput.value = s.strand || '';
     document.getElementById('parentContact').value = s.parentContact;
-    if (ageInput) {
-      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
-      ageInput.value = age !== '' && age != null ? age : '';
+    if (birthdateInput) {
+      birthdateInput.value = s.birthdate ? String(s.birthdate).slice(0, 10) : '';
     }
     editIndex.value = index;
     modalTitle.textContent = 'Edit Student';
@@ -468,6 +481,8 @@
     const firstName = firstNameField?.value?.trim() || '';
     const middleName = middleNameField?.value?.trim() || null;
     const lastName = lastNameField?.value?.trim() || '';
+    const normalizedBirthdate = birthdateInput?.value?.trim() || null;
+    const normalizedAge = normalizedBirthdate ? computeAge(normalizedBirthdate) : null;
     const payload = {
       lrn: lrnField?.value?.trim() || null,
       full_name: composeFullName(firstName, middleName, lastName),
@@ -475,15 +490,11 @@
       first_name: firstName,
       middle_name: middleName,
       last_name: lastName,
-      age: (() => {
-        if (!ageInput) return null;
-        const value = ageInput.value.trim();
-        if (value === '') return null;
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : null;
-      })(),
+      age: normalizedAge,
+      birthdate: normalizedBirthdate || (existing?.birthdate || null),
       grade: gradeField?.value || null,
       section: sectionField?.value?.trim() || null,
+      strand: strandInput?.value || null,
       parent_contact: parentContactField?.value?.trim() || null
     };
 
@@ -509,7 +520,7 @@
       await refreshCurrentPage(targetPage);
       studentModal.style.display = 'none';
       resetUploader();
-      if (ageInput) ageInput.value = '';
+      if (birthdateInput) birthdateInput.value = '';
     } catch (err) {
       console.error('[students] save failed', err);
       alert(err.message || 'Failed to save student.');
@@ -531,47 +542,41 @@
     }
   }
 
-  function searchStudent(){
-    (async () => {
-      const raw = document.getElementById('searchInput')?.value || '';
-      const input = raw.toString().trim();
-      if (!input) {
-        // nothing -> show all currently loaded rows
-        document.querySelectorAll('#studentTable tbody tr').forEach(row => { row.style.display = ''; });
+  async function searchStudent(){
+    const raw = document.getElementById('searchInput')?.value || '';
+    const input = raw.toString().trim();
+    if (!input) {
+      renderTable(allStudents);
+      return;
+    }
+
+    // Heuristic: treat as LRN when input contains digits and has no whitespace
+    const looksLikeLRN = /\d/.test(input) && !/\s/.test(input);
+    if (looksLikeLRN) {
+      try {
+        const data = await api(`/students?lrn=${encodeURIComponent(input)}`);
+        const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+        renderTable(rows.map(normalizeStudent));
         return;
+      } catch (err) {
+        console.error('[students] LRN search failed', err);
       }
+    }
 
-      // Heuristic: treat as LRN when input contains digits and has no whitespace
-      const looksLikeLRN = /\d/.test(input) && !/\s/.test(input);
-      if (looksLikeLRN) {
-        try {
-          const data = await api(`/students?lrn=${encodeURIComponent(input)}`);
-          const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-          if (!rows.length) {
-            // show empty placeholder
-            studentTable.innerHTML = '';
-            const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="7" style="text-align:center;color:#6b7280;">No records found.</td>';
-            studentTable.appendChild(row);
-            return;
-          }
-          // Render returned canonical rows
-          const normalized = rows.map(normalizeStudent);
-          renderTable(normalized);
-          return;
-        } catch (err) {
-          console.error('[students] LRN search failed', err);
-          // fall back to client-side filter below
-        }
-      }
-
-      // Default: client-side text filter on currently rendered rows
-      const q = input.toLowerCase();
-      document.querySelectorAll('#studentTable tbody tr').forEach(row => {
-        const text = row.innerText.toLowerCase();
-        row.style.display = text.includes(q) ? '' : 'none';
-      });
-    })();
+    // Default: client-side text filter on the latest full page dataset
+    const q = input.toLowerCase();
+    const filtered = allStudents.filter((student) => {
+      const rowText = [
+        student.lrn,
+        student.fullName || composeFullName(student.firstName, student.middleName, student.lastName),
+        student.grade,
+        student.section,
+        student.strand,
+        student.parentContact
+      ].join(' ').toLowerCase();
+      return rowText.includes(q);
+    });
+    renderTable(filtered);
   }
 
   (function(){
@@ -588,10 +593,10 @@
       return '';
     }
 
-    function getSectionFromRow(row){
-      if (row.dataset && row.dataset.grade) return normalize(row.dataset.grade);
+    function getStrandFromRow(row){
+      if (row.dataset && row.dataset.strand) return normalize(row.dataset.strand);
       try {
-        var cell = row.cells && row.cells[4];
+        var cell = row.cells && row.cells[5];
         if (cell) return normalize(cell.textContent || cell.innerText);
       } catch(e){}
       return '';
@@ -614,7 +619,7 @@
     }
 
     function applyDropdownFilters(){
-      var selSection = normalize(document.getElementById('filterSection') && document.getElementById('filterSection').value);
+      var selStrand = normalize(document.getElementById('filterStrand') && document.getElementById('filterStrand').value);
       var selGrade  = normalize(document.getElementById('filterGrade') && document.getElementById('filterGrade').value);
 
       var table = document.getElementById('studentTable');
@@ -634,19 +639,19 @@
         }
 
         var rowGrade = getGradeFromRow(row);
-        var rowSection = getSectionFromRow(row);
+        var rowStrand = getStrandFromRow(row);
 
         var matchesGrade = true;
-        var matchesSection = true;
+        var matchesStrand = true;
 
         if (selGrade) {
           matchesGrade = (rowGrade === selGrade || rowGrade === ('grade ' + selGrade));
         }
-        if (selSection) {
-          matchesSection = (rowSection === selSection);
+        if (selStrand) {
+          matchesStrand = (rowStrand === selStrand);
         }
 
-        var keep = matchesGrade && matchesSection;
+        var keep = matchesGrade && matchesStrand;
         row.style.display = keep ? '' : 'none';
         if (keep) visibleCount++;
       });
@@ -659,7 +664,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function(){
-      var filterSection = document.getElementById('filterSection');
+      var filterSection = document.getElementById('filterStrand');
       var filterGrade  = document.getElementById('filterGrade');
 
       if (filterSection) filterSection.addEventListener('change', applyDropdownFilters);

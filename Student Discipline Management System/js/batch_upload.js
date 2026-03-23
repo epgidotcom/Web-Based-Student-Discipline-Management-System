@@ -4,12 +4,15 @@
   const BATCH_UPLOAD_URL = API_BASE.endsWith('/api')
     ? `${API_BASE}/students/batch-upload`
     : `${API_BASE}/api/students/batch-upload`;
+  const BATCH_CREATE_URL = API_BASE.endsWith('/api')
+    ? `${API_BASE}/students/batch`
+    : `${API_BASE}/api/students/batch`;
   const stripWebsiteContentTags = window.SDMSUrlSanitize?.stripWebsiteContentTags || ((value) => {
     if (value == null) return '';
     return String(value).replace(/^<WebsiteContent_[^>]+>/, '').replace(/<\/WebsiteContent_[^>]+>$/, '').trim();
   });
   const sanitizeRow = window.SDMSUrlSanitize?.sanitizeRow || ((row) => row);
-  const EXPECTED_HEADERS = ['lrn', 'full_name', 'age', 'grade', 'section', 'strand'];
+  const EXPECTED_HEADERS = ['lrn', 'full_name', 'birthdate', 'grade', 'section', 'strand'];
   const HEADER_ALIASES = {
     fullname: 'full_name',
     full_name: 'full_name',
@@ -19,6 +22,9 @@
     last_name: 'last_name',
     lrn: 'lrn',
     age: 'age',
+    birthdate: 'birthdate',
+    dateofbirth: 'birthdate',
+    dob: 'birthdate',
     grade: 'grade',
     section: 'section',
     strand: 'strand',
@@ -137,6 +143,17 @@
     return composed || fallbackFullName || '';
   }
 
+  function normalizeBirthdate(value) {
+    const raw = stripWebsiteContentTags(value || '');
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   function parseCSVText(rawText) {
     const parseErrors = [];
     const text = rawText.replace(/^\uFEFF/, '');
@@ -171,21 +188,21 @@
             if (header) acc[header] = cells[i] || '';
             return acc;
           }, {})
-        : { lrn: cells[0] || '', full_name: cells[1] || '', age: cells[2] || '', grade: cells[3] || '', section: cells[4] || '', strand: cells[5] || '' };
+        : { lrn: cells[0] || '', full_name: cells[1] || '', birthdate: cells[2] || '', grade: cells[3] || '', section: cells[4] || '', strand: cells[5] || '' };
 
       const sanitized = sanitizeRow(record);
       const fullName = stripWebsiteContentTags(sanitized.full_name || '');
       const firstName = stripWebsiteContentTags(sanitized.first_name || '');
       const middleName = stripWebsiteContentTags(sanitized.middle_name || '');
       const lastName = stripWebsiteContentTags(sanitized.last_name || '');
-      const ageRaw = stripWebsiteContentTags(sanitized.age || '');
-      const age = ageRaw !== '' ? Number(ageRaw) : null;
+      const birthdateRaw = stripWebsiteContentTags(sanitized.birthdate || sanitized.date_of_birth || sanitized.dob || '');
+      const birthdate = normalizeBirthdate(birthdateRaw);
 
       students.push({
         _row: row,
         lrn: stripWebsiteContentTags(sanitized.lrn || '') || null,
         full_name: buildFullName(firstName, middleName, lastName, fullName),
-        age: Number.isFinite(age) ? age : null,
+        birthdate,
         grade: stripWebsiteContentTags(sanitized.grade || '') || null,
         section: stripWebsiteContentTags(sanitized.section || '') || null,
         strand: stripWebsiteContentTags(sanitized.strand || '') || null,
@@ -194,7 +211,7 @@
         profile_url: stripWebsiteContentTags(sanitized.profile_url || '') || null,
         last_name: lastName || null,
         _fullName: buildFullName(firstName, middleName, lastName, fullName),
-        _ageRaw: ageRaw
+        _birthdateRaw: birthdateRaw
       });
     });
 
@@ -206,7 +223,11 @@
     students.forEach(s => {
       if (!s.full_name) errors.push(`Row ${s._row}: Full Name is required (got "${s._fullName || ''}")`);
       if (s.lrn && !/^\d{1,12}$/.test(s.lrn)) errors.push(`Row ${s._row}: LRN must be up to 12 digits (got "${s.lrn}")`);
-      if (s._ageRaw !== '' && s._ageRaw != null && (s.age === null || s.age < 0 || s.age > 120)) errors.push(`Row ${s._row}: Invalid age "${s._ageRaw}"`);
+      if (!s._birthdateRaw) {
+        errors.push(`Row ${s._row}: Birthdate is required`);
+      } else if (!s.birthdate) {
+        errors.push(`Row ${s._row}: Invalid birthdate "${s._birthdateRaw}"`);
+      }
       if (s.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email)) errors.push(`Row ${s._row}: Invalid email format`);
       if (s.phone && !/^\+?[0-9()\-\s]{7,20}$/.test(s.phone)) errors.push(`Row ${s._row}: Invalid phone format`);
       if (s.profile_url) {
@@ -226,7 +247,7 @@
     previewTbody.innerHTML = '';
     students.forEach(s => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${s.lrn || ''}</td><td>${s._fullName || ''}</td><td>${s.age !== null ? s.age : ''}</td><td>${s.grade || ''}</td><td>${s.section || ''}</td><td>${s.strand || ''}</td><td><span style="color:#16a34a;font-weight:500;">Ready</span></td>`;
+      tr.innerHTML = `<td>${s.lrn || ''}</td><td>${s._fullName || ''}</td><td>${s.birthdate || ''}</td><td>${s.grade || ''}</td><td>${s.section || ''}</td><td>${s.strand || ''}</td><td><span style="color:#16a34a;font-weight:500;">Ready</span></td>`;
       previewTbody.appendChild(tr);
     });
   }
@@ -276,6 +297,30 @@
     return { inserted, errors };
   }
 
+  async function uploadParsedStudents(students) {
+    const payload = {
+      students: (Array.isArray(students) ? students : []).map((s) => ({
+        lrn: s.lrn || null,
+        full_name: s.full_name || null,
+        birthdate: s.birthdate || null,
+        grade: s.grade || null,
+        section: s.section || null,
+        strand: s.strand || null,
+        email: s.email || null,
+        phone: s.phone || null,
+        profile_url: s.profile_url || null
+      }))
+    };
+
+    const response = await apiRequest(BATCH_CREATE_URL, { method: 'POST', body: payload });
+    return {
+      inserted: Number(response?.inserted || 0),
+      skipped: Number(response?.skipped || 0),
+      failed: Number(response?.failed || 0),
+      errors: Array.isArray(response?.errors) ? response.errors : []
+    };
+  }
+
   async function handleBatchUploadInputChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -314,7 +359,7 @@
   csvFileInput?.addEventListener('change', handleBatchUploadInputChange);
   clearFileBtn?.addEventListener('click', () => { selectedFile = null; if (csvFileInput) csvFileInput.value = ''; if (fileInfo) fileInfo.style.display = 'none'; if (previewSection) previewSection.style.display = 'none'; });
   downloadTplBtn?.addEventListener('click', () => {
-    const csv = 'LRN,FullName,Age,Grade,Section,Strand\r\n123456789012,Juan Dela Cruz,16,11,A,STEM\r\n';
+    const csv = 'LRN,FullName,Birthdate,Grade,Section,Strand\r\n123456789012,Juan Dela Cruz,2009-04-03,11,A,STEM\r\n';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -353,8 +398,7 @@
 
     if (confirmUploadBtn) { confirmUploadBtn.disabled = true; confirmUploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...'; }
     try {
-      if (!selectedFile) throw new Error('No CSV file selected. Please choose a file before uploading.');
-      const { inserted, errors } = await uploadStudentCSV(selectedFile);
+      const { inserted, skipped, failed, errors } = await uploadParsedStudents(parsedStudents);
       if (errors.length) {
         const formatted = errors.slice(0, 5).map((err) => {
           if (typeof err === 'string') return err;
@@ -365,9 +409,9 @@
           }
           return String(err);
         }).join('\n');
-        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
+        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⏭️ Skipped: ${skipped}\n❌ Failed: ${failed}\n⚠️ Errors:\n${formatted}${errors.length > 5 ? '\n...and more' : ''}`);
       } else {
-        alert(`Upload complete!\n✅ Inserted: ${inserted}`);
+        alert(`Upload complete!\n✅ Inserted: ${inserted}\n⏭️ Skipped: ${skipped}\n❌ Failed: ${failed}`);
       }
       closeModal();
       if (typeof window.SDMS_refreshStudents === 'function') window.SDMS_refreshStudents();

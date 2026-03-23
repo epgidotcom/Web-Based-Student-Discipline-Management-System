@@ -2,20 +2,188 @@ import { Router } from 'express';
 import { query } from '../db.js';
 
 const router = Router();
+const VIOLATIONS_TABLE = 'norm_violations';
 
 // Helper: fetch student by id
 async function fetchStudent(id) {
   if (!id) return null;
   const { rows } = await query(
-    'SELECT id, full_name, grade, section, strand FROM students WHERE id = $1',
+    `SELECT s.id,
+            TRIM(CONCAT_WS(' ', s.first_name, s.middle_name, s.last_name)) AS full_name,
+            sec.grade_level AS grade,
+            sec.section_name AS section,
+            sec.strand
+       FROM norm_students s
+       LEFT JOIN norm_sections sec ON sec.id = s.section_id
+      WHERE s.id = $1`,
     [id]
   );
   return rows[0] || null;
 }
 
-function buildStudentDisplay(s) {
-  if (!s) return null;
-  return s.full_name || null;
+function parseGradeSectionInput(rawValue) {
+  const raw = String(rawValue ?? '').trim();
+  if (!raw) return { grade: null, section: null };
+
+  const compact = raw.replace(/\s+/g, ' ').trim();
+  const withGradeLabel = compact.match(/^grade\s*(\d{1,2})\s*[-:|]?\s*(.*)$/i);
+  if (withGradeLabel) {
+    return {
+      grade: withGradeLabel[1],
+      section: (withGradeLabel[2] || '').trim() || null
+    };
+  }
+
+  const numericLead = compact.match(/^(\d{1,2})\s*[-:|]?\s*(.*)$/);
+  if (numericLead) {
+    return {
+      grade: numericLead[1],
+      section: (numericLead[2] || '').trim() || null
+    };
+  }
+
+  return { grade: null, section: compact };
+}
+
+async function resolveSectionId(grade, section, strand) {
+  const sectionName = String(section ?? '').trim();
+  if (!sectionName) return null;
+
+  const values = [sectionName];
+  const whereParts = ['section_name = $1'];
+
+  const gradeLevel = String(grade ?? '').trim();
+  if (gradeLevel) {
+    values.push(gradeLevel);
+    whereParts.push(`grade_level = $${values.length}`);
+  }
+
+  const strandName = String(strand ?? '').trim();
+  if (strandName) {
+    values.push(strandName);
+    whereParts.push(`strand = $${values.length}`);
+  }
+
+  const { rows } = await query(
+    `SELECT id
+       FROM norm_sections
+      WHERE ${whereParts.join(' AND ')}
+      ORDER BY id ASC
+      LIMIT 1`,
+    values
+  );
+
+  return rows[0]?.id ?? null;
+}
+
+async function getOrCreateSectionId(grade, section, strand) {
+  const sectionName = String(section ?? '').trim();
+  if (!sectionName) return null;
+
+  const existing = await resolveSectionId(grade, section, strand);
+  if (existing) return existing;
+
+  const gradeLevel = String(grade ?? '').trim() || null;
+  const strandName = String(strand ?? '').trim() || null;
+  const { rows } = await query(
+    `INSERT INTO norm_sections (grade_level, section_name, strand)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (section_name)
+     DO UPDATE SET
+       grade_level = COALESCE($1, norm_sections.grade_level),
+       strand = COALESCE($3, norm_sections.strand)
+     RETURNING id`,
+    [gradeLevel, sectionName, strandName]
+  );
+  return rows[0]?.id ?? null;
+}
+
+async function applyGradeSectionToStudent(studentId, gradeSectionValue) {
+  if (!studentId || !gradeSectionValue) return;
+  const student = await fetchStudent(studentId);
+  if (!student) return;
+
+  const { grade, section } = parseGradeSectionInput(gradeSectionValue);
+  if (!section) return;
+
+  const sectionId = await getOrCreateSectionId(grade, section, student.strand);
+  if (!sectionId) return;
+
+  await query(
+    `UPDATE norm_students
+        SET section_id = $1
+      WHERE id = $2`,
+    [sectionId, studentId]
+  );
+}
+
+async function resolveOffense(input) {
+  const raw = String(input ?? '').trim();
+  if (!raw) return null;
+
+  if (/^\d+$/.test(raw)) {
+    const { rows } = await query(
+      `SELECT id, description
+         FROM norm_offenses
+        WHERE id = $1
+        LIMIT 1`,
+      [Number.parseInt(raw, 10)]
+    );
+    return rows[0] || null;
+  }
+
+  const { rows } = await query(
+    `SELECT id, description
+       FROM norm_offenses
+      WHERE LOWER(description) = LOWER($1)
+         OR LOWER(code) = LOWER($1)
+      ORDER BY id ASC
+      LIMIT 1`,
+    [raw]
+  );
+  return rows[0] || null;
+}
+
+function violationSelectSql(whereClause, orderClause = '') {
+  return `
+    SELECT
+      v.id,
+      v.student_id,
+      v.offense_id,
+      TRIM(CONCAT_WS(' ', s.first_name, s.middle_name, s.last_name)) AS student_name,
+      CASE
+        WHEN sec.grade_level IS NOT NULL AND sec.section_name IS NOT NULL THEN sec.grade_level::text || '-' || sec.section_name
+        WHEN sec.grade_level IS NOT NULL THEN sec.grade_level::text
+        WHEN sec.section_name IS NOT NULL THEN sec.section_name
+        ELSE NULL
+      END AS grade_section,
+      COALESCE(oi.category, od.category) AS offense_category,
+      COALESCE(od.description, oi.description, v.description) AS violation_type,
+      v.description,
+      v.sanction,
+      v.incident_date,
+      v.status,
+      v.remarks,
+      v.repeat_count_at_insert,
+      v.evidence,
+      v.created_at,
+      v.updated_at
+    FROM ${VIOLATIONS_TABLE} v
+    LEFT JOIN norm_students s ON s.id = v.student_id
+    LEFT JOIN norm_sections sec ON sec.id = s.section_id
+    LEFT JOIN norm_offenses oi ON oi.id = v.offense_id
+    LEFT JOIN norm_offenses od ON LOWER(od.description) = LOWER(v.description)
+    ${whereClause}
+    ${orderClause}`;
+}
+
+async function fetchViolationById(id) {
+  const { rows } = await query(
+    violationSelectSql('WHERE v.id = $1', 'LIMIT 1'),
+    [id]
+  );
+  if (!rows.length) return null;
+  return { ...rows[0], repeat_count: rows[0].repeat_count_at_insert };
 }
 
 function normalizeEvidence(raw) {
@@ -28,6 +196,39 @@ function normalizeEvidence(raw) {
   }
   return { value: raw };
 }
+
+//VIOLATION TYPES
+router.get('/type', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT DISTINCT category FROM norm_offenses ORDER BY category`
+    );
+
+    res.json(rows.map(r => r.category));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch offenses' });
+  }
+});
+
+// get descriptions for specific violation category
+router.get('/description/:category', async (req, res) => {
+  try {
+    const category = decodeURIComponent(req.params.category);
+    const { rows } = await query(
+      `SELECT id, code, description
+       FROM norm_offenses
+       WHERE LOWER(TRIM(category)) = LOWER(TRIM($1))
+       ORDER BY code`,
+      [category]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 // === List with optional filters (student_id, q)
 router.get('/', async (req, res) => {
@@ -79,11 +280,10 @@ router.get('/', async (req, res) => {
       )`);
     }
 
-    clauses.push(`s.active = TRUE`);
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
     // Count total matching rows (for accurate pagination metadata)
-    const countSql = `SELECT COUNT(*)::int AS total FROM violations v INNER JOIN students s ON v.student_id = s.id ${where}`;
+    const countSql = `SELECT COUNT(*)::int AS total FROM ${VIOLATIONS_TABLE} v ${where}`;
     const countRes = await query(countSql, params);
     const total = countRes.rows[0]?.total ?? 0;
 
@@ -92,30 +292,9 @@ router.get('/', async (req, res) => {
     pageParams.push(limit);
     pageParams.push(offset);
 
-    const sql = `
-      SELECT
-        v.id,
-        v.student_id,
-        v.student_name,
-        v.grade_section,
-        v.description AS violation_type,
-        v.description, -- added original description here
-        v.sanction, 
-        v.incident_date,
-        v.status,
-        v.remarks,
-        v.repeat_count_at_insert,
-        v.evidence,
-        v.created_at,
-        v.updated_at,
-        s.active
-      FROM violations v
-      INNER JOIN students s ON v.student_id = s.id
-      ${where}
-      ORDER BY v.incident_date DESC, v.created_at DESC
+    const sql = `${violationSelectSql(where, 'ORDER BY v.incident_date DESC, v.created_at DESC')}
       LIMIT $${pageParams.length - 1}
-      OFFSET $${pageParams.length};
-    `;
+      OFFSET $${pageParams.length};`;
 
     const { rows } = await query(sql, pageParams);
     const data = rows.map(r => ({ ...r, repeat_count: r.repeat_count_at_insert }));
@@ -135,24 +314,32 @@ router.get('/', async (req, res) => {
 // === Stats endpoint
 router.get('/stats', async (req, res) => {
   try {
-    const totalQ = await query('SELECT COUNT(*)::int AS total FROM violations');
+    const totalQ = await query(`SELECT COUNT(*)::int AS total FROM ${VIOLATIONS_TABLE}`);
     const last30Q = await query(
-      "SELECT COUNT(*)::int AS last30 FROM violations WHERE incident_date >= CURRENT_DATE - INTERVAL '29 days'"
+      `SELECT COUNT(*)::int AS last30 FROM ${VIOLATIONS_TABLE} WHERE incident_date >= CURRENT_DATE - INTERVAL '29 days'`
     );
     const openQ = await query(
-      "SELECT COUNT(*)::int AS open FROM violations WHERE status IN ('Pending','Ongoing')"
+      `SELECT COUNT(*)::int AS open FROM ${VIOLATIONS_TABLE} WHERE status IN ('Pending','Ongoing')`
     );
     const repeatQ = await query(
-      "SELECT COUNT(*)::int AS repeat_offenders_90 FROM (SELECT student_id, COUNT(*) AS c FROM violations WHERE incident_date >= CURRENT_DATE - INTERVAL '89 days' GROUP BY student_id HAVING COUNT(*) >= 3) t"
+      `SELECT COUNT(*)::int AS repeat_offenders_90 FROM (SELECT student_id, COUNT(*) AS c FROM ${VIOLATIONS_TABLE} WHERE incident_date >= CURRENT_DATE - INTERVAL '89 days' GROUP BY student_id HAVING COUNT(*) >= 3) t`
     );
     const topTypesQ = await query(
-      "SELECT description AS violation_type, COUNT(*)::int AS count FROM violations WHERE incident_date >= CURRENT_DATE - INTERVAL '89 days' GROUP BY description ORDER BY count DESC LIMIT 5"
+      `SELECT COALESCE(od.description, oi.description, v.description) AS violation_type,
+              COUNT(*)::int AS count
+         FROM ${VIOLATIONS_TABLE} v
+         LEFT JOIN norm_offenses oi ON oi.id = v.offense_id
+         LEFT JOIN norm_offenses od ON LOWER(od.description) = LOWER(v.description)
+        WHERE v.incident_date >= CURRENT_DATE - INTERVAL '89 days'
+        GROUP BY COALESCE(od.description, oi.description, v.description)
+        ORDER BY count DESC
+        LIMIT 5`
     );
     const weeklyTrendQ = await query(`
       SELECT to_char(week_start, 'YYYY-MM-DD') AS week_start,
              COALESCE(COUNT(v.id),0)::int AS count
       FROM generate_series(CURRENT_DATE - INTERVAL '77 days', CURRENT_DATE, INTERVAL '7 days') AS week_start
-      LEFT JOIN violations v
+      LEFT JOIN ${VIOLATIONS_TABLE} v
         ON v.incident_date >= week_start
        AND v.incident_date < (week_start + INTERVAL '7 days')
       GROUP BY week_start
@@ -175,13 +362,8 @@ router.get('/stats', async (req, res) => {
 // === GET single violation
 router.get('/:id', async (req, res) => {
   try {
-    const { rows } = await query(
-      'SELECT id, student_id, student_name, grade_section, description AS violation_type, sanction, remarks, incident_date, status, repeat_count_at_insert, evidence, created_at, updated_at FROM violations WHERE id = $1',
-      [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    const row = rows[0];
-    row.repeat_count = row.repeat_count_at_insert;
+    const row = await fetchViolationById(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -193,44 +375,38 @@ router.post('/', async (req, res) => {
   try {
     const { student_id, grade_section, offense_type, sanction, remarks, incident_date, status, evidence } = req.body || {};
     if (!student_id) return res.status(400).json({ error: 'student_id required' });
-    //if (!violationType || !violationType.trim()) return res.status(400).json({ error: 'violationType required' });
+    if (!offense_type) return res.status(400).json({ error: 'offense_type required' });
 
     const student = await fetchStudent(student_id);
     if (!student) return res.status(400).json({ error: 'Student not found' });
-    const student_name = buildStudentDisplay(student);
-    const gradeSectionFinal =
-      grade_section || (student.grade && student.section ? `${student.grade}-${student.section}` : null);
+    if (grade_section) {
+      await applyGradeSectionToStudent(student_id, grade_section);
+    }
+    const offense = await resolveOffense(offense_type);
+    if (!offense) return res.status(400).json({ error: 'Invalid offense_type' });
 
     const normEvidence = normalizeEvidence(evidence);
 
       const insertSQL = `
-          INSERT INTO violations (
-          student_id, student_name, grade_section,
-          offense_type, description, sanction, remarks,
-          incident_date, status, evidence
+          INSERT INTO ${VIOLATIONS_TABLE} (
+          student_id, offense_id, description, sanction, remarks,
+          incident_date, status, evidence, active, created_at, updated_at
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::date, CURRENT_DATE),COALESCE($9::violation_status_type,'Pending'),$10)
-          RETURNING id, student_id, student_name, grade_section,
-                offense_type, description, sanction, remarks, incident_date, status,
-                repeat_count_at_insert, evidence, created_at, updated_at`;
+          VALUES ($1,$2,$3,$4,$5,COALESCE($6::date, CURRENT_DATE),COALESCE($7,'Pending'),$8,TRUE,NOW(),NOW())
+          RETURNING id`;
 
       const params = [
         student_id,
-        student_name,
-        gradeSectionFinal,
-        "NA",
-        offense_type.trim(),
+        offense.id,
+        offense.description,
         sanction || null,
         remarks || null,
         incident_date || null,
         status || null,
         normEvidence
       ];
-      // console.log(insertSQL, params);
-
     const { rows } = await query(insertSQL, params);
-    const row = rows[0];
-    row.repeat_count = row.repeat_count_at_insert;
+    const row = await fetchViolationById(rows[0].id);
     res.status(201).json(row);
   } catch (e) {
     console.error('Error inserting violation:', e);
@@ -242,55 +418,69 @@ router.post('/', async (req, res) => {
   router.put('/:id', async (req, res) => {
     try {
       const { student_id, grade_section, offense_type, description, sanction, remarks, incident_date, status, evidence } = req.body || {};
+      const hasRemarksField = Object.prototype.hasOwnProperty.call(req.body || {}, 'remarks');
+      const normalizedRemarks = typeof remarks === 'string' ? remarks.trim() : remarks;
 
-    let student_name = null;
-    let gradeSectionFinal = grade_section || null;
+    const existingViolationResult = await query(
+      `SELECT student_id FROM ${VIOLATIONS_TABLE} WHERE id = $1 LIMIT 1`,
+      [req.params.id]
+    );
+    const existingViolation = existingViolationResult.rows[0] || null;
+    if (!existingViolation) return res.status(404).json({ error: 'Not found' });
+
+    const effectiveStudentId = student_id || existingViolation.student_id;
+
     if (student_id) {
       const student = await fetchStudent(student_id);
       if (!student) return res.status(400).json({ error: 'Student not found' });
-      student_name = buildStudentDisplay(student);
-      if (!gradeSectionFinal && student.grade && student.section)
-        gradeSectionFinal = `${student.grade}-${student.section}`;
+    }
+
+    if (grade_section && effectiveStudentId) {
+      await applyGradeSectionToStudent(effectiveStudentId, grade_section);
+    }
+
+    let nextOffenseId = null;
+    let nextDescription = null;
+    if (offense_type != null && String(offense_type).trim() !== '') {
+      const offense = await resolveOffense(offense_type);
+      if (!offense) return res.status(400).json({ error: 'Invalid offense_type' });
+      nextOffenseId = offense.id;
+      nextDescription = offense.description;
     }
 
     const normEvidence = normalizeEvidence(evidence);
 
       const updateSQL = `
-        UPDATE violations SET
+        UPDATE ${VIOLATIONS_TABLE} SET
           student_id    = COALESCE($1, student_id),
-          student_name  = COALESCE($2, student_name),
-          grade_section = COALESCE($3, grade_section),
-          offense_type  = COALESCE($4, offense_type),
-          description   = COALESCE($5, description),
-          sanction      = COALESCE($6, sanction),
-          remarks       = COALESCE($7, remarks),
-          incident_date = COALESCE($8::date, incident_date),
-          status        = COALESCE($9::violation_status_type, status),
-          evidence      = $10,
+          offense_id    = COALESCE($2, offense_id),
+          description   = COALESCE($3, description, $4),
+          sanction      = COALESCE($5, sanction),
+          remarks       = CASE WHEN $11 THEN $6 ELSE remarks END,
+          incident_date = COALESCE($7::date, incident_date),
+          status        = COALESCE($8, status),
+          evidence      = $9,
           updated_at    = NOW()
-        WHERE id = $11
-        RETURNING id, student_id, student_name, grade_section,
-                  offense_type, description, sanction, remarks, incident_date, status,
-                  repeat_count_at_insert, evidence, created_at, updated_at`;
+        WHERE id = $10
+        RETURNING id`;
 
       const params = [
         student_id || null,
-        student_name,
-        gradeSectionFinal,
-        offense_type || null,
+        nextOffenseId,
+        nextDescription,
         description || null,
         sanction || null,
-        remarks || null,
+        normalizedRemarks === '' ? null : (normalizedRemarks ?? null),
         incident_date || null,
         status || null,
         normEvidence,
-        req.params.id
+        req.params.id,
+        hasRemarksField
       ];
 
     const { rows } = await query(updateSQL, params);
       if (!rows.length) return res.status(404).json({ error: 'Not found' });
-      const row = rows[0];
-      row.repeat_count = row.repeat_count_at_insert;
+      const row = await fetchViolationById(rows[0].id);
       res.json(row);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -308,10 +498,10 @@ router.post('/', async (req, res) => {
     }
 
     const { rows } = await query(
-      `UPDATE violations 
+      `UPDATE ${VIOLATIONS_TABLE} 
        SET status = $1, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, student_name, grade_section, status, updated_at`,
+       RETURNING id, student_id, status, updated_at`,
       [status, req.params.id]
     );
 
@@ -326,12 +516,14 @@ router.post('/', async (req, res) => {
 // === DELETE violation
 router.delete('/:id', async (req, res) => {
   try {
-    const { rowCount } = await query('DELETE FROM violations WHERE id = $1', [req.params.id]);
+    const { rowCount } = await query(`DELETE FROM ${VIOLATIONS_TABLE} WHERE id = $1`, [req.params.id]);
     if (!rowCount) return res.status(404).json({ error: 'Not found' });
     res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
+
+
 
 export default router;
