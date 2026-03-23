@@ -182,6 +182,17 @@
       <label>Grade & Section:</label>
       <input type="text" id="gradeSection" placeholder="e.g., Grade 10 - St. Matthew" required>
 
+      <details id="previousOffensesAccordion" class="previous-offenses-accordion">
+        <summary id="previousOffensesToggle">Previous Offenses</summary>
+        <div id="previousOffensesContent" class="previous-offenses-content">
+          <div id="previousOffensesMessage" class="previous-offenses-message">Select a student first to view previous offenses.</div>
+          <div id="previousOffensesData" class="is-hidden">
+            <div id="previousOffensesStudentMeta" class="offense-card"></div>
+            <div id="previousOffensesList" class="previous-offense-list"></div>
+          </div>
+        </div>
+      </details>
+
       <label>Incident Date:</label>
       <input type="date" id="incidentDate" required>
 

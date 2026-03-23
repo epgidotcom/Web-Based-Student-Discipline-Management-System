@@ -646,3 +646,26 @@ tr[data-status="Appealed"] {
   background-color: #f97316;  /* orange */
   color: #fff;
 }
+
+.previous-offenses-accordion {
+  margin: 6px 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  padding: 8px 10px;
+}
+
+.previous-offenses-accordion > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #111827;
+}
+
+.previous-offenses-content {
+  margin-top: 8px;
+}
+
+.previous-offenses-message {
+  font-size: 13px;
+  color: #374151;
+}
