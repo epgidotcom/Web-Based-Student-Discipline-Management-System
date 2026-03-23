@@ -370,6 +370,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   sanctionForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const sanctionType = (document.getElementById('sanctionType') || {}).value?.trim();
+    const editId = sanctionForm.dataset.editId;
 
     if (!sanctionType) {
       showToast('Please enter a sanction type', 'error');
@@ -377,10 +378,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-      // Provide compatible payload fields
-      const payload = { name: sanctionType, level: 'default', description: sanctionType };
-      const res = await fetch(`${API_BASE}/api/sanctions`, {
-        method: 'POST',
+      const payload = { sanction: sanctionType };
+      const isEdit = !!editId;
+      const method = isEdit ? 'PUT' : 'POST';
+      const endpoint = isEdit ? `${API_BASE}/api/settings/sanctions/${encodeURIComponent(editId)}` : `${API_BASE}/api/settings/sanctions`;
+
+      const res = await fetch(endpoint, {
+        method,
         headers: authHeaders(),
         body: JSON.stringify(payload)
       });
@@ -391,17 +395,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       sanctionForm.reset();
-      showToast('Sanction type added successfully!', 'success');
+      delete sanctionForm.dataset.editId;
+      document.querySelector('#sanctionForm button[type="submit"]').textContent = 'Add Sanction';
+      showToast(isEdit ? 'Sanction type updated successfully!' : 'Sanction type added successfully!', 'success');
       await loadSanctions();
     } catch (err) {
-      console.error('Error adding sanction:', err);
+      console.error('Error saving sanction:', err);
       showToast(`Error: ${err.message}`, 'error');
     }
   });
 
   async function loadSanctions() {
     try {
-      const res = await fetch(`${API_BASE}/api/sanctions`, {
+      const res = await fetch(`${API_BASE}/api/settings/sanctions`, {
         headers: authHeaders()
       });
 
@@ -416,17 +422,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       sanctionsList.innerHTML = sanctions.map(s => `
         <div class="list-item">
           <div class="list-item-header">
-            <h4>${s.name || 'Sanction'}</h4>
-            <span class="list-item-level">${s.level || 'N/A'}</span>
+            <h4>${s.sanction || 'Sanction'}</h4>
           </div>
-          <p class="list-item-description">${s.description || ''}</p>
           <div class="list-item-actions">
+            <button class="btn btn-primary btn-sm edit-sanction" data-id="${s.id}" data-sanction="${s.sanction || ''}">
+              <i class="fa fa-edit"></i> Edit
+            </button>
             <button class="btn btn-danger btn-sm delete-sanction" data-id="${s.id}">
               <i class="fa fa-trash"></i> Delete
             </button>
           </div>
         </div>
       `).join('');
+
+      // Attach edit handlers
+      sanctionsList.querySelectorAll('.edit-sanction').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.dataset.id;
+          const sanction = e.currentTarget.dataset.sanction;
+          
+          sanctionForm.dataset.editId = id;
+          document.getElementById('sanctionType').value = sanction;
+          document.querySelector('#sanctionForm button[type="submit"]').textContent = 'Update Sanction';
+          document.getElementById('sanctionType').focus();
+        });
+      });
 
       // Attach delete handlers
       sanctionsList.querySelectorAll('.delete-sanction').forEach(btn => {
@@ -435,7 +455,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (!confirm('Are you sure you want to delete this sanction type?')) return;
 
           try {
-            const res = await fetch(`${API_BASE}/api/sanctions/${encodeURIComponent(id)}`, {
+            const res = await fetch(`${API_BASE}/api/settings/sanctions/${encodeURIComponent(id)}`, {
               method: 'DELETE',
               headers: authHeaders()
             });
@@ -472,7 +492,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       const payload = { grade: gradeName, section: sectionName, adviser };
-      const res = await fetch(`${API_BASE}/api/grades-sections`, {
+      const res = await fetch(`${API_BASE}/api/settings/grades-sections`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(payload)
@@ -494,7 +514,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function loadGrades() {
     try {
-      const res = await fetch(`${API_BASE}/api/grades-sections`, {
+      const res = await fetch(`${API_BASE}/api/settings/grades-sections`, {
         headers: authHeaders()
       });
 
@@ -528,7 +548,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (!confirm('Are you sure you want to delete this grade & section?')) return;
 
           try {
-            const res = await fetch(`${API_BASE}/api/grades-sections/${encodeURIComponent(id)}`, {
+            const res = await fetch(`${API_BASE}/api/settings/grades-sections/${encodeURIComponent(id)}`, {
               method: 'DELETE',
               headers: authHeaders()
             });
