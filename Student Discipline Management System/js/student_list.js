@@ -503,16 +503,21 @@
         strandDropdown.appendChild(option);
       });
 
-      // if (selectedValue != null && selectedValue !== '') {
-      //   strandDropdown.value = String(selectedValue);
-      //   if (strandDropdown.value !== String(selectedValue)) {
-      //     const custom = document.createElement('option');
-      //     custom.value = String(selectedValue);
-      //     custom.textContent = String(selectedValue);
-      //     strandDropdown.appendChild(custom);
-      //     strandDropdown.value = String(selectedValue);
-      //   }
-      // }
+      if (selectedValue != null && selectedValue !== '') {
+        // Find the option with matching strand name
+        const options = Array.from(strandDropdown.options);
+        const matchingOption = options.find(opt => opt.textContent === String(selectedValue));
+        if (matchingOption) {
+          strandDropdown.value = matchingOption.value;
+        } else {
+          // Add custom option if not found
+          const custom = document.createElement('option');
+          custom.value = String(selectedValue);
+          custom.textContent = String(selectedValue);
+          strandDropdown.appendChild(custom);
+          strandDropdown.value = String(selectedValue);
+        }
+      }
     } catch (err) { 
       console.error("Failed to load strands:", err);
     }
@@ -613,7 +618,7 @@
       birthdate: normalizedBirthdate || (existing?.birthdate || null),
       grade: gradeField?.value || null,
       section: sectionField?.value?.trim() || null,
-      strand: strandInput?.value || null,
+      strand: strandInput?.options[strandInput.selectedIndex]?.textContent || null,
       parent_contact: parentContactField?.value?.trim() || null
     };
 
