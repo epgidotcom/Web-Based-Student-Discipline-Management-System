@@ -211,6 +211,17 @@ router.get('/type', async (req, res) => {
   }
 });
 
+// create a new violation category (type)
+router.post('/type', async (req, res) => {
+  try {
+    const { category, code, description } = req.body || {};
+    return await insertViolationDescription(category, code, description, res);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // get descriptions for specific violation category
 router.get('/description/:category', async (req, res) => {
   try {
@@ -223,6 +234,126 @@ router.get('/description/:category', async (req, res) => {
       [category]
     );
     res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// create a new description under a violation category
+async function insertViolationDescription(category, code, description, res) {
+  if (!category || !code || !description) {
+    return res.status(400).json({ error: 'category, code, and description are required' });
+  }
+
+  const normalizedCategory = String(category).trim();
+  const normalizedCode = String(code).trim();
+  const normalizedDescription = String(description).trim();
+
+  const { rows } = await query(
+    `INSERT INTO norm_offenses (category, code, description)
+     VALUES ($1, $2, $3)
+     RETURNING id, category, code, description`,
+    [normalizedCategory, normalizedCode, normalizedDescription]
+  );
+
+  return res.status(201).json(rows[0]);
+}
+
+router.post('/description', async (req, res) => {
+  try {
+    const { category, code, description } = req.body || {};
+    return await insertViolationDescription(category, code, description, res);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// backward-compatible: allow category in path if called as /description/:category
+router.post('/description/:category', async (req, res) => {
+  try {
+    const category = decodeURIComponent(req.params.category || '');
+    const { code, description } = req.body || {};
+    return await insertViolationDescription(category, code, description, res);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// delete a whole category and all associated violation descriptions
+router.delete('/type/:category', async (req, res) => {
+  try {
+    const category = decodeURIComponent(req.params.category || '').trim();
+    if (!category) return res.status(400).json({ error: 'category is required' });
+
+    const { rowCount } = await query(
+      `DELETE FROM norm_offenses
+       WHERE LOWER(TRIM(category)) = LOWER(TRIM($1))`,
+      [category]
+    );
+
+    if (!rowCount) return res.status(404).json({ error: 'category not found' });
+    return res.status(204).end();
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// update an existing description by id
+router.put('/description/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { category, code, description } = req.body || {};
+    if (!category && !code && !description) {
+      return res.status(400).json({ error: 'At least one of category, code, or description must be provided' });
+    }
+
+    const fields = [];
+    const values = [];
+
+    if (category !== undefined) {
+      values.push(String(category).trim());
+      fields.push(`category = $${values.length}`);
+    }
+    if (code !== undefined) {
+      values.push(String(code).trim());
+      fields.push(`code = $${values.length}`);
+    }
+    if (description !== undefined) {
+      values.push(String(description).trim());
+      fields.push(`description = $${values.length}`);
+    }
+
+    values.push(id);
+
+    const { rows } = await query(
+      `UPDATE norm_offenses
+       SET ${fields.join(', ')}
+       WHERE id = $${values.length}
+       RETURNING id, category, code, description`,
+      values
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    res.json(rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// delete a description by id
+router.delete('/description/:id', async (req, res) => {
+  try {
+    const { rowCount } = await query(`DELETE FROM norm_offenses WHERE id = $1`, [req.params.id]);
+    if (!rowCount) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message });

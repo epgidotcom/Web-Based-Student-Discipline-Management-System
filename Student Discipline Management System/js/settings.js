@@ -57,21 +57,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   violationForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const violationType = (document.getElementById('violationType') || {}).value?.trim();
+    const category = (document.getElementById('violationType') || {}).value?.trim();
+    const code = (document.getElementById('violationCode') || {}).value?.trim();
+    const description = (document.getElementById('violationDescription') || {}).value?.trim();
 
-    if (!violationType) {
-      showToast('Please enter a violation type', 'error');
+    if (!category || !code || !description) {
+      showToast('Please complete category, code, and description', 'error');
       return;
     }
 
     try {
-      // Keep payload compatible by populating previous fields from single input
       const payload = {
-        code: violationType.slice(0, 5),
-        category: violationType,
-        description: violationType
+        category,
+        code,
+        description
       };
-      const res = await fetch(`${API_BASE}/api/violations`, {
+      const res = await fetch(`${API_BASE}/api/violations/type`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(payload)
@@ -91,9 +92,179 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  async function fetchViolationDescriptions(category) {
+    const res = await fetch(`${API_BASE}/api/violations/description/${encodeURIComponent(category)}`, {
+      headers: authHeaders()
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  function createViolationDescriptionModal(category, descriptions) {
+    const existing = document.getElementById('violationDescriptionModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'violationDescriptionModal';
+    modal.className = 'confirmation-modal show';
+    modal.style.zIndex = 9999;
+    modal.innerHTML = `
+      <div class="confirmation-modal-content" style="max-width: 680px; width: 95%;">
+        <div class="confirmation-modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h2 class="confirmation-modal-title">Violation Descriptions: ${category}</h2>
+          <button id="closeViolationDescriptionModal" class="btn btn-secondary" type="button">Close</button>
+        </div>
+        <div class="confirmation-modal-body" style="max-height: 60vh; overflow-y:auto;">
+          <div class="violation-description-add" style="margin: 10px 0; display:flex; gap: 8px; flex-wrap:wrap;">
+            <input id="newDescriptionCode" type="text" placeholder="Code" style="flex: 0 0 110px;" />
+            <input id="newDescriptionText" type="text" placeholder="Description" style="flex: 1;" />
+            <button id="addDescriptionBtn" class="btn btn-sm btn-success" type="button">Add</button>
+          </div>
+          <div class="description-items">
+            ${descriptions.length === 0 ? '<p class="empty-state"><i class="fa fa-inbox"></i> No descriptions found.</p>' : descriptions.map(item => `
+              <div class="description-item" data-id="${item.id}" style="border-bottom:1px solid #ddd; padding:8px 0;">
+                <div class="description-content" style="display:flex; justify-content:space-between; align-items:center;">
+                  <div><strong>${item.code || 'N/A'}</strong> - ${item.description || 'No description'}</div>
+                  <div style="display:flex; gap:6px;">
+                    <button class="btn btn-sm btn-outline-secondary edit-description" type="button">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger delete-description" type="button">Delete</button>
+                  </div>
+                </div>
+                <div class="edit-description-form" style="display:none; margin-top:8px; gap: 6px;">
+                  <input class="edit-description-code" type="text" value="${item.code || ''}" style="flex:0 0 110px;" />
+                  <input class="edit-description-text" type="text" value="${item.description || ''}" style="flex:1;" />
+                  <button class="btn btn-sm btn-primary save-description" type="button">Save</button>
+                  <button class="btn btn-sm btn-secondary cancel-description" type="button">Cancel</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('#closeViolationDescriptionModal')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    const addButton = modal.querySelector('#addDescriptionBtn');
+    const newCodeInput = modal.querySelector('#newDescriptionCode');
+    const newTextInput = modal.querySelector('#newDescriptionText');
+
+    addButton?.addEventListener('click', async () => {
+      const code = (newCodeInput?.value || '').trim();
+      const description = (newTextInput?.value || '').trim();
+      if (!code || !description) {
+        showToast('Code and description are required', 'error');
+        return;
+      }
+      try {
+        const createRes = await fetch(`${API_BASE}/api/violations/description`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ category, code, description })
+        });
+        if (!createRes.ok) {
+          const errData = await createRes.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${createRes.status}`);
+        }
+        showToast('Description added', 'success');
+        const updated = await fetchViolationDescriptions(category);
+        modal.remove();
+        createViolationDescriptionModal(category, updated);
+      } catch (err) {
+        console.error('Error adding description:', err);
+        showToast(`Error: ${err.message}`, 'error');
+      }
+    });
+
+    modal.querySelectorAll('.description-item').forEach(itemEl => {
+      const id = itemEl.dataset.id;
+      const editBtn = itemEl.querySelector('.edit-description');
+      const deleteBtn = itemEl.querySelector('.delete-description');
+      const editForm = itemEl.querySelector('.edit-description-form');
+      const saveBtn = itemEl.querySelector('.save-description');
+      const cancelBtn = itemEl.querySelector('.cancel-description');
+      const codeInput = itemEl.querySelector('.edit-description-code');
+      const textInput = itemEl.querySelector('.edit-description-text');
+
+      editBtn?.addEventListener('click', () => {
+        if (!editForm) return;
+        editForm.style.display = editForm.style.display === 'flex' ? 'none' : 'flex';
+      });
+      cancelBtn?.addEventListener('click', () => { if (!editForm) return; editForm.style.display = 'none'; });
+
+      saveBtn?.addEventListener('click', async () => {
+        const code = (codeInput?.value || '').trim();
+        const description = (textInput?.value || '').trim();
+        if (!code || !description) {
+          showToast('Code and description are required for update', 'error');
+          return;
+        }
+        try {
+          const updateRes = await fetch(`${API_BASE}/api/violations/description/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            headers: authHeaders(),
+            body: JSON.stringify({ category, code, description })
+          });
+          if (!updateRes.ok) {
+            const errData = await updateRes.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${updateRes.status}`);
+          }
+          showToast('Description updated', 'success');
+          const updated = await fetchViolationDescriptions(category);
+          modal.remove();
+          createViolationDescriptionModal(category, updated);
+        } catch (err) {
+          console.error('Error updating description:', err);
+          showToast(`Error: ${err.message}`, 'error');
+        }
+      });
+
+      deleteBtn?.addEventListener('click', async () => {
+        if (!confirm('Delete this description?')) return;
+        try {
+          const deleteRes = await fetch(`${API_BASE}/api/violations/description/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: authHeaders()
+          });
+          if (!deleteRes.ok && deleteRes.status !== 204) {
+            const errData = await deleteRes.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${deleteRes.status}`);
+          }
+          showToast('Description deleted', 'success');
+          const updated = await fetchViolationDescriptions(category);
+          modal.remove();
+          createViolationDescriptionModal(category, updated);
+        } catch (err) {
+          console.error('Error deleting description:', err);
+          showToast(`Error: ${err.message}`, 'error');
+        }
+      });
+    });
+  }
+
+  async function openViolationDescriptionModal(category) {
+    try {
+      const descriptions = await fetchViolationDescriptions(category);
+      createViolationDescriptionModal(category, descriptions);
+    } catch (err) {
+      console.error('Error opening violation description modal:', err);
+      showToast(`Error: ${err.message}`, 'error');
+    }
+  }
+
   async function loadViolations() {
     try {
-      const res = await fetch(`${API_BASE}/api/violations`, {
+      const res = await fetch(`${API_BASE}/api/violations/type`, {
         headers: authHeaders()
       });
 
@@ -105,38 +276,83 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      violationsList.innerHTML = violations.map(v => `
-        <div class="list-item">
+      const normalized = violations.map((item, index) => {
+        if (typeof item === 'string') {
+          const category = item.trim();
+          return {
+            id: null,
+            category,
+            code: category.slice(0, 5).toUpperCase() || 'N/A',
+            description: category
+          };
+        }
+
+        if (item && typeof item === 'object') {
+          const category = item.category || item.description || item.code || 'Violation';
+          return {
+            id: item.id || null,
+            category,
+            code: item.code || (typeof category === 'string' ? category.slice(0, 5).toUpperCase() : 'N/A'),
+            description: item.description || ''
+          };
+        }
+
+        return {
+          id: null,
+          category: 'Violation',
+          code: 'N/A',
+          description: ''
+        };
+      });
+
+      violationsList.innerHTML = normalized.map(v => `
+        <div class="list-item" data-category="${encodeURIComponent(v.category)}">
           <div class="list-item-header">
-            <h4>${v.category || 'Violation'}</h4>
-            <span class="list-item-code">${v.code || 'N/A'}</span>
+            <h4>${v.category}</h4>
           </div>
-          <p class="list-item-description">${v.description || ''}</p>
+          <p class="list-item-description">${v.description}</p>
           <div class="list-item-actions">
-            <button class="btn btn-danger btn-sm delete-violation" data-id="${v.id}">
+            <button class="btn btn-secondary btn-sm view-violation-descriptions" data-category="${encodeURIComponent(v.category)}">
+              <i class="fa fa-eye"></i> View Descriptions
+            </button>
+            <button class="btn btn-danger btn-sm delete-violation" data-category="${encodeURIComponent(v.category)}">
               <i class="fa fa-trash"></i> Delete
             </button>
           </div>
+          <div class="violation-description-panel" style="display:none; margin-top:10px;"></div>
         </div>
       `).join('');
+
+      // Attach view descriptions handlers
+      violationsList.querySelectorAll('.view-violation-descriptions').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const category = decodeURIComponent((e.currentTarget.dataset.category || '').toString());
+          await openViolationDescriptionModal(category);
+        });
+      });
 
       // Attach delete handlers
       violationsList.querySelectorAll('.delete-violation').forEach(btn => {
         btn.addEventListener('click', async (e) => {
-          const id = e.currentTarget.dataset.id;
-          if (!confirm('Are you sure you want to delete this violation type?')) return;
+          const category = decodeURIComponent((e.currentTarget.dataset.category || '').toString());
+          if (!category) return;
+          if (!confirm(`Are you sure you want to delete the category '${category}'; this removes all descriptions for it?`)) return;
 
           try {
-            const res = await fetch(`${API_BASE}/api/violations/${encodeURIComponent(id)}`, {
+            const res = await fetch(`${API_BASE}/api/violations/type/${encodeURIComponent(category)}`, {
               method: 'DELETE',
               headers: authHeaders()
             });
 
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            showToast('Violation type deleted', 'success');
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || `HTTP ${res.status}`);
+            }
+
+            showToast('Violation category deleted', 'success');
             await loadViolations();
           } catch (err) {
-            console.error('Error deleting violation:', err);
+            console.error('Error deleting violation category:', err);
             showToast(`Error: ${err.message}`, 'error');
           }
         });
