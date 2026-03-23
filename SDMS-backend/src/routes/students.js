@@ -346,8 +346,9 @@ router.post('/', async (req, res) => {
 
   try {
     const columns = await getNormStudentColumnSet();
-    const sectionId = await getOrCreateSectionId(grade, section, strand);
-
+    //const sectionId = await getOrCreateSectionId(grade, section, strand);
+    const sectionId = strand
+    // console.log("PARAMS:", { sectionId });
     const { rows } = await insertNormStudentRow({
       columns,
       lrn,
@@ -551,7 +552,7 @@ router.put('/:id', async (req, res) => {
     }
 
     assignments.push(`section_id = COALESCE($${values.length + 1}, section_id)`);
-    values.push((grade != null || section != null || strand != null) ? nextSectionId : null);
+    values.push((grade != null || section != null || strand != null) ? strand : null); //strand has section id
     values.push(lookup.value);
 
     const { rows } = await query(
