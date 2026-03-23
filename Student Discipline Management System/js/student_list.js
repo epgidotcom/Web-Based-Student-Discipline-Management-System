@@ -503,16 +503,16 @@
         strandDropdown.appendChild(option);
       });
 
-      if (selectedValue != null && selectedValue !== '') {
-        strandDropdown.value = String(selectedValue);
-        if (strandDropdown.value !== String(selectedValue)) {
-          const custom = document.createElement('option');
-          custom.value = String(selectedValue);
-          custom.textContent = String(selectedValue);
-          strandDropdown.appendChild(custom);
-          strandDropdown.value = String(selectedValue);
-        }
-      }
+      // if (selectedValue != null && selectedValue !== '') {
+      //   strandDropdown.value = String(selectedValue);
+      //   if (strandDropdown.value !== String(selectedValue)) {
+      //     const custom = document.createElement('option');
+      //     custom.value = String(selectedValue);
+      //     custom.textContent = String(selectedValue);
+      //     strandDropdown.appendChild(custom);
+      //     strandDropdown.value = String(selectedValue);
+      //   }
+      // }
     } catch (err) { 
       console.error("Failed to load strands:", err);
     }
