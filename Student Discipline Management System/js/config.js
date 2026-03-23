@@ -7,11 +7,12 @@
   const LIVE_SERVER_PORTS = new Set(['5500', '5501', '5502']);
   const isFile = protocol === 'file:';
 
-  const FALLBACK_REMOTE = 'https://sdms-backend.onrender.com';
+  const FALLBACK_REMOTE = 'https://mpnag.vercel.app';
   const LEGACY_BACKENDS = [
     'https://web-based-student-discipline-management.onrender.com',
     'https://web-based-student-discipline-management.onrender.com/api',
-    'https://web-based-student-disciplines.onrender.com'
+    'https://web-based-student-disciplines.onrender.com',
+    'https://sdms-backend.onrender.com'
   ];
   const FALLBACK_LOCAL = 'http://localhost:3000';
 
