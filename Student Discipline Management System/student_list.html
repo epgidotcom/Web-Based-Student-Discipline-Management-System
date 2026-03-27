@@ -383,15 +383,6 @@ document.addEventListener('DOMContentLoaded', function () {
     menuBtn.dataset.bound = '1';
   }
 
-  var settingsBtn = document.getElementById('settingsBtn');
-  var settingsMenu = document.getElementById('settingsMenu');
-  if (settingsBtn && settingsMenu) {
-    settingsBtn.addEventListener('click', function () {
-      var open = settingsMenu.hasAttribute('hidden');
-      settingsMenu.toggleAttribute('hidden');
-      settingsBtn.setAttribute('aria-expanded', String(open));
-    });
-  }
 });
 </script>
 </body>
