@@ -5,6 +5,35 @@ import { query } from './db.js';
  * Each step uses IF NOT EXISTS / IF EXISTS so re-running is safe.
  */
 export async function runMigrations() {
+  const violationsIdTypeQuery = await query(`
+    SELECT udt_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'violations'
+      AND column_name = 'id'
+    LIMIT 1
+  `);
+
+  const studentsIdTypeQuery = await query(`
+    SELECT udt_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'students'
+      AND column_name = 'id'
+    LIMIT 1
+  `);
+
+  const toSqlType = (udtName, fallback) => {
+    if (!udtName) return fallback;
+    if (udtName === 'uuid') return 'UUID';
+    if (udtName === 'int8') return 'BIGINT';
+    if (udtName === 'int4') return 'INTEGER';
+    return fallback;
+  };
+
+  const violationsIdType = toSqlType(violationsIdTypeQuery.rows[0]?.udt_name, 'UUID');
+  const studentsIdType = toSqlType(studentsIdTypeQuery.rows[0]?.udt_name, violationsIdType);
+
   // --- students table ---
   // Ensure all expected columns exist (old deployments may only have full_name)
   const studentColumns = [
@@ -102,4 +131,78 @@ export async function runMigrations() {
      WHERE full_name IS NULL
        AND (first_name IS NOT NULL OR last_name IS NOT NULL)
   `);
+
+  // --- predictive inference storage ---
+  await query(`
+    CREATE TABLE IF NOT EXISTS violation_predictions (
+      id BIGSERIAL PRIMARY KEY,
+      violation_id ${violationsIdType} NOT NULL REFERENCES violations(id) ON DELETE CASCADE,
+      student_id ${studentsIdType} NOT NULL,
+      grade_section VARCHAR,
+      violation_label VARCHAR,
+      incident_date DATE,
+      repeat_probability DOUBLE PRECISION NOT NULL CHECK (repeat_probability >= 0 AND repeat_probability <= 1),
+      model_version VARCHAR NOT NULL,
+      source_service VARCHAR,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (violation_id, model_version)
+    )
+  `);
+
+  await query(`
+    ALTER TABLE violation_predictions
+    ADD COLUMN IF NOT EXISTS incident_date DATE
+  `);
+
+  await query(`
+    UPDATE violation_predictions vp
+       SET incident_date = v.incident_date
+      FROM violations v
+     WHERE vp.violation_id = v.id
+       AND vp.incident_date IS NULL
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_violation_predictions_section_time
+      ON violation_predictions (grade_section, created_at DESC)
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_violation_predictions_incident_date
+      ON violation_predictions (incident_date DESC)
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_violation_predictions_violation_label
+      ON violation_predictions (violation_label)
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS section_repeat_likelihood_snapshots (
+      id BIGSERIAL PRIMARY KEY,
+      grade_section VARCHAR NOT NULL,
+      violation_label VARCHAR,
+      window_days INTEGER NOT NULL,
+      sample_size INTEGER NOT NULL,
+      avg_repeat_probability DOUBLE PRECISION NOT NULL CHECK (avg_repeat_probability >= 0 AND avg_repeat_probability <= 1),
+      computed_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_section_repeat_likelihood_recent
+      ON section_repeat_likelihood_snapshots (grade_section, computed_at DESC)
+  `);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runMigrations()
+    .then(() => {
+      console.log('Migrations complete.');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Migration failed:', error);
+      process.exit(1);
+    });
 }

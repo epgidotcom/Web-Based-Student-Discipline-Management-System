@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db.js';
+import { runAsyncPredictionForViolation } from '../services/predictive.js';
 
 const router = Router();
 const VIOLATIONS_TABLE = 'norm_violations';
@@ -19,6 +20,25 @@ async function fetchStudent(id) {
     [id]
   );
   return rows[0] || null;
+}
+
+function triggerPredictionAfterInsert(violationRow, studentRow) {
+  setTimeout(async () => {
+    try {
+      await runAsyncPredictionForViolation({
+        violationRow,
+        studentRow: {
+          ...studentRow,
+          active: studentRow?.active ?? true,
+        },
+      });
+    } catch (error) {
+      console.error('[predictive] async inference failed', {
+        violationId: violationRow?.id,
+        error: error.message,
+      });
+    }
+  }, 0);
 }
 
 function parseGradeSectionInput(rawValue) {
@@ -538,6 +558,10 @@ router.post('/', async (req, res) => {
       ];
     const { rows } = await query(insertSQL, params);
     const row = await fetchViolationById(rows[0].id);
+
+      // Keep insert path fast: run predictive inference asynchronously.
+      triggerPredictionAfterInsert(row, student);
+
     res.status(201).json(row);
   } catch (e) {
     console.error('Error inserting violation:', e);

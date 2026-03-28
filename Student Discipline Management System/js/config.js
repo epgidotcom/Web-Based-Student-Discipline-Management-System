@@ -35,7 +35,15 @@
     const cleaned = normalize(raw);
     const originIsLocal = isLocalHost || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(origin || '');
 
-    if (cleaned && !isLegacyBackend(cleaned)) {
+    // On VS Code Live Server ports, always use local backend by default.
+    if (originIsLocal && LIVE_SERVER_PORTS.has(location?.port)) {
+      return FALLBACK_LOCAL;
+    }
+
+    const cleanedIsLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleaned);
+    const forceModernLocalFallback = Boolean(cleanedIsLocalhost && LIVE_SERVER_PORTS.has(location?.port));
+
+    if (cleaned && !isLegacyBackend(cleaned) && !forceModernLocalFallback) {
       if (!originIsLocal && origin && !isLegacyBackend(origin) && cleaned === FALLBACK_REMOTE) {
         return origin.replace(/\/+$/, '');
       }

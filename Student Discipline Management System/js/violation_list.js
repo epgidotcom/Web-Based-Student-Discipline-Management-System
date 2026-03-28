@@ -446,7 +446,7 @@ violationTypeField?.addEventListener('change', async function () {
     items.slice(0, 5).forEach(v => {
       const li = document.createElement('li');
       const date = formatDate(v.incident_date);
-      li.textContent = `${date ? `${date}: ` : ''}${v.offense_type || 'Violation'}`;
+      li.textContent = `${date ? `${date}: ` : ''}${v.violation_type || v.offense_type || v.description || 'Violation'}`;
       pastOffenseList.appendChild(li);
     });
   }
@@ -483,7 +483,7 @@ violationTypeField?.addEventListener('change', async function () {
         <td>${v.student_name || '—'}</td>
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
-        <td>${v.violation_type || '—'}</td>
+        <td>${v.violation_type || v.description || v.offense_type || '—'}</td>
         <td>${pastOffense}</td>
         <td>${totalViolations}</td> <!-- 🆕 Added new column -->
         <td>${v.sanction || '—'}</td>
@@ -722,7 +722,7 @@ violationTypeField?.addEventListener('change', async function () {
             <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
           </div>
           <div class="offense-body">
-            <div><strong>Violation Type:</strong> ${off.description || '—'}</div>
+            <div><strong>Violation Type:</strong> ${off.violation_type || off.description || '—'}</div>
             <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
             <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
             <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
