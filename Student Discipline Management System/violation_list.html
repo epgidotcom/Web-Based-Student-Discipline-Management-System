@@ -177,7 +177,7 @@
       <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" />
 
       <label>Student Name:</label>
-      <input type="text" id="studentName" autocomplete="off" required>
+      <input type="text" id="studentName" autocomplete="off">
 
       <label>Grade & Section:</label>
       <input type="text" id="gradeSection" placeholder="e.g., Grade 10 - St. Matthew" required>
@@ -197,8 +197,7 @@
       <input type="date" id="incidentDate" required>
 
 
-      <!-- DITO -->
-      <label>Violation Type Part 2 :</label>
+      <label>Violation Type:</label>
       <select id="violationType2" required>
         <option value="" disabled selected>Select Violation</option>
       </select>
@@ -207,22 +206,10 @@
         <select id="violationDescription" required>
           <option value="" disabled selected>Select Description</option>       
       </select>
-      <!-- END DITO -->
-
-
-      <label>Violation Type:</label>
-      <select id="violationType" required>
-        <option value="" disabled selected>Select Violation</option>
-        <option value="Classroom Misconduct">Classroom Misconduct</option>
-        <option value="Tardiness">Tardiness</option>
-        <option value="Cutting Classes">Cutting Classes</option>
-        <option value="Dress Code">Dress Code</option>   
-      </select>
+      
 
       <label>Remarks:</label>
-        <select id="remarks" required>
-          <option value="" disabled selected>Select type</option>       
-      </select>
+      <input type="text" id="remarks" placeholder="Enter remarks" required>
 
       <label>Sanction:</label>
       <select id="sanction" required>

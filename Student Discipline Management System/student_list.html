@@ -177,8 +177,8 @@
       <label for="lastName">Last Name:</label>
       <input type="text" id="lastName" name="lastName" required>
 
-      <label for="age">Age:</label>
-      <input type="number" id="age" name="age" placeholder="Enter age" min="0" max="120" required>
+      <label for="birthdate">Birthdate:</label>
+      <input type="date" id="birthdate" name="birthdate" required>
 
       <label for="grade">Grade:</label>
       <select id="grade" name="grade" required>
@@ -237,10 +237,6 @@
           <span class="value" id="viewName"></span>
         </div>
         <div class="detail-row">
-          <span class="label">Age</span>
-          <span class="value" id="viewAge"></span>
-        </div>
-        <div class="detail-row">
           <span class="label">Birthdate</span>
           <span class="value" id="viewBirthdate"></span>
         </div>
@@ -277,13 +273,13 @@
       <div class="upload-section">
         <p style="margin-bottom: 15px; color: #6b7280;">
           Upload a CSV file with the following headers (in exact order):
-          <strong>LRN, FullName, Age, Grade, Section, Strand</strong>
+          <strong>LRN, FullName, Birthdate, Grade, Section, Strand</strong>
         </p>
         
         <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <p style="margin: 0; font-size: 14px; color: #374151;">
             <strong>Example format:</strong><br>
-            <code style="background: white; padding: 2px 6px; border-radius: 4px;">123456789012,Juan Dela Cruz,16,11,A,STEM</code>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px;">123456789012,Juan Dela Cruz,2009-04-03,11,A,STEM</code>
           </p>
           <p style="margin: 10px 0 0 0; font-size: 13px; color: #6b7280;">
             <em>Note: Parent contact will default to 09000000000. You can edit individual records later.</em>
@@ -339,7 +335,7 @@
               <tr>
                 <th>LRN</th>
                 <th>Full Name</th>
-                <th>Age</th>
+                <th>Birthdate</th>
                 <th>Grade</th>
                 <th>Section</th>
                 <th>Strand</th>

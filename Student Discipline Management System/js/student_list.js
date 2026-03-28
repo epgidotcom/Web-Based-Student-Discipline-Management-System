@@ -26,7 +26,6 @@
 
   const viewLRN = document.getElementById('viewLRN');
   const viewName = document.getElementById('viewName');
-  const viewAge = document.getElementById('viewAge');
   const viewBirthdate = document.getElementById('viewBirthdate');
   const viewGrade = document.getElementById('viewGrade');
   const viewSection = document.getElementById('viewSection');
@@ -35,7 +34,7 @@
   const viewAvatar = document.getElementById('viewAvatar');
   const viewInitials = document.getElementById('viewInitials');
 
-  const ageInput = document.getElementById('age');
+  const birthdateInput = document.getElementById('birthdate');
   const strandInput = document.getElementById('strand');
 
   /* =================== Photo storage (front-end) =================== */
@@ -206,16 +205,6 @@
     };
   }
 
-  function deriveBirthdateFromAge(ageValue) {
-    const age = Number(ageValue);
-    if (!Number.isFinite(age) || age < 0) return null;
-    const today = new Date();
-    const year = today.getFullYear() - Math.floor(age);
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
   function initialsFromName(name) {
     return name.split(/\s+/).filter(Boolean).map(s => s[0]).join('').slice(0,2).toUpperCase() || '?';
   }
@@ -245,7 +234,6 @@
       const nameWrap = document.createElement('div');
       nameWrap.className = 'name-cell';
       const fullName = s.fullName || composeFullName(s.firstName, s.middleName, s.lastName);
-      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
       const photo = StudentPhotos.get(s.lrn);
       if (photo) {
         const img = document.createElement('img');
@@ -394,7 +382,7 @@
 
   function openCreateModal(){
     studentForm?.reset();
-    if (ageInput) ageInput.value = '';
+    if (birthdateInput) birthdateInput.value = '';
     editIndex.value = '';
     modalTitle.textContent = 'Add Student';
     resetUploader();
@@ -404,11 +392,9 @@
   function openView(index){
     const s = students[index];
     const fullName = s.fullName || composeFullName(s.firstName, s.middleName, s.lastName);
-    const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
 
     viewLRN.textContent = s.lrn;
     viewName.textContent = fullName;
-    viewAge.textContent = age !== '' && age != null ? `${age} yrs` : '—';
     if (viewBirthdate) {
       viewBirthdate.textContent = s.birthdate ? formatDate(s.birthdate) : '—';
     }
@@ -443,9 +429,8 @@
     document.getElementById('section').value = s.section;
     if (strandInput) strandInput.value = s.strand || '';
     document.getElementById('parentContact').value = s.parentContact;
-    if (ageInput) {
-      const age = (s.age != null && !Number.isNaN(s.age)) ? s.age : computeAge(s.birthdate);
-      ageInput.value = age !== '' && age != null ? age : '';
+    if (birthdateInput) {
+      birthdateInput.value = s.birthdate ? String(s.birthdate).slice(0, 10) : '';
     }
     editIndex.value = index;
     modalTitle.textContent = 'Edit Student';
@@ -496,13 +481,8 @@
     const firstName = firstNameField?.value?.trim() || '';
     const middleName = middleNameField?.value?.trim() || null;
     const lastName = lastNameField?.value?.trim() || '';
-    const normalizedAge = (() => {
-      if (!ageInput) return null;
-      const value = ageInput.value.trim();
-      if (value === '') return null;
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    })();
+    const normalizedBirthdate = birthdateInput?.value?.trim() || null;
+    const normalizedAge = normalizedBirthdate ? computeAge(normalizedBirthdate) : null;
     const payload = {
       lrn: lrnField?.value?.trim() || null,
       full_name: composeFullName(firstName, middleName, lastName),
@@ -511,7 +491,7 @@
       middle_name: middleName,
       last_name: lastName,
       age: normalizedAge,
-      birthdate: normalizedAge != null ? deriveBirthdateFromAge(normalizedAge) : (existing?.birthdate || null),
+      birthdate: normalizedBirthdate || (existing?.birthdate || null),
       grade: gradeField?.value || null,
       section: sectionField?.value?.trim() || null,
       strand: strandInput?.value || null,
@@ -540,7 +520,7 @@
       await refreshCurrentPage(targetPage);
       studentModal.style.display = 'none';
       resetUploader();
-      if (ageInput) ageInput.value = '';
+      if (birthdateInput) birthdateInput.value = '';
     } catch (err) {
       console.error('[students] save failed', err);
       alert(err.message || 'Failed to save student.');

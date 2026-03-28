@@ -18,6 +18,35 @@ function parseDateOrNull(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function normalizeHeaderKey(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function getCsvValue(row, aliases) {
+  const entries = Object.entries(row ?? {});
+  for (const [rawKey, rawValue] of entries) {
+    if (!aliases.includes(normalizeHeaderKey(rawKey))) continue;
+    const trimmed = String(rawValue ?? '').trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+function normalizeBatchUploadRow(row) {
+  return {
+    lrn: getCsvValue(row, ['lrn', 'lrnnumber', 'learnerreferencenumber']),
+    fullName: getCsvValue(row, ['fullname', 'fullname', 'full_name', 'studentname', 'name']),
+    grade: getCsvValue(row, ['grade', 'gradelevel', 'yearlevel']),
+    section: getCsvValue(row, ['section', 'sectionname', 'classsection']),
+    strand: getCsvValue(row, ['strand', 'track', 'program']),
+    birthdate: getCsvValue(row, ['birthdate', 'dateofbirth', 'dob']),
+    parentContact: getCsvValue(row, ['parentcontact', 'parentcontactnumber', 'phone', 'phonenumber', 'contactnumber', 'parent_phone', 'parentcontactno'])
+  };
+}
+
 function splitFullName(fullName) {
   const name = String(fullName ?? '').trim();
   if (!name) {
@@ -429,12 +458,13 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
     const hasLrnUniqueConstraint = await hasStudentUniqueConstraint('lrn');
     let inserted = 0;
 
-    for (const row of rows) {
-      const lrn = row.LRN?.trim() || null;
-      const fullName = row.FullName?.trim();
-      const grade = row.Grade?.trim() || null;
-      const section = row.Section?.trim() || null;
-      const strand = row.Strand?.trim() || null;
+    for (const rawRow of rows) {
+      const row = normalizeBatchUploadRow(rawRow);
+      const lrn = row.lrn;
+      const fullName = row.fullName;
+      const grade = row.grade;
+      const section = row.section;
+      const strand = row.strand;
 
       const { firstName, middleName, lastName } = splitFullName(fullName);
       if (!firstName) continue;
@@ -447,8 +477,8 @@ router.post('/batch-upload', upload.single('file'), async (req, res) => {
         middleName,
         lastName,
         sectionId,
-        birthdate: row.Birthdate,
-        parent_contact: row.ParentContact || null,
+        birthdate: row.birthdate,
+        parent_contact: row.parentContact,
         onConflictLrn: hasLrnUniqueConstraint,
         returningId: false
       });

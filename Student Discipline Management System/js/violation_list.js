@@ -239,10 +239,6 @@
   const previousOffensesStudentMeta = document.getElementById('previousOffensesStudentMeta');
   const previousOffensesList = document.getElementById('previousOffensesList');
 
-  //added for "normalized table"
-  const violationType2Field = document.getElementById('violationType2');
-  const descriptionField = document.getElementById('description');
-  
   const sanctionField = document.getElementById('sanction');
   const remarksField = document.getElementById('remarks');
 
@@ -348,7 +344,9 @@
   try {
     const types = await api('/violations/type');
 
-    const dropdown = document.getElementById('violationType2');
+    const dropdown = violationTypeField;
+    if (!dropdown) return;
+    dropdown.innerHTML = '<option value="" disabled selected>Select Violation</option>';
 
     types.forEach(type => {
       const option = document.createElement('option');
@@ -361,37 +359,42 @@
     console.error("Failed to load violation types:", err);
   }
 }
-// When violation type changes, load descriptions for that type
-violationType2Field.addEventListener('change', async function () {
 
-  const category = this.value;
-  const descriptionDropdown = document.getElementById('violationDescription');
+async function loadViolationDescriptions(category, selectedValue = null) {
+  const descriptionDropdown = violationDescriptionField || document.getElementById('violationDescription');
+  if (!descriptionDropdown) return;
 
-  // reset dropdown
-  descriptionDropdown.innerHTML =
-    '<option value="">Select Description</option>';
-
+  descriptionDropdown.innerHTML = '<option value="">Select Description</option>';
   if (!category) return;
 
   try {
-
     const encoded = encodeURIComponent(category);
-
     const descriptions = await api(`/violations/description/${encoded}`);
-
-    descriptions.forEach(item => {
+    (Array.isArray(descriptions) ? descriptions : []).forEach(item => {
       const option = document.createElement('option');
-
-      option.value = item.id;
+      option.value = String(item.id);
       option.textContent = `${item.code} - ${item.description}`;
-
       descriptionDropdown.appendChild(option);
     });
 
+    if (selectedValue != null && selectedValue !== '') {
+      descriptionDropdown.value = String(selectedValue);
+      if (descriptionDropdown.value !== String(selectedValue)) {
+        const custom = document.createElement('option');
+        custom.value = String(selectedValue);
+        custom.textContent = String(selectedValue);
+        descriptionDropdown.appendChild(custom);
+        descriptionDropdown.value = String(selectedValue);
+      }
+    }
   } catch (err) {
     console.error("Failed to load descriptions:", err);
   }
-
+}
+// When violation type changes, load descriptions for that type
+violationTypeField?.addEventListener('change', async function () {
+  const category = this.value;
+  await loadViolationDescriptions(category);
 });
 
   function resetEvidence() {
@@ -747,13 +750,16 @@ violationType2Field.addEventListener('change', async function () {
     remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
     resetEvidence();
-    loadViolationTypes();
+    await loadViolationTypes();
+    if (violationDescriptionField) {
+      violationDescriptionField.innerHTML = '<option value="">Select Description</option>';
+    }
     displayPastOffensesFor(null);
     resetPreviousOffensesSection();
     openModal(violationModal);
   }
 
-  function prepareEditModal(index) {
+  async function prepareEditModal(index) {
     const item = violations[index];
     if (!item) return;
     modalTitle.textContent = 'Edit Violation';
@@ -772,7 +778,9 @@ violationType2Field.addEventListener('change', async function () {
     }
 
     incidentDateField.value = item.incident_date ? String(item.incident_date).slice(0, 10) : '';
-    violationTypeField.value = item.offense_type || '';
+  await loadViolationTypes();
+  violationTypeField.value = item.offense_category || '';
+  await loadViolationDescriptions(item.offense_category || '', item.offense_id || item.description || '');
     sanctionField.value = item.sanction || '';
     remarksField.value = item.remarks || '';
 
@@ -794,12 +802,12 @@ violationType2Field.addEventListener('change', async function () {
       viewGradeSection.textContent = item.grade_section || '—';
       viewIncidentDate.textContent = formatDate(item.incident_date) || '—';
       viewAddedDate.textContent = formatDate(item.created_at) || '—';
-      viewViolationType.textContent =  item.description || '—';
+      viewViolationType.textContent =  item.violation_type || item.description || '—';
       viewSanction.textContent = item.sanction || '—';
       //remarksField.textContent = item.remarks || '-';
-      viewRemarks.textContext = item.remarks || '-';
+      viewRemarks.textContent = item.remarks || '-';
       const viewRemarks2 = document.getElementById('viewRemarks');
-      viewRemarks2.value = item.remarks || '-';
+      if ('value' in viewRemarks2) viewRemarks2.value = item.remarks || '-';
       viewRemarks2.textContent = item.remarks || '-';
 
       // === All Offense Cards ===
@@ -842,7 +850,7 @@ violationType2Field.addEventListener('change', async function () {
               <strong>Case ${i + 1}</strong> — ${formatDate(off.incident_date)}
             </div>
             <div class="offense-body">
-              <div><strong>Violation Type:</strong> ${off.description || '—'}</div>
+              <div><strong>Violation Type:</strong> ${off.violation_type || off.description || '—'}</div>
               <div><strong>Sanction:</strong> ${off.sanction || '—'}</div>
               <div><strong>Recorded On:</strong> ${formatDate(off.created_at) || '—'}</div>
               <div><strong>Status:</strong> <span class="${badgeClass}">${statusLabel}</span></div>
@@ -895,7 +903,7 @@ violationType2Field.addEventListener('change', async function () {
     const payload = {
       student_id: studentId,
       grade_section: gradeSectionField?.value?.trim() || null,
-      offense_type: violationTypeField?.value || null,
+      offense_type: violationDescriptionField?.value || violationTypeField?.value || null,
       sanction: sanctionField?.value || null,
       remarks: remarksField?.value?.trim() || null,
       incident_date: incidentDateField?.value || null,
@@ -903,6 +911,10 @@ violationType2Field.addEventListener('change', async function () {
     };
 
     try {
+      if (!payload.offense_type) {
+        alert('Please select a violation description.');
+        return;
+      }
       const editIndex = editIndexField?.value === '' ? null : Number(editIndexField.value);
       if (editIndex === null) {
         await api('/violations', { method: 'POST', body: payload });
@@ -932,13 +944,29 @@ violationType2Field.addEventListener('change', async function () {
     const item = violations[index];
     if (!item) return;
     if (!confirm('Delete this violation record?')) return;
+    let deleted = false;
     try {
       await api(`/violations/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+      deleted = true;
+    } catch (err) {
+      const message = String(err?.message || '').toLowerCase();
+      // If the row was already removed on the server, treat as success and refresh UI.
+      if (message.includes('404') || message.includes('not found')) {
+        deleted = true;
+      } else {
+        console.error('[violations] delete failed', err);
+        alert(err.message || 'Failed to delete violation.');
+        return;
+      }
+    }
+
+    if (!deleted) return;
+    try {
       const state = paginator?.getState?.() || { currentPage: 1 };
       await refreshCurrentPage(state.currentPage);
     } catch (err) {
       console.error('[violations] delete failed', err);
-      alert(err.message || 'Failed to delete violation.');
+      alert('Violation deleted, but failed to refresh the table. Please reload the page.');
     }
   }
 
@@ -1020,7 +1048,7 @@ violationType2Field.addEventListener('change', async function () {
 
     // helper to add option if not present
     function addOptionsToSelect(selectEl) {
-      if (!selectEl) return;
+      if (!selectEl || selectEl.tagName !== 'SELECT') return;
       // build existing values set to avoid duplicates
       const existing = new Set(Array.from(selectEl.options).map(o => (o.value || o.text).trim()));
       // append sorted
@@ -1327,7 +1355,7 @@ violationType2Field.addEventListener('change', async function () {
     initDateFilter();
     initDateRangeFilter(); // NEW
 
-    addBtn?.addEventListener('click', prepareCreateModal);
+    addBtn?.addEventListener('click', () => { prepareCreateModal().catch(console.error); });
     document.querySelectorAll('#violationModal .close-btn').forEach(btn => btn.addEventListener('click', () => closeModal(violationModal)));
     document.querySelectorAll('#viewModal .close-btn').forEach(btn => btn.addEventListener('click', () => closeModal(viewModal)));
     imagePreviewClose?.addEventListener('click', () => closeModal(imagePreviewModal));
@@ -1361,7 +1389,7 @@ violationType2Field.addEventListener('change', async function () {
       if (Number.isNaN(index)) return;
 
       if (action === 'view') showViewModal(index);
-      else if (action === 'edit') prepareEditModal(index);
+      else if (action === 'edit') prepareEditModal(index).catch(console.error);
       else if (action === 'delete') removeViolation(index);
       else if (action === 'resolve') handleResolve(index);
     });
