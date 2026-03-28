@@ -17,8 +17,8 @@ async function predictiveTablesReady() {
 }
 
 function getPredictiveServiceUrl() {
-  // const value = String(process.env.PREDICTIVE_SERVICE_URL || '').trim();
-  const value = "https://sdms-predictive.onrender.com/"
+  const value = String(process.env.PREDICTIVE_SERVICE_URL || '').trim();
+  //const value = "https://sdms-predictive.onrender.com/"
   return value ? value.replace(/\/+$/, '') : '';
 }
 
