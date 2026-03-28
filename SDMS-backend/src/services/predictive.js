@@ -4,6 +4,18 @@ const DEFAULT_WINDOW_DAYS = 90;
 const DEFAULT_INFER_TIMEOUT_MS = 5000;
 const DEFAULT_INFER_RETRIES = 1;
 
+async function predictiveTablesReady() {
+  const { rows } = await query(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'violation_predictions'
+     ) AS exists`
+  );
+  return Boolean(rows[0]?.exists);
+}
+
 function getPredictiveServiceUrl() {
   const value = String(process.env.PREDICTIVE_SERVICE_URL || '').trim();
   return value ? value.replace(/\/+$/, '') : '';
@@ -225,6 +237,10 @@ export async function runAsyncPredictionForViolation({ violationRow, studentRow 
 }
 
 export async function listSectionLikelihood({ section = null, violation = null, windowDays = DEFAULT_WINDOW_DAYS, limit = 30 }) {
+  if (!(await predictiveTablesReady())) {
+    return [];
+  }
+
   const params = [windowDays];
   let where = `WHERE COALESCE(vp.incident_date, vp.created_at::date) >= CURRENT_DATE - $1::int`;
 
@@ -261,6 +277,10 @@ export async function listSectionLikelihood({ section = null, violation = null, 
 }
 
 export async function listAvailableViolationLabels() {
+  if (!(await predictiveTablesReady())) {
+    return [];
+  }
+
   const { rows } = await query(
     `SELECT DISTINCT violation_label
        FROM violation_predictions
@@ -271,6 +291,10 @@ export async function listAvailableViolationLabels() {
 }
 
 export async function listAvailableSections() {
+  if (!(await predictiveTablesReady())) {
+    return [];
+  }
+
   const { rows } = await query(
     `SELECT DISTINCT grade_section
        FROM violation_predictions
