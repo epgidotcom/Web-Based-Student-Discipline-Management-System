@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="sdms-api-base" content="https://web-based-student-discipline-management.onrender.com" />
+  <meta name="sdms-api-base" content="https://mpnag.vercel.app" />
   <title>SDMS - Dashboard</title>
 
   <!-- Global Styles -->
@@ -215,8 +215,9 @@
 <script>
   (function(){
     const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
-    const fallback = isLocal ? 'http://localhost:3000' : 'https://web-based-student-discipline-management.onrender.com';
-    window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
+    const configured = window.SDMS_API_BASE || window.API_BASE || window.SDMS_CONFIG?.API_BASE;
+    const fallback = configured || (isLocal ? 'http://localhost:3000' : 'https://mpnag.vercel.app');
+    window.SDMS_API_BASE = fallback;
   })();
 </script>
 

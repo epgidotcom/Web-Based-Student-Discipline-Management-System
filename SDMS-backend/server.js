@@ -5,6 +5,7 @@ import cors from 'cors';
 import accountsRoute from './src/routes/accounts.js';
 import offensesRoute from './src/routes/offenses.js';
 import smsRoute from './src/routes/sms.js';
+import settingsRoute from './src/routes/settings.js';
 import studentsRoute from './src/routes/students.js';
 import violationsRoute from './src/routes/violations.js';
 import authRoute from './src/routes/auth.js';
@@ -86,6 +87,7 @@ app.use('/api/accounts', accountsRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/past-offenses', offensesRoute);
 app.use('/api/sms', smsRoute);
+app.use('/api/settings', settingsRoute);
 app.use('/api/students', studentsRoute);
 // IMPORTANT: Add violations route (missing earlier caused 404 on /api/violations)
 app.use('/api/violations', violationsRoute);

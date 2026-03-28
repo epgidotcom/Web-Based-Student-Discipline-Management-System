@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="sdms-api-base" content="http://localhost:3000" />
+  <meta name="sdms-api-base" content="https://mpnag.vercel.app" />
   <title>SDMS - Settings</title>
 
   <!-- Global + Page CSS -->
@@ -93,8 +93,16 @@
         <div class="widget-body">
           <form id="violationForm">
             <div class="form-group">
-              <label for="violationType">Violation Type</label>
+              <label for="violationType">Violation Category</label>
               <input type="text" id="violationType" placeholder="e.g., Bullying" required>
+            </div>
+            <div class="form-group">
+              <label for="violationCode">Violation Code</label>
+              <input type="text" id="violationCode" placeholder="e.g., B1" required>
+            </div>
+            <div class="form-group">
+              <label for="violationDescription">Violation Description</label>
+              <input type="text" id="violationDescription" placeholder="e.g., Bullying behavior" required>
             </div>
 
             <div class="form-actions">
@@ -172,11 +180,16 @@
                 <label for="sectionName">Section</label>
                 <input type="text" id="sectionName" placeholder="e.g., A" required>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label for="adviser">Class Adviser</label>
-              <input type="text" id="adviser" placeholder="Name of the adviser">
+              <div class="form-group">
+                <label for="sectionName">Strand</label>
+                <input type="text" id="strandName" placeholder="e.g., ABM" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="sectionName">Adviser</label>
+                <input type="text" id="adviser" placeholder="Name of the adviser" required>
+              </div>
             </div>
 
             <div class="form-actions">
