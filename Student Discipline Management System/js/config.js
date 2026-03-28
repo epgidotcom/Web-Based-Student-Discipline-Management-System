@@ -7,7 +7,10 @@
   const LIVE_SERVER_PORTS = new Set(['5500', '5501', '5502']);
   const isFile = protocol === 'file:';
 
-  const FALLBACK_REMOTE = 'https://mpnag.vercel.app';
+  const FALLBACK_REMOTE = 'https://web-based-student-discipline-management.onrender.com';
+  const FRONTEND_ONLY_BASES = new Set([
+    'https://mpnag.vercel.app'
+  ]);
   const LEGACY_BACKENDS = [
     'https://web-based-student-discipline-management.onrender.com',
     'https://web-based-student-discipline-management.onrender.com/api',
@@ -40,12 +43,13 @@
       return FALLBACK_LOCAL;
     }
 
-    const cleanedIsLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleaned);
-    const forceModernLocalFallback = Boolean(cleanedIsLocalhost && LIVE_SERVER_PORTS.has(location?.port));
-
-    if (cleaned && !isLegacyBackend(cleaned) && !forceModernLocalFallback) {
-      if (!originIsLocal && origin && !isLegacyBackend(origin) && cleaned === FALLBACK_REMOTE) {
-        return origin.replace(/\/+$/, '');
+    const cleanedPointsToLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleaned);
+    if (cleaned) {
+      if (cleanedPointsToLocalhost && !originIsLocal) {
+        return FALLBACK_REMOTE;
+      }
+      if (FRONTEND_ONLY_BASES.has(cleaned)) {
+        return FALLBACK_REMOTE;
       }
       return cleaned;
     }
