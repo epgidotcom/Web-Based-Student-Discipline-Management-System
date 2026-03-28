@@ -5,7 +5,8 @@ const DEFAULT_INFER_TIMEOUT_MS = 5000;
 const DEFAULT_INFER_RETRIES = 1;
 
 function getPredictiveServiceUrl() {
-  const value = String(process.env.PREDICTIVE_SERVICE_URL || '').trim();
+  // const value = String(process.env.PREDICTIVE_SERVICE_URL || '').trim();
+  const value = "https://sdms-predictive.onrender.com/"
   return value ? value.replace(/\/+$/, '') : '';
 }
 
