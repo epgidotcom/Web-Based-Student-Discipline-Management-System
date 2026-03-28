@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="sdms-api-base" content="http://localhost:3000" />
+  <meta name="sdms-api-base" content="https://mpnag.vercel.app" />
   <title>SDMS - Student List</title>
 
   <!-- Global + Page CSS -->
@@ -183,26 +183,16 @@
       <label for="grade">Grade:</label>
       <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
-        <option value="7">Grade 7</option>
-        <option value="8">Grade 8</option>
-        <option value="9">Grade 9</option>
-        <option value="10">Grade 10</option>
-        <option value="11">Grade 11</option>
-        <option value="12">Grade 12</option>
       </select>
 
       <label for="section">Section:</label>
-      <input type="text" id="section" name="section" placeholder="e.g. A" required>
+      <select id="section" name="section" required>
+        <option value="">-- Select Section --</option>
+      </select>
 
       <label for="strand">Strand:</label>
       <select id="strand" name="strand">
         <option value="">-- Select Strand --</option>
-        <option value="ABM">ABM</option>
-        <option value="HUMSS">HUMSS</option>
-        <option value="STEM">STEM</option>
-        <option value="HE">HE</option>
-        <option value="ICT">ICT</option>
-        <option value="GAS">GAS</option>
       </select>
 
       <label for="parentContact">Parent's Contact Number:</label>
@@ -364,8 +354,9 @@
 <script>
   (function(){
     const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
-    const fallback = 'http://localhost:3000';
-    window.SDMS_API_BASE = window.SDMS_API_BASE || fallback;
+    const configured = window.SDMS_API_BASE || window.API_BASE || window.SDMS_CONFIG?.API_BASE;
+    const fallback = configured || (isLocal ? 'http://localhost:3000' : 'https://mpnag.vercel.app');
+    window.SDMS_API_BASE = fallback;
   })();
 </script>
 

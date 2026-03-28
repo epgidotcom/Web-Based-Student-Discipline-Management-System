@@ -232,7 +232,7 @@
   const studentNameField = document.getElementById('studentName');
   const gradeSectionField = document.getElementById('gradeSection');
   const incidentDateField = document.getElementById('incidentDate');
-  const violationTypeField = document.getElementById('violationType');
+  const violationTypeField = document.getElementById('violationType2');
   const violationDescriptionField = document.getElementById('violationDescription');
   const previousOffensesAccordion = document.getElementById('previousOffensesAccordion');
   const previousOffensesMessage = document.getElementById('previousOffensesMessage');
@@ -746,7 +746,6 @@ violationTypeField?.addEventListener('change', async function () {
     studentNameField.value = '';
     gradeSectionField.value = '';
     incidentDateField.value = '';
-    violationTypeField.value = '';
     sanctionField.value = '';
     remarksField.value = '';
     modalTitle.textContent = 'Add Violation';
@@ -1011,6 +1010,40 @@ violationTypeField?.addEventListener('change', async function () {
   const filterText = document.getElementById('filterText');
   const applyFilterBtn = document.getElementById('applyFilterBtn');
   const printReportBtn = document.getElementById('printReportBtn');
+
+  // --- Load sanctions from API ---
+  async function loadSanctions() {
+    try {
+      const API_BASE = window.SDMS_API_BASE || 'http://localhost:3000';
+      const res = await fetch(`${API_BASE}/api/settings/sanctions`, {
+        headers: authHeaders()
+      });
+
+      if (!res.ok) {
+        console.warn('Failed to load sanctions from API');
+        return;
+      }
+
+      const sanctions = await res.json();
+      if (!Array.isArray(sanctions)) return;
+
+      // Add sanctions to the dropdown
+      const sanctionSelect = document.getElementById('sanction');
+      if (!sanctionSelect) return;
+
+      const existing = new Set(Array.from(sanctionSelect.options).map(o => (o.value || o.text).trim()));
+      sanctions.forEach(s => {
+        const val = s.sanction || '';
+        if (!val || existing.has(val)) return;
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        sanctionSelect.appendChild(opt);
+      });
+    } catch (e) {
+      console.error('Error loading sanctions:', e);
+    }
+  }
 
   // --- Load school_violations.json and populate dropdowns ---
   async function loadSchoolViolations() {
@@ -1494,7 +1527,7 @@ violationTypeField?.addEventListener('change', async function () {
 
     window.addEventListener('load', bindEvents, { once: true });
 
-    await Promise.all([loadStudents(), fetchData(1), loadSchoolViolations()]);
+    await Promise.all([loadStudents(), fetchData(1), loadSchoolViolations(), loadSanctions()]);
   }
 
   window.searchViolation = applyFilters;
