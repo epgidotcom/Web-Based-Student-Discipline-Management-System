@@ -43,9 +43,9 @@
       return FALLBACK_LOCAL;
     }
 
-    const cleanedIsLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleaned);
+    const cleanedPointsToLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleaned);
     if (cleaned) {
-      if (cleanedIsLocalhost && !originIsLocal) {
+      if (cleanedPointsToLocalhost && !originIsLocal) {
         return FALLBACK_REMOTE;
       }
       if (FRONTEND_ONLY_BASES.has(cleaned)) {

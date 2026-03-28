@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
-const CONFIG_JS_PATH = '/home/runner/work/Web-Based-Student-Discipline-Management-System/Web-Based-Student-Discipline-Management-System/Student Discipline Management System/js/config.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CONFIG_JS_PATH = path.resolve(__dirname, '../../Student Discipline Management System/js/config.js');
 const configScript = readFileSync(CONFIG_JS_PATH, 'utf8');
 
 function runConfig({
