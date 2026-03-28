@@ -225,6 +225,18 @@ export async function runAsyncPredictionForViolation({ violationRow, studentRow 
 }
 
 export async function listSectionLikelihood({ section = null, violation = null, windowDays = DEFAULT_WINDOW_DAYS, limit = 30 }) {
+  const { rows: tableCheckRows } = await query(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'violation_predictions'
+     ) AS exists`
+  );
+  if (!tableCheckRows[0]?.exists) {
+    return [];
+  }
+
   const params = [windowDays];
   let where = `WHERE COALESCE(vp.incident_date, vp.created_at::date) >= CURRENT_DATE - $1::int`;
 
@@ -261,6 +273,18 @@ export async function listSectionLikelihood({ section = null, violation = null, 
 }
 
 export async function listAvailableViolationLabels() {
+  const { rows: tableCheckRows } = await query(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'violation_predictions'
+     ) AS exists`
+  );
+  if (!tableCheckRows[0]?.exists) {
+    return [];
+  }
+
   const { rows } = await query(
     `SELECT DISTINCT violation_label
        FROM violation_predictions
@@ -271,6 +295,18 @@ export async function listAvailableViolationLabels() {
 }
 
 export async function listAvailableSections() {
+  const { rows: tableCheckRows } = await query(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'violation_predictions'
+     ) AS exists`
+  );
+  if (!tableCheckRows[0]?.exists) {
+    return [];
+  }
+
   const { rows } = await query(
     `SELECT DISTINCT grade_section
        FROM violation_predictions
