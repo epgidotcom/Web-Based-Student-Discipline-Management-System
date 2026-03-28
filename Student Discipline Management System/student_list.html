@@ -397,12 +397,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var settingsBtn = document.getElementById('settingsBtn');
-  var settingsMenu = document.getElementById('settingsMenu');
-  if (settingsBtn && settingsMenu) {
+  if (settingsBtn) {
     settingsBtn.addEventListener('click', function () {
-      var open = settingsMenu.hasAttribute('hidden');
-      settingsMenu.toggleAttribute('hidden');
-      settingsBtn.setAttribute('aria-expanded', String(open));
+      window.location.href = 'settings.html';
     });
   }
 });

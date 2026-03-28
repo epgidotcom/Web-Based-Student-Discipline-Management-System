@@ -167,26 +167,27 @@
   <div class="predictive-wrapper">
     <div class="predictive-section card">
       <div class="card-header">
-        <h3>Predictive Analytics – Estimated Repeat Offenders (7-Day Forecast)</h3>
+        <h3>Predictive Analytics - Repeat Violation Likelihood by Section</h3>
         <div class="predictive-filters">
           <label>
-            Strand:
-            <select id="filterStrand">
-              <option value="All">All</option>
-              <option value="STEM">STEM</option>
-              <option value="ABM">ABM</option>
-              <option value="GAS">GAS</option>
-              <option value="HUMSS">HUMSS</option>
+            Window:
+            <select id="filterPredictiveWindow">
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90" selected>3 months</option>
+              <option value="365">1 year</option>
             </select>
           </label>
           <label>
-            Violation:
-            <select id="filterViolation">
+            Section:
+            <select id="filterPredictiveSection">
               <option value="All">All</option>
-              <option value="Tardiness">Tardiness</option>
-              <option value="Cheating">Cheating</option>
-              <option value="Dress Code">Dress Code</option>
-              <option value="Disrespect">Disrespect</option>
+            </select>
+          </label>
+          <label>
+            Violation Type:
+            <select id="filterPredictiveViolation">
+              <option value="All">All</option>
             </select>
           </label>
         </div>
@@ -197,7 +198,7 @@
       </div>
 
       <p class="chart-note">
-        Forecasted number of students likely to commit repeat offenses every 7 days, grouped by strand (STEM, ABM, GAS, HUMSS).
+        Estimated likelihood of repeat violations by section, updated automatically when new violations are recorded.
       </p>
     </div>
   </div>

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db.js';
+import { runAsyncPredictionForViolation } from '../services/predictive.js';
 
 const router = Router();
 
@@ -7,10 +8,26 @@ const router = Router();
 async function fetchStudent(id) {
   if (!id) return null;
   const { rows } = await query(
-    'SELECT id, full_name, grade, section, strand FROM students WHERE id = $1',
+    'SELECT id, full_name, grade, section, strand, active FROM students WHERE id = $1',
     [id]
   );
   return rows[0] || null;
+}
+
+function triggerPredictionAfterInsert(violationRow, studentRow) {
+  setTimeout(async () => {
+    try {
+      await runAsyncPredictionForViolation({
+        violationRow,
+        studentRow,
+      });
+    } catch (error) {
+      console.error('[predictive] async inference failed', {
+        violationId: violationRow?.id,
+        error: error.message,
+      });
+    }
+  }, 0);
 }
 
 function buildStudentDisplay(s) {
@@ -268,6 +285,10 @@ router.post('/', async (req, res) => {
     const { rows } = await query(insertSQL, params);
     const row = rows[0];
     row.repeat_count = row.repeat_count_at_insert;
+
+    // Keep insert path fast: run predictive inference asynchronously.
+    triggerPredictionAfterInsert(row, student);
+
     res.status(201).json(row);
   } catch (e) {
     console.error('Error inserting violation:', e);

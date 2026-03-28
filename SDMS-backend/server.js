@@ -10,9 +10,11 @@ import violationsRoute from './src/routes/violations.js';
 import authRoute from './src/routes/auth.js';
 import appealsRoute from './src/routes/appeals.js';
 import messagesRoute from './src/routes/messages.js';
+import analyticsRoute from './src/routes/analytics.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const STRICT_STARTUP = process.env.FAIL_ON_MIGRATION_ERROR === 'true' || process.env.NODE_ENV === 'production';
 
 // Build allowed origins list from env (comma-separated)
 const allowed = (process.env.ALLOWED_ORIGINS || '')
@@ -89,6 +91,7 @@ app.use('/api/students', studentsRoute);
 app.use('/api/violations', violationsRoute);
 app.use('/api/appeals', appealsRoute);
 app.use('/api/messages', messagesRoute);
+app.use('/api/analytics', analyticsRoute);
 
 // Optional debug route to list mounted paths (enable by setting DEBUG_ROUTES=true)
 if (process.env.DEBUG_ROUTES === 'true') {
@@ -135,6 +138,12 @@ app.use((err, _req, res, _next) => {
     }
   } catch (e) {
     console.error('Migration error during startup:', e);
+    if (STRICT_STARTUP) {
+      console.error('Startup aborted because FAIL_ON_MIGRATION_ERROR is enabled or NODE_ENV=production.');
+      process.exit(1);
+      return;
+    }
+    console.warn('Continuing startup despite migration error (non-production mode).');
   }
   app.listen(PORT, () => {
     console.log(`SDMS backend listening on ${PORT}`);
