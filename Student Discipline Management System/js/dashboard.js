@@ -129,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
       id: row.id,
       studentId: row.student_id,
       studentName: row.student_name || buildStudentName(student),
+      offenseCategory: (row.offense_category || '').toString().trim(),
       description: (row.description ?? row.violation_description ?? row.details ?? row.violation ?? row.offense_type ?? '').toString().trim(),
       type: row.offense_type || 'Violation',
       status: row.status || 'Pending',
@@ -264,19 +265,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Violation category mapping used for the Top Types chart — only these categories are counted
   const VIOLATION_CATEGORIES = [
-    'Classroom Misconduct',
-    'Dress Code Violation',
-    'Tardiness',
-    'Cutting Classes',
+    'Academic Integrity & Records',
+    'Attendance & Punctuality',
+    'Bullying, Harassment & Violence',
+    'Campus Movement & Permission',
+    'Cleanliness, Facilities & Smoking',
+    'Conduct & Disruption',
+    'Devices & Technology',
+    'Dress Code & Identification',
+    'ID Misuse',
+    'Organizations & Group Misconduct',
+    'Property, Vandalism & Damage',
+    'Repeated or Aggravated Misconduct',
+    'Safety & Prohibited Items',
+    'Solicitation, Fraud & School Reputation',
+    'Substances, Gambling & Obscenity',
   ];
 
+  const VIOLATION_CATEGORY_LOOKUP = new Map(
+    VIOLATION_CATEGORIES.map((category) => [
+      category.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+      category,
+    ])
+  );
+
   function toCategory(v) {
-    const s = (v?.description || v?.type || '').toString().toLowerCase().trim();
-    if (s.includes('classroom')) return 'Classroom Misconduct';
-    if (s.includes('dress')) return 'Dress Code Violation';
-    if (s.includes('tardi')) return 'Tardiness';
-    if (s.includes('cut') || s.includes('absent without')) return 'Cutting Classes';
-    return null; // anything else won’t be counted
+    const raw = (v?.offenseCategory || '').toString().trim();
+    if (!raw) return null;
+    const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return VIOLATION_CATEGORY_LOOKUP.get(key) || null;
   }
 
   function initFilters() {
@@ -502,7 +519,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderTopTypes(list) {
-    // init counts with zero for all 4
+    // init counts with zero for all configured categories
     const counts = Object.fromEntries(VIOLATION_CATEGORIES.map((c) => [c, 0]));
     for (const it of list) {
       const cat = toCategory(it);
