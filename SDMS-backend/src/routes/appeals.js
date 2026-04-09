@@ -60,7 +60,7 @@ function mapMessageRow(row) {
 
 async function loadAppealRow(appealId) {
   const { rows } = await query(
-    `SELECT a.*, s.lrn AS student_lrn, sec.section_name AS student_section, COALESCE(v.offense_type, v.description) AS offense_type,
+    `SELECT a.*, s.lrn AS student_lrn, sec.section_name AS student_section, COALESCE(no.description, v.description) AS offense_type,
             lm.body AS latest_message_body,
             lm.created_at AS latest_message_created_at,
             lm.sender_role AS latest_message_sender_role
@@ -68,6 +68,7 @@ async function loadAppealRow(appealId) {
        LEFT JOIN norm_students s ON s.id = a.student_id
        LEFT JOIN norm_sections sec ON sec.id = s.section_id
        LEFT JOIN ${VIOLATIONS_TABLE} v ON v.id = a.violation_id
+       LEFT JOIN norm_offenses no ON no.id = v.offense_id
        LEFT JOIN LATERAL (
          SELECT body, created_at, sender_role
            FROM appeal_messages am
@@ -164,7 +165,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const sql = `
-      SELECT a.*, s.lrn AS student_lrn, sec.section_name AS student_section, COALESCE(v.offense_type, v.description) AS offense_type,
+      SELECT a.*, s.lrn AS student_lrn, sec.section_name AS student_section, COALESCE(no.description, v.description) AS offense_type,
              lm.body AS latest_message_body,
              lm.created_at AS latest_message_created_at,
              lm.sender_role AS latest_message_sender_role
@@ -172,6 +173,7 @@ router.get('/', requireAuth, async (req, res) => {
         LEFT JOIN norm_students s ON s.id = a.student_id
         LEFT JOIN norm_sections sec ON sec.id = s.section_id
         LEFT JOIN ${VIOLATIONS_TABLE} v ON v.id = a.violation_id
+        LEFT JOIN norm_offenses no ON no.id = v.offense_id
         LEFT JOIN LATERAL (
           SELECT body, created_at, sender_role
             FROM appeal_messages am
@@ -272,7 +274,13 @@ router.post('/', requireAuth, async (req, res) => {
 
     let violationId = null;
     if (violationIdInput) {
-      const { rows } = await query(`SELECT id, COALESCE(offense_type, description) AS offense_type FROM ${VIOLATIONS_TABLE} WHERE id = $1`, [violationIdInput]);
+      const { rows } = await query(
+        `SELECT v.id, COALESCE(no.description, v.description) AS offense_type
+           FROM ${VIOLATIONS_TABLE} v
+           LEFT JOIN norm_offenses no ON no.id = v.offense_id
+          WHERE v.id = $1`,
+        [violationIdInput]
+      );
       if (rows.length) {
         violationId = rows[0].id;
         if (!violationText) violationText = rows[0].offense_type || violationText;

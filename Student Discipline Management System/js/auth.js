@@ -1,11 +1,24 @@
 // Simple auth helper using localStorage (browser-safe: removed ES module exports)
 const AUTH_KEY = 'sdms_auth_v1';
+const AUTH_LEGACY_KEYS = ['sdms_auth', 'sdms_auth_v0'];
 
 function saveAuth(data){
   try { localStorage.setItem(AUTH_KEY, JSON.stringify(data)); console.debug('[auth] saved auth payload'); } catch(_){}
 }
 function getAuth(){
-  try { return JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); } catch(_) { return null; }
+  try {
+    const primary = localStorage.getItem(AUTH_KEY);
+    if (primary) return JSON.parse(primary);
+    for (const key of AUTH_LEGACY_KEYS) {
+      const legacy = localStorage.getItem(key);
+      if (!legacy) continue;
+      const parsed = JSON.parse(legacy);
+      // promote legacy payload to current key for future reads
+      try { localStorage.setItem(AUTH_KEY, JSON.stringify(parsed)); } catch (_) {}
+      return parsed;
+    }
+    return null;
+  } catch(_) { return null; }
 }
 function getToken(){ return getAuth()?.token || null; }
 function getUser(){ return getAuth()?.account || null; }

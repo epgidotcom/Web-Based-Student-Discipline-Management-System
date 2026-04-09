@@ -102,7 +102,16 @@
         return token ? { Authorization: 'Bearer ' + token } : {};
       }
 
+      function getAuthToken() {
+        return (window.SDMSAuth && typeof window.SDMSAuth.getToken === 'function') ? window.SDMSAuth.getToken() : null;
+      }
+
       async function adminApi(path, options = {}) {
+        const token = getAuthToken();
+        if (!token) {
+          throw new Error('Missing token. Please log in again.');
+        }
+
         const init = { method: options.method || 'GET', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(), options.headers || {}) };
         if (options.body !== undefined) init.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
         const fullUrl = ADMIN_API_ROOT + path;
@@ -181,6 +190,17 @@
           applyFilter();
         } catch (err) {
           console.error('[admin appeals] load failed', err);
+          const isAuthProblem = /missing token|unauthorized|401/i.test((err && err.message) || '');
+          if (isAuthProblem) {
+            if (tableBody) {
+              var authRow = document.createElement('tr');
+              authRow.innerHTML = '<td colspan="8" style="text-align:center;color:#b45309;">Session expired or not logged in. Redirecting to login...</td>';
+              tableBody.innerHTML = '';
+              tableBody.appendChild(authRow);
+            }
+            setTimeout(function () { window.location.href = 'index.html'; }, 900);
+            return;
+          }
           var row = document.createElement('tr'); row.innerHTML = '<td colspan="8" style="text-align:center;color:#e11d48;">Failed to load appeals.</td>'; tableBody.innerHTML = ''; tableBody.appendChild(row);
         }
       }
