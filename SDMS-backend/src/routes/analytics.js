@@ -3,6 +3,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import {
   backfillViolationPredictions,
   cleanupPredictiveData,
+  listAvailableSectionEntries,
   listAvailableSections,
   listAvailableViolationLabels,
   listSectionLikelihood,
@@ -24,9 +25,10 @@ router.get('/predictive-repeat-risk', async (req, res) => {
     const windowDays = Number.isFinite(windowRaw) && windowRaw > 0 ? Math.min(windowRaw, 365) : 90;
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 30;
 
-    const [rows, sections, violations] = await Promise.all([
+    const [rows, sections, sectionEntries, violations] = await Promise.all([
       listSectionLikelihood({ section, violation, windowDays, limit }),
       listAvailableSections(),
+      listAvailableSectionEntries(),
       listAvailableViolationLabels(),
     ]);
 
@@ -36,6 +38,7 @@ router.get('/predictive-repeat-risk', async (req, res) => {
       violation_filter: violation,
       generated_at: new Date().toISOString(),
       sections,
+      section_entries: sectionEntries,
       violations,
       labels: rows.map((row) => row.section),
       likelihood: rows.map((row) => row.likelihood),

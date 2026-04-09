@@ -465,7 +465,7 @@ violationTypeField?.addEventListener('change', async function () {
     if (!source.length) {
       const row = document.createElement('tr');
       row.dataset.placeholder = 'empty';
-      row.innerHTML = '<td colspan="10" style="text-align:center;color:#6b7280;">No records found.</td>';
+      row.innerHTML = '<td colspan="11" style="text-align:center;color:#6b7280;">No records found.</td>';
       tableBody.appendChild(row);
       applyFilters();
       return;
@@ -485,6 +485,7 @@ violationTypeField?.addEventListener('change', async function () {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${v.student_name || '—'}</td>
+        <td>${v.strand || '—'}</td>
         <td>${v.grade_section || '—'}</td>
         <td>${formatDate(v.incident_date)}</td>
         <td>${v.violation_type || v.description || v.offense_type || '—'}</td>
@@ -1098,6 +1099,7 @@ violationTypeField?.addEventListener('change', async function () {
 
   // === Dropdown + Text filters + keep global search ===
   const filterGrade = document.getElementById('filterGrade');
+  const filterStrand = document.getElementById('filterStrand');
   const filterSection = document.getElementById('filterSection');
   const filterViolationType = document.getElementById('filterViolationType');
   const filterText = document.getElementById('filterText');
@@ -1113,20 +1115,25 @@ violationTypeField?.addEventListener('change', async function () {
   }
 
   function populateGradeSectionFilters() {
-    if (!filterGrade || !filterSection) return;
+    if (!filterGrade || !filterStrand || !filterSection) return;
 
     const prevGrade = filterGrade.value;
+    const prevStrand = filterStrand.value;
     const prevSection = filterSection.value;
     const grades = new Set();
+    const strands = new Set();
     const sections = new Set();
 
     (Array.isArray(violations) ? violations : []).forEach((v) => {
       const parsed = parseGradeSectionValue(v?.grade_section);
+      const strand = String(v?.strand || '').trim();
       if (parsed.grade) grades.add(parsed.grade);
+      if (strand && strand !== '—') strands.add(strand);
       if (parsed.section) sections.add(parsed.section);
     });
 
     filterGrade.innerHTML = '<option value="">All Grades</option>';
+    filterStrand.innerHTML = '<option value="">All Strands</option>';
     filterSection.innerHTML = '<option value="">All Sections</option>';
 
     Array.from(grades)
@@ -1136,6 +1143,15 @@ violationTypeField?.addEventListener('change', async function () {
         opt.value = grade;
         opt.textContent = grade;
         filterGrade.appendChild(opt);
+      });
+
+    Array.from(strands)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .forEach((strand) => {
+        const opt = document.createElement('option');
+        opt.value = strand;
+        opt.textContent = strand;
+        filterStrand.appendChild(opt);
       });
 
     Array.from(sections)
@@ -1149,6 +1165,9 @@ violationTypeField?.addEventListener('change', async function () {
 
     if (prevGrade && Array.from(filterGrade.options).some((o) => o.value === prevGrade)) {
       filterGrade.value = prevGrade;
+    }
+    if (prevStrand && Array.from(filterStrand.options).some((o) => o.value === prevStrand)) {
+      filterStrand.value = prevStrand;
     }
     if (prevSection && Array.from(filterSection.options).some((o) => o.value === prevSection)) {
       filterSection.value = prevSection;
@@ -1247,6 +1266,7 @@ violationTypeField?.addEventListener('change', async function () {
 
     function applyFilters() {
     const gradeFilter = (filterGrade?.value || '').toLowerCase();
+    const strandFilter = (filterStrand?.value || '').toLowerCase();
     const sectionFilter = (filterSection?.value || '').toLowerCase();
     const violationType = (filterViolationType?.value || '').toLowerCase();
     const textQuery = (filterText?.value || '').toLowerCase();
@@ -1268,22 +1288,24 @@ violationTypeField?.addEventListener('change', async function () {
       if (row.dataset?.placeholder === 'empty') return;
 
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
-      const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
+      const strand = row.cells[1]?.textContent.toLowerCase() || '';
+      const gradeSection = row.cells[2]?.textContent.toLowerCase() || '';
       const parsed = parseGradeSectionValue(gradeSection);
-      const vType = row.cells[3]?.textContent.toLowerCase() || '';
-      const description = row.cells[4]?.textContent.toLowerCase() || '';
+      const vType = row.cells[4]?.textContent.toLowerCase() || '';
+      const description = row.cells[5]?.textContent.toLowerCase() || '';
       const rowText = row.innerText.toLowerCase();
 
       const matchGrade = !gradeFilter || (parsed.grade || '').toLowerCase() === gradeFilter;
+      const matchStrand = !strandFilter || strand === strandFilter;
       const matchSection = !sectionFilter || (parsed.section || '').toLowerCase() === sectionFilter;
       const matchType = !violationType || vType.includes(violationType);
-      const matchText = !textQuery || [studentName, gradeSection, vType, description].some(s => s.includes(textQuery));
+      const matchText = !textQuery || [studentName, strand, gradeSection, vType, description].some(s => s.includes(textQuery));
       const matchGlobal = !globalQuery || rowText.includes(globalQuery);
 
       // date match
       let matchDate = true;
       if (fromDate || toDate) {
-        const raw = row.dataset.incident || row.cells[2]?.textContent || '';
+        const raw = row.dataset.incident || row.cells[3]?.textContent || '';
         const d = raw ? new Date(raw) : null;
         if (!d || isNaN(d)) {
           matchDate = false;
@@ -1293,7 +1315,7 @@ violationTypeField?.addEventListener('change', async function () {
         }
       }
 
-      row.style.display = (matchGrade && matchSection && matchType && matchText && matchGlobal && matchDate) ? '' : 'none';
+      row.style.display = (matchGrade && matchStrand && matchSection && matchType && matchText && matchGlobal && matchDate) ? '' : 'none';
     });
 
     // Update "Showing X of Y"
@@ -1330,6 +1352,7 @@ violationTypeField?.addEventListener('change', async function () {
         Generated on: ${new Date().toLocaleString()}<br>
         Filters:
         ${filterGrade?.value ? 'Grade: ' + filterGrade.value : 'All Grades'} |
+        ${filterStrand?.value ? 'Strand: ' + filterStrand.value : 'All Strands'} |
         ${filterSection?.value ? 'Section: ' + filterSection.value : 'All Sections'} |
         ${filterViolationType?.value ? 'Violation: ' + filterViolationType.value : 'All Violations'} |
         ${filterText?.value ? 'Search: ' + filterText.value : 'No text filter'}
@@ -1375,6 +1398,7 @@ violationTypeField?.addEventListener('change', async function () {
     if (!table) return;
 
     const grade = (filterGrade?.value || 'All Grades');
+    const strand = (filterStrand?.value || 'All Strands');
     const section = (filterSection?.value || 'All Sections');
     const vtype  = (filterViolationType?.value || 'All Violations');
     const txt    = (filterText?.value || 'No text filter');
@@ -1407,7 +1431,7 @@ violationTypeField?.addEventListener('change', async function () {
     const meta = [
       ['Student Violation Report'],
       ['Generated on', new Date().toLocaleString()],
-      ['Filters', `Grade: ${grade} | Section: ${section} | Violation: ${vtype} | Search: ${txt}`],
+      ['Filters', `Grade: ${grade} | Strand: ${strand} | Section: ${section} | Violation: ${vtype} | Search: ${txt}`],
       []
     ];
 
@@ -1619,6 +1643,7 @@ violationTypeField?.addEventListener('change', async function () {
     // filter + print
     applyFilterBtn?.addEventListener('click', applyFilters);
     filterGrade?.addEventListener('change', applyFilters);
+    filterStrand?.addEventListener('change', applyFilters);
     filterSection?.addEventListener('change', applyFilters);
     filterViolationType?.addEventListener('change', applyFilters);
     // keep floating picker for filter only; modal violation type uses native dropdown

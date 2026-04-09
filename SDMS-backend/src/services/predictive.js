@@ -440,6 +440,59 @@ export async function listAvailableSections() {
   return normalizeStringList(rows.map((row) => row.grade_section)).filter((section) => !isBlockedSection(section));
 }
 
+export async function listAvailableSectionEntries() {
+  let rows = [];
+  try {
+    const result = await query(
+      `SELECT DISTINCT
+         CASE
+           WHEN sec.grade_level IS NOT NULL AND sec.section_name IS NOT NULL THEN sec.grade_level::text || '-' || sec.section_name
+           WHEN sec.grade_level IS NOT NULL THEN sec.grade_level::text
+           WHEN sec.section_name IS NOT NULL THEN sec.section_name
+           ELSE NULL
+         END AS grade_section,
+         NULLIF(TRIM(sec.strand), '') AS strand
+       FROM norm_violations v
+       LEFT JOIN norm_students s ON s.id = v.student_id
+       LEFT JOIN norm_sections sec ON sec.id = s.section_id
+       WHERE CASE
+         WHEN sec.grade_level IS NOT NULL AND sec.section_name IS NOT NULL THEN sec.grade_level::text || '-' || sec.section_name
+         WHEN sec.grade_level IS NOT NULL THEN sec.grade_level::text
+         WHEN sec.section_name IS NOT NULL THEN sec.section_name
+         ELSE NULL
+       END IS NOT NULL`
+    );
+    rows = Array.isArray(result?.rows) ? result.rows : [];
+  } catch (error) {
+    console.warn('[predictive] listAvailableSectionEntries fallback to empty', error.message);
+    return [];
+  }
+
+  const bySection = new Map();
+  rows.forEach((row) => {
+    const gradeSection = String(row.grade_section || '').trim();
+    if (!gradeSection || isBlockedSection(gradeSection)) return;
+    const strand = String(row.strand || '').trim();
+
+    if (!bySection.has(gradeSection)) {
+      bySection.set(gradeSection, {
+        grade_section: gradeSection,
+        strand: strand || null,
+      });
+      return;
+    }
+
+    const existing = bySection.get(gradeSection);
+    if (!existing.strand && strand) {
+      existing.strand = strand;
+    }
+  });
+
+  return Array.from(bySection.values()).sort((a, b) =>
+    String(a.grade_section).localeCompare(String(b.grade_section), undefined, { numeric: true })
+  );
+}
+
 export async function cleanupPredictiveData({ sections = [], violations = [], dryRun = false } = {}) {
   if (!(await predictiveTablesReady())) {
     return {
@@ -530,18 +583,23 @@ export async function backfillViolationPredictions({ limit = 200 } = {}) {
     `SELECT
        v.id,
        v.student_id,
-       v.grade_section,
-       v.description,
+       CASE
+         WHEN sec.grade_level IS NOT NULL AND sec.section_name IS NOT NULL THEN sec.grade_level::text || '-' || sec.section_name
+         WHEN sec.grade_level IS NOT NULL THEN sec.grade_level::text
+         WHEN sec.section_name IS NOT NULL THEN sec.section_name
+         ELSE NULL
+       END AS grade_section,
+       COALESCE(v.violation_type, v.description) AS description,
        v.sanction,
        v.status,
        v.evidence,
        v.incident_date,
        v.created_at,
        s.active,
-       s.grade,
-       s.section
-     FROM violations v
-     INNER JOIN students s ON s.id = v.student_id
+       sec.strand
+     FROM norm_violations v
+     INNER JOIN norm_students s ON s.id = v.student_id
+     LEFT JOIN norm_sections sec ON sec.id = s.section_id
      LEFT JOIN violation_predictions vp ON vp.violation_id = v.id
      WHERE vp.violation_id IS NULL
      ORDER BY v.incident_date DESC NULLS LAST, v.created_at DESC
@@ -557,7 +615,7 @@ export async function backfillViolationPredictions({ limit = 200 } = {}) {
   };
 
   for (const row of rows) {
-    const normalizedGradeSection = row.grade_section || (row.grade && row.section ? `${row.grade}-${row.section}` : 'Unknown');
+    const normalizedGradeSection = row.grade_section || 'Unknown';
 
     try {
       await runAsyncPredictionForViolation({
@@ -567,6 +625,7 @@ export async function backfillViolationPredictions({ limit = 200 } = {}) {
         },
         studentRow: {
           active: row.active,
+          strand: row.strand,
         },
       });
       summary.inserted += 1;

@@ -208,6 +208,7 @@ function violationSelectSql(whereClause, orderClause = '') {
         WHEN sec.section_name IS NOT NULL THEN sec.section_name
         ELSE NULL
       END AS grade_section,
+      sec.strand,
       COALESCE(oi.category, od.category) AS offense_category,
       COALESCE(od.description, oi.description, v.description) AS violation_type,
       v.description,
