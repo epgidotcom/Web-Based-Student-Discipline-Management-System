@@ -6,12 +6,7 @@ const DEFAULT_INFER_RETRIES = 1;
 
 async function predictiveTablesReady() {
   const { rows } = await query(
-    `SELECT EXISTS (
-       SELECT 1
-         FROM information_schema.tables
-        WHERE table_schema = 'public'
-          AND table_name = 'violation_predictions'
-     ) AS exists`
+    `SELECT to_regclass('violation_predictions') IS NOT NULL AS exists`
   );
   return Boolean(rows[0]?.exists);
 }
