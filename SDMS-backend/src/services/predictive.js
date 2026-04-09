@@ -3,6 +3,8 @@ import { query } from '../db.js';
 const DEFAULT_WINDOW_DAYS = 90;
 const DEFAULT_INFER_TIMEOUT_MS = 5000;
 const DEFAULT_INFER_RETRIES = 1;
+const DEFAULT_BLOCKED_SECTIONS = ['11-TVL', '12-Mabangis', '12-pogi'];
+const DEFAULT_BLOCKED_SECTION_NAMES = ['TVL', 'Mabangis', 'pogi'];
 
 async function predictiveTablesReady() {
   const { rows } = await query(
@@ -19,6 +21,39 @@ function normalizeStringList(values) {
     if (normalized) unique.add(normalized);
   });
   return Array.from(unique);
+}
+
+function getBlockedSections() {
+  const configured = String(process.env.PREDICTIVE_BLOCKED_SECTIONS || '').trim();
+  if (!configured) return DEFAULT_BLOCKED_SECTIONS;
+  return normalizeStringList(configured.split(','));
+}
+
+function getBlockedSectionNames() {
+  const configured = String(process.env.PREDICTIVE_BLOCKED_SECTION_NAMES || '').trim();
+  if (!configured) return DEFAULT_BLOCKED_SECTION_NAMES;
+  return normalizeStringList(configured.split(','));
+}
+
+function getSectionNameFromGradeSection(gradeSection) {
+  const raw = String(gradeSection ?? '').trim();
+  if (!raw) return '';
+  const parts = raw.split('-');
+  if (parts.length < 2) return raw;
+  return parts.slice(1).join('-').trim();
+}
+
+function isBlockedSection(section) {
+  const normalized = String(section ?? '').trim();
+  if (!normalized) return false;
+
+  if (getBlockedSections().includes(normalized)) {
+    return true;
+  }
+
+  const sectionName = getSectionNameFromGradeSection(normalized);
+  if (!sectionName) return false;
+  return getBlockedSectionNames().includes(sectionName);
 }
 
 async function listCanonicalSections() {
@@ -180,6 +215,11 @@ export async function persistViolationPrediction({
   modelVersion,
   sourceService,
 }) {
+  const normalizedGradeSection = String(gradeSection || 'Unknown').trim() || 'Unknown';
+  if (isBlockedSection(normalizedGradeSection)) {
+    return;
+  }
+
   await query(
     `INSERT INTO violation_predictions (
        violation_id,
@@ -201,7 +241,7 @@ export async function persistViolationPrediction({
     [
       violationId,
       studentId,
-      gradeSection || 'Unknown',
+      normalizedGradeSection,
       violationLabel || 'Unknown',
       incidentDate || null,
       repeatProbability,
@@ -212,6 +252,11 @@ export async function persistViolationPrediction({
 }
 
 export async function upsertSectionSnapshot({ gradeSection, violationLabel = null, windowDays = DEFAULT_WINDOW_DAYS }) {
+  const normalizedGradeSection = String(gradeSection || 'Unknown').trim() || 'Unknown';
+  if (isBlockedSection(normalizedGradeSection)) {
+    return;
+  }
+
   const { rows } = await query(
     `SELECT
        COALESCE(AVG(repeat_probability), 0) AS avg_probability,
@@ -220,7 +265,7 @@ export async function upsertSectionSnapshot({ gradeSection, violationLabel = nul
      WHERE grade_section = $1
        AND ($2::varchar IS NULL OR violation_label = $2)
        AND COALESCE(incident_date, created_at::date) >= CURRENT_DATE - $3::int`,
-    [gradeSection || 'Unknown', violationLabel, windowDays]
+    [normalizedGradeSection, violationLabel, windowDays]
   );
 
   const avgProbability = Number(rows[0]?.avg_probability || 0);
@@ -234,7 +279,7 @@ export async function upsertSectionSnapshot({ gradeSection, violationLabel = nul
        sample_size,
        avg_repeat_probability
      ) VALUES ($1,$2,$3,$4,$5)`,
-    [gradeSection || 'Unknown', violationLabel, windowDays, sampleSize, avgProbability]
+    [normalizedGradeSection, violationLabel, windowDays, sampleSize, avgProbability]
   );
 }
 
@@ -244,13 +289,22 @@ export async function runAsyncPredictionForViolation({ violationRow, studentRow 
     throw new Error('Invalid violation id for predictive inference');
   }
 
+  const normalizedGradeSection = String(violationRow?.grade_section || 'Unknown').trim() || 'Unknown';
+  if (isBlockedSection(normalizedGradeSection)) {
+    return {
+      skipped: true,
+      reason: 'blocked_section',
+      section: normalizedGradeSection,
+    };
+  }
+
   const payload = await buildInferencePayload(violationRow, studentRow);
   const result = await requestRepeatProbability(payload);
 
   await persistViolationPrediction({
     violationId,
     studentId: violationRow.student_id,
-    gradeSection: violationRow.grade_section,
+    gradeSection: normalizedGradeSection,
     violationLabel: violationRow.description,
     incidentDate: violationRow.incident_date,
     repeatProbability: result.repeatProbability,
@@ -259,7 +313,7 @@ export async function runAsyncPredictionForViolation({ violationRow, studentRow 
   });
 
   await upsertSectionSnapshot({
-    gradeSection: violationRow.grade_section,
+    gradeSection: normalizedGradeSection,
     violationLabel: null,
     windowDays: DEFAULT_WINDOW_DAYS,
   });
@@ -283,6 +337,12 @@ export async function listSectionLikelihood({ section = null, violation = null, 
   if (violation && violation !== 'All') {
     params.push(violation);
     where += ` AND vp.violation_label = $${params.length}`;
+  }
+
+  const blockedSections = getBlockedSections();
+  if (blockedSections.length) {
+    params.push(blockedSections);
+    where += ` AND NOT (vp.grade_section = ANY($${params.length}::varchar[]))`;
   }
 
   params.push(limit);
@@ -336,7 +396,7 @@ export async function listAvailableSections() {
       ORDER BY grade_section ASC`
   );
 
-  return normalizeStringList(rows.map((row) => row.grade_section));
+  return normalizeStringList(rows.map((row) => row.grade_section)).filter((section) => !isBlockedSection(section));
 }
 
 export async function cleanupPredictiveData({ sections = [], violations = [], dryRun = false } = {}) {
