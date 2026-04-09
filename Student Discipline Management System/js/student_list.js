@@ -486,42 +486,41 @@
 
   //for strand
   async function loadStrand(section, grade, selectedValue = null) {
-    const strandDropdown = document.getElementById('strand');
-    if (!strandDropdown) return;
+  const strandDropdown = document.getElementById('strand');
+  if (!strandDropdown) return;
 
-    strandDropdown.innerHTML = '<option value="">Select Strand</option>';
-    if (!grade) return;
+  strandDropdown.innerHTML = '<option value="">Select Strand</option>';
+  if (!grade) return;
 
-    try {
-      const encodedSection = encodeURIComponent(section);
-      const encodedGrade = encodeURIComponent(grade);
-      const sections = await api(`/settings/grades/${encodedGrade}/${encodedSection}/strand`);
-      (Array.isArray(sections) ? sections : []).forEach(item => {
-        const option = document.createElement('option');
-        option.value = String(item.id);
-        option.textContent = `${item.strand}`;
-        strandDropdown.appendChild(option);
-      });
+  try {
+    const encodedSection = encodeURIComponent(section);
+    const encodedGrade = encodeURIComponent(grade);
+    const sections = await api(`/settings/grades/${encodedGrade}/${encodedSection}/strand`);
 
-      if (selectedValue != null && selectedValue !== '') {
-        // Find the option with matching strand name
-        const options = Array.from(strandDropdown.options);
-        const matchingOption = options.find(opt => opt.textContent === String(selectedValue));
-        if (matchingOption) {
-          strandDropdown.value = matchingOption.value;
-        } else {
-          // Add custom option if not found
-          const custom = document.createElement('option');
-          custom.value = String(selectedValue);
-          custom.textContent = String(selectedValue);
-          strandDropdown.appendChild(custom);
-          strandDropdown.value = String(selectedValue);
-        }
+    (Array.isArray(sections) ? sections : []).forEach(item => {
+      const strandName = String(item.strand || '').trim();
+      if (!strandName) return;
+
+      const option = document.createElement('option');
+      option.value = strandName;
+      option.textContent = strandName;
+      strandDropdown.appendChild(option);
+    });
+
+    if (selectedValue != null && selectedValue !== '') {
+      strandDropdown.value = String(selectedValue).trim();
+      if (strandDropdown.value !== String(selectedValue).trim()) {
+        const custom = document.createElement('option');
+        custom.value = String(selectedValue).trim();
+        custom.textContent = String(selectedValue).trim();
+        strandDropdown.appendChild(custom);
+        strandDropdown.value = String(selectedValue).trim();
       }
-    } catch (err) { 
-      console.error("Failed to load strands:", err);
     }
+  } catch (err) {
+    console.error("Failed to load strands:", err);
   }
+} 
 // When section changes, load strand for that section
    document.getElementById('section')?.addEventListener('change', async function () {
     const section = this.value;
@@ -608,19 +607,18 @@
     const normalizedBirthdate = birthdateInput?.value?.trim() || null;
     const normalizedAge = normalizedBirthdate ? computeAge(normalizedBirthdate) : null;
     const payload = {
-      lrn: lrnField?.value?.trim() || null,
-      full_name: composeFullName(firstName, middleName, lastName),
-      // Keep legacy keys for backward compatibility with older backend deployments.
-      first_name: firstName,
-      middle_name: middleName,
-      last_name: lastName,
-      age: normalizedAge,
-      birthdate: normalizedBirthdate || (existing?.birthdate || null),
-      grade: gradeField?.value || null,
-      section: sectionField?.value?.trim() || null,
-      strand: strandInput?.options[strandInput.selectedIndex]?.textContent || null,
-      parent_contact: parentContactField?.value?.trim() || null
-    };
+  lrn: lrnField?.value?.trim() || null,
+  full_name: composeFullName(firstName, middleName, lastName),
+  first_name: firstName,
+  middle_name: middleName,
+  last_name: lastName,
+  age: normalizedAge,
+  birthdate: normalizedBirthdate || (existing?.birthdate || null),
+  grade: gradeField?.value || null,
+  section: sectionField?.value?.trim() || null,
+  strand: strandField?.value?.trim() || null,
+  parent_contact: parentContactField?.value?.trim() || null
+};
 
     try {
       let saved;

@@ -7,6 +7,14 @@ import { processBatchStudents } from '../utils/studentUpload.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+let ensureNormSectionsStrandTextPromise = null;
+
+function parseGradeLevelOrNull(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NUMERIC_ID_REGEX = /^\d+$/;
@@ -76,6 +84,27 @@ async function getNormStudentColumnSet() {
   return new Set(rows.map((row) => row.column_name));
 }
 
+async function ensureNormSectionsStrandText() {
+  if (!ensureNormSectionsStrandTextPromise) {
+    ensureNormSectionsStrandTextPromise = (async () => {
+      await query(`
+        ALTER TABLE IF EXISTS norm_sections
+        ADD COLUMN IF NOT EXISTS strand VARCHAR
+      `);
+
+      await query(`
+        ALTER TABLE IF EXISTS norm_sections
+        ALTER COLUMN strand TYPE VARCHAR USING strand::VARCHAR
+      `);
+    })().catch((error) => {
+      ensureNormSectionsStrandTextPromise = null;
+      throw error;
+    });
+  }
+
+  return ensureNormSectionsStrandTextPromise;
+}
+
 function getStudentSelectClause(columns) {
   const birthdateExpr = columns.has('birthdate') ? 's.birthdate' : 'NULL::date AS birthdate';
   const statusExpr = columns.has('active') ? 's.active AS status' : 'NULL::boolean AS status';
@@ -104,16 +133,16 @@ async function resolveSectionId(grade, section, strand) {
   const values = [sectionName];
   const whereParts = ['section_name = $1'];
 
-  const gradeLevel = String(grade ?? '').trim();
-  if (gradeLevel) {
+  const gradeLevel = parseGradeLevelOrNull(grade);
+  if (gradeLevel !== null) {
     values.push(gradeLevel);
-    whereParts.push(`grade_level = $${values.length}`);
+    whereParts.push(`grade_level = $${values.length}::int`);
   }
 
   const strandName = String(strand ?? '').trim();
   if (strandName) {
     values.push(strandName);
-    whereParts.push(`strand = $${values.length}`);
+    whereParts.push(`strand = $${values.length}::text`);
   }
 
   const { rows } = await query(
@@ -142,25 +171,31 @@ async function fetchStudentByLookup(lookup) {
 
   return rows[0] ?? null;
 }
+
 async function getOrCreateSectionId(grade, section, strand) {
   const sectionName = String(section ?? '').trim();
   if (!sectionName) return null;
 
-  // Try to find existing section
+  await ensureNormSectionsStrandText();
+
   const existing = await resolveSectionId(grade, section, strand);
   if (existing) return existing;
 
-  // Section not found, create it
   try {
-    const gradeLevel = String(grade ?? '').trim() || null;
+    const gradeLevel = parseGradeLevelOrNull(grade);
+
     const strandName = String(strand ?? '').trim() || null;
+
     const { rows } = await query(
       `INSERT INTO norm_sections (grade_level, section_name, strand)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (section_name) DO UPDATE SET grade_level = COALESCE($1, grade_level), strand = COALESCE($3, strand)
+       VALUES ($1::int, $2::text, $3::text)
+       ON CONFLICT (section_name) DO UPDATE
+       SET grade_level = COALESCE($1::int, grade_level),
+           strand = COALESCE($3::text, strand)
        RETURNING id`,
       [gradeLevel, sectionName, strandName]
     );
+
     return rows[0]?.id ?? null;
   } catch (error) {
     console.warn('[getOrCreateSectionId] failed to create section', {
@@ -169,7 +204,7 @@ async function getOrCreateSectionId(grade, section, strand) {
       strand,
       error: error.message
     });
-    return null;
+    throw error;
   }
 }
 export function getStudentLookup(rawId) {
@@ -346,9 +381,7 @@ router.post('/', async (req, res) => {
 
   try {
     const columns = await getNormStudentColumnSet();
-    //const sectionId = await getOrCreateSectionId(grade, section, strand);
-    const sectionId = strand
-    // console.log("PARAMS:", { sectionId });
+    const sectionId = await getOrCreateSectionId(grade, section, strand);
     const { rows } = await insertNormStudentRow({
       columns,
       lrn,
@@ -552,7 +585,7 @@ router.put('/:id', async (req, res) => {
     }
 
     assignments.push(`section_id = COALESCE($${values.length + 1}, section_id)`);
-    values.push((grade != null || section != null || strand != null) ? strand : null); //strand has section id
+    values.push((grade != null || section != null || strand != null) ? nextSectionId : null);
     values.push(lookup.value);
 
     const { rows } = await query(

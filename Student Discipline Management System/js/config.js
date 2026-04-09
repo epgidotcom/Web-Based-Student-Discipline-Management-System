@@ -60,7 +60,7 @@
       }
       return origin.replace(/\/+$/, '');
     }
-    if (isFile) return FALLBACK_REMOTE;
+    if (isFile) return FALLBACK_LOCAL;
     if (origin && !originIsLocal && !isLegacyBackend(origin)) {
       return origin.replace(/\/+$/, '');
     }

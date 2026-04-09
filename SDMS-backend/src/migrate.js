@@ -132,6 +132,18 @@ export async function runMigrations() {
        AND (first_name IS NOT NULL OR last_name IS NOT NULL)
   `);
 
+  // --- norm_sections compatibility ---
+  // Ensure strand stores textual tracks (e.g., STEM/ABM), not numeric ids.
+  await query(`
+    ALTER TABLE IF EXISTS norm_sections
+    ADD COLUMN IF NOT EXISTS strand VARCHAR
+  `);
+
+  await query(`
+    ALTER TABLE IF EXISTS norm_sections
+    ALTER COLUMN strand TYPE VARCHAR USING strand::VARCHAR
+  `);
+
   // --- predictive inference storage ---
   await query(`
     CREATE TABLE IF NOT EXISTS violation_predictions (

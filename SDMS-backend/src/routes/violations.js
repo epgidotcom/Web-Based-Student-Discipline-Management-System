@@ -4,6 +4,35 @@ import { runAsyncPredictionForViolation } from '../services/predictive.js';
 
 const router = Router();
 const VIOLATIONS_TABLE = 'norm_violations';
+let ensureNormSectionsStrandTextPromise = null;
+
+function parseGradeLevelOrNull(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+async function ensureNormSectionsStrandText() {
+  if (!ensureNormSectionsStrandTextPromise) {
+    ensureNormSectionsStrandTextPromise = (async () => {
+      await query(`
+        ALTER TABLE IF EXISTS norm_sections
+        ADD COLUMN IF NOT EXISTS strand VARCHAR
+      `);
+
+      await query(`
+        ALTER TABLE IF EXISTS norm_sections
+        ALTER COLUMN strand TYPE VARCHAR USING strand::VARCHAR
+      `);
+    })().catch((error) => {
+      ensureNormSectionsStrandTextPromise = null;
+      throw error;
+    });
+  }
+
+  return ensureNormSectionsStrandTextPromise;
+}
 
 // Helper: fetch student by id
 async function fetchStudent(id) {
@@ -72,10 +101,10 @@ async function resolveSectionId(grade, section, strand) {
   const values = [sectionName];
   const whereParts = ['section_name = $1'];
 
-  const gradeLevel = String(grade ?? '').trim();
+  const gradeLevel = parseGradeLevelOrNull(grade);
   if (gradeLevel) {
     values.push(gradeLevel);
-    whereParts.push(`grade_level = $${values.length}`);
+    whereParts.push(`grade_level = $${values.length}::int`);
   }
 
   const strandName = String(strand ?? '').trim();
@@ -100,18 +129,20 @@ async function getOrCreateSectionId(grade, section, strand) {
   const sectionName = String(section ?? '').trim();
   if (!sectionName) return null;
 
+  await ensureNormSectionsStrandText();
+
   const existing = await resolveSectionId(grade, section, strand);
   if (existing) return existing;
 
-  const gradeLevel = String(grade ?? '').trim() || null;
+  const gradeLevel = parseGradeLevelOrNull(grade);
   const strandName = String(strand ?? '').trim() || null;
   const { rows } = await query(
     `INSERT INTO norm_sections (grade_level, section_name, strand)
-     VALUES ($1, $2, $3)
+     VALUES ($1::int, $2::text, $3::text)
      ON CONFLICT (section_name)
      DO UPDATE SET
-       grade_level = COALESCE($1, norm_sections.grade_level),
-       strand = COALESCE($3, norm_sections.strand)
+       grade_level = COALESCE($1::int, norm_sections.grade_level),
+       strand = COALESCE($3::text, norm_sections.strand)
      RETURNING id`,
     [gradeLevel, sectionName, strandName]
   );
