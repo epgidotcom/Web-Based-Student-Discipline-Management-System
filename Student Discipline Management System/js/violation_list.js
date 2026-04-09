@@ -459,6 +459,8 @@ violationTypeField?.addEventListener('change', async function () {
     const source = Array.isArray(list) ? list : [];
     if (list !== violations) violations = source;
 
+    populateGradeSectionFilters();
+
     tableBody.innerHTML = '';
     if (!source.length) {
       const row = document.createElement('tr');
@@ -1095,11 +1097,63 @@ violationTypeField?.addEventListener('change', async function () {
   }
 
   // === Dropdown + Text filters + keep global search ===
-  const filterStrand = document.getElementById('filterStrand');
+  const filterGrade = document.getElementById('filterGrade');
+  const filterSection = document.getElementById('filterSection');
   const filterViolationType = document.getElementById('filterViolationType');
   const filterText = document.getElementById('filterText');
   const applyFilterBtn = document.getElementById('applyFilterBtn');
   const printReportBtn = document.getElementById('printReportBtn');
+
+  function parseGradeSectionValue(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value || value === '—') return { grade: '', section: '' };
+    const parts = value.split('-').map((p) => p.trim()).filter(Boolean);
+    if (parts.length <= 1) return { grade: parts[0] || '', section: '' };
+    return { grade: parts[0] || '', section: parts.slice(1).join('-') };
+  }
+
+  function populateGradeSectionFilters() {
+    if (!filterGrade || !filterSection) return;
+
+    const prevGrade = filterGrade.value;
+    const prevSection = filterSection.value;
+    const grades = new Set();
+    const sections = new Set();
+
+    (Array.isArray(violations) ? violations : []).forEach((v) => {
+      const parsed = parseGradeSectionValue(v?.grade_section);
+      if (parsed.grade) grades.add(parsed.grade);
+      if (parsed.section) sections.add(parsed.section);
+    });
+
+    filterGrade.innerHTML = '<option value="">All Grades</option>';
+    filterSection.innerHTML = '<option value="">All Sections</option>';
+
+    Array.from(grades)
+      .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10) || String(a).localeCompare(String(b)))
+      .forEach((grade) => {
+        const opt = document.createElement('option');
+        opt.value = grade;
+        opt.textContent = grade;
+        filterGrade.appendChild(opt);
+      });
+
+    Array.from(sections)
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .forEach((section) => {
+        const opt = document.createElement('option');
+        opt.value = section;
+        opt.textContent = section;
+        filterSection.appendChild(opt);
+      });
+
+    if (prevGrade && Array.from(filterGrade.options).some((o) => o.value === prevGrade)) {
+      filterGrade.value = prevGrade;
+    }
+    if (prevSection && Array.from(filterSection.options).some((o) => o.value === prevSection)) {
+      filterSection.value = prevSection;
+    }
+  }
 
   // --- Load sanctions from API ---
   async function loadSanctions() {
@@ -1192,7 +1246,8 @@ violationTypeField?.addEventListener('change', async function () {
 
 
     function applyFilters() {
-    const strand = (filterStrand?.value || '').toLowerCase();
+    const gradeFilter = (filterGrade?.value || '').toLowerCase();
+    const sectionFilter = (filterSection?.value || '').toLowerCase();
     const violationType = (filterViolationType?.value || '').toLowerCase();
     const textQuery = (filterText?.value || '').toLowerCase();
     const globalQuery = (searchInput?.value || '').toLowerCase();
@@ -1214,11 +1269,13 @@ violationTypeField?.addEventListener('change', async function () {
 
       const studentName = row.cells[0]?.textContent.toLowerCase() || '';
       const gradeSection = row.cells[1]?.textContent.toLowerCase() || '';
+      const parsed = parseGradeSectionValue(gradeSection);
       const vType = row.cells[3]?.textContent.toLowerCase() || '';
       const description = row.cells[4]?.textContent.toLowerCase() || '';
       const rowText = row.innerText.toLowerCase();
 
-      const matchStrand = !strand || gradeSection.includes(strand);
+      const matchGrade = !gradeFilter || (parsed.grade || '').toLowerCase() === gradeFilter;
+      const matchSection = !sectionFilter || (parsed.section || '').toLowerCase() === sectionFilter;
       const matchType = !violationType || vType.includes(violationType);
       const matchText = !textQuery || [studentName, gradeSection, vType, description].some(s => s.includes(textQuery));
       const matchGlobal = !globalQuery || rowText.includes(globalQuery);
@@ -1236,7 +1293,7 @@ violationTypeField?.addEventListener('change', async function () {
         }
       }
 
-      row.style.display = (matchStrand && matchType && matchText && matchGlobal && matchDate) ? '' : 'none';
+      row.style.display = (matchGrade && matchSection && matchType && matchText && matchGlobal && matchDate) ? '' : 'none';
     });
 
     // Update "Showing X of Y"
@@ -1272,7 +1329,8 @@ violationTypeField?.addEventListener('change', async function () {
       <div style="text-align:right;font-size:12px;color:#555;margin-bottom:8px;">
         Generated on: ${new Date().toLocaleString()}<br>
         Filters:
-        ${filterStrand?.value ? 'Strand: ' + filterStrand.value : 'All Strands'} |
+        ${filterGrade?.value ? 'Grade: ' + filterGrade.value : 'All Grades'} |
+        ${filterSection?.value ? 'Section: ' + filterSection.value : 'All Sections'} |
         ${filterViolationType?.value ? 'Violation: ' + filterViolationType.value : 'All Violations'} |
         ${filterText?.value ? 'Search: ' + filterText.value : 'No text filter'}
       </div>
@@ -1316,7 +1374,8 @@ violationTypeField?.addEventListener('change', async function () {
     const table = document.getElementById('violationTable');
     if (!table) return;
 
-    const strand = (filterStrand?.value || 'All Strands');
+    const grade = (filterGrade?.value || 'All Grades');
+    const section = (filterSection?.value || 'All Sections');
     const vtype  = (filterViolationType?.value || 'All Violations');
     const txt    = (filterText?.value || 'No text filter');
 
@@ -1348,7 +1407,7 @@ violationTypeField?.addEventListener('change', async function () {
     const meta = [
       ['Student Violation Report'],
       ['Generated on', new Date().toLocaleString()],
-      ['Filters', `Strand: ${strand} | Violation: ${vtype} | Search: ${txt}`],
+      ['Filters', `Grade: ${grade} | Section: ${section} | Violation: ${vtype} | Search: ${txt}`],
       []
     ];
 
@@ -1559,7 +1618,8 @@ violationTypeField?.addEventListener('change', async function () {
 
     // filter + print
     applyFilterBtn?.addEventListener('click', applyFilters);
-  filterStrand?.addEventListener('change', applyFilters);
+    filterGrade?.addEventListener('change', applyFilters);
+    filterSection?.addEventListener('change', applyFilters);
     filterViolationType?.addEventListener('change', applyFilters);
     // keep floating picker for filter only; modal violation type uses native dropdown
     [filterViolationType].forEach(sel => {
@@ -1596,6 +1656,7 @@ violationTypeField?.addEventListener('change', async function () {
     window.addEventListener('load', bindEvents, { once: true });
 
     await Promise.all([loadStudents(), fetchData(1), loadSchoolViolations(), loadSanctions()]);
+    populateGradeSectionFilters();
   }
 
   window.searchViolation = applyFilters;

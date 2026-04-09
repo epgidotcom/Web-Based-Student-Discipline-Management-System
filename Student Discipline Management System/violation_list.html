@@ -73,12 +73,6 @@
 
     <!-- Controls Row -->
     <div class="top-controls">
-      <!-- Left: Search -->
-      <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Search student..." onkeyup="searchViolation()">
-        <button type="button" class="search-btn"><i class="fa fa-search"></i><span> Search</span></button>
-      </div>
-
       <!-- Filters + Print -->
       <div class="filter-container">
 
@@ -106,14 +100,12 @@
         </div>
 
 
-        <select id="filterStrand">
-          <option value="">All Strands</option>
-          <option value="STEM">STEM</option>
-          <option value="HUMSS">HUMSS</option>
-          <option value="ABM">ABM</option>
-          <option value="HE">HE</option>
-          <option value="ICT">ICT</option>
-          <option value="GAS">GAS</option>
+        <select id="filterGrade">
+          <option value="">All Grades</option>
+        </select>
+
+        <select id="filterSection">
+          <option value="">All Sections</option>
         </select>
 
         <select id="filterViolationType">
