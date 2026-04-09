@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const chartWrap = canvas.parentElement;
   const windowSelect = document.getElementById('filterPredictiveWindow');
   const sectionSelect = document.getElementById('filterPredictiveSection');
+  const strandSelect = document.getElementById('filterPredictiveStrand');
   const violationSelect = document.getElementById('filterPredictiveViolation');
   const noteEl = document.querySelector('.predictive-section .chart-note');
 
@@ -29,6 +30,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let chartInstance = null;
   let predictiveData = null;
+  const KNOWN_STRANDS = new Set(['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'HE', 'ICT']);
+
+  function parseGradeSection(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return { grade: '', sectionName: '' };
+    const parts = raw.split('-').map((p) => p.trim()).filter(Boolean);
+    if (parts.length <= 1) return { grade: parts[0] || '', sectionName: '' };
+    return { grade: parts[0] || '', sectionName: parts.slice(1).join('-') };
+  }
+
+  function derivePredictiveFilterOptions(sections) {
+    const strands = new Set();
+
+    (Array.isArray(sections) ? sections : []).forEach((entry) => {
+      const parsed = parseGradeSection(entry);
+      if (parsed.sectionName) {
+        if (KNOWN_STRANDS.has(parsed.sectionName.toUpperCase())) {
+          strands.add(parsed.sectionName.toUpperCase());
+        }
+      }
+    });
+
+    return {
+      strands: Array.from(strands).sort((a, b) => String(a).localeCompare(String(b))),
+    };
+  }
 
   function authHeaders() {
     const token = window.SDMSAuth?.getToken?.();
@@ -86,6 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     selectEl.value = values.includes(previous) ? previous : 'All';
+  }
+
+  function filterRowsByExtraFilters(rows) {
+    const strandFilter = strandSelect?.value || 'All';
+
+    return (Array.isArray(rows) ? rows : []).filter((row) => {
+      const parsed = parseGradeSection(row?.section);
+      if (strandFilter !== 'All' && String(parsed.sectionName || '').toUpperCase() !== String(strandFilter).toUpperCase()) return false;
+      return true;
+    });
   }
 
   function renderChart(rows) {
@@ -184,10 +221,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const sections = Array.isArray(payload.sections) ? payload.sections : [];
       const violations = Array.isArray(payload.violations) ? payload.violations : [];
       const rows = Array.isArray(payload.rows) ? payload.rows : [];
+      const derived = derivePredictiveFilterOptions(sections);
 
       updateSelectOptions(sectionSelect, sections);
+      updateSelectOptions(strandSelect, derived.strands);
       updateSelectOptions(violationSelect, violations);
-      renderChart(rows);
+      renderChart(filterRowsByExtraFilters(rows));
 
       if (noteEl) {
         const windowDays = Number(payload.window_days || 90);
@@ -208,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   windowSelect?.addEventListener('change', loadPredictiveData);
   sectionSelect?.addEventListener('change', loadPredictiveData);
+  strandSelect?.addEventListener('change', loadPredictiveData);
   violationSelect?.addEventListener('change', loadPredictiveData);
 
   loadPredictiveData();
