@@ -183,6 +183,9 @@ body.modal-open{
 .violation-modal {
   padding: 0;
   overflow: hidden;
+  top: 6vh;
+  transform: translate(-50%, 0);
+  max-height: 88vh;
 }
 
 /* Header */

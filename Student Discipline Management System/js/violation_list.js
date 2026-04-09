@@ -270,6 +270,8 @@
   const viewRemarks = document.getElementById('viewRemarks');
 
   let previousOffensesLoadedStudentId = '';
+  let __lrnLookupSeq = 0;
+  let __lrnLookupDebounce = null;
 
   const imagePreviewModal = document.getElementById('imagePreviewModal');
   const imagePreviewClose = document.getElementById('imagePreviewClose');
@@ -625,10 +627,98 @@ violationTypeField?.addEventListener('change', async function () {
     }
   }
 
+  function normalizeLRN(value) {
+    return String(value || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  }
+
   function findStudentByLRN(lrn) {
     if (!lrn) return null;
-    const target = lrn.replace(/\s+/g, '').toLowerCase();
-    return students.find(s => String(s.lrn || '').replace(/\s+/g, '').toLowerCase() === target) || null;
+    const target = normalizeLRN(lrn);
+    if (!target) return null;
+    return students.find(s => normalizeLRN(s.lrn) === target) || null;
+  }
+
+  function studentDisplayName(student) {
+    if (!student) return '';
+    const fromNames = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ').trim();
+    return fromNames || String(student.full_name || '').trim();
+  }
+
+  function applyStudentToForm(student) {
+    if (!student) return;
+    violationForm.dataset.studentId = String(student.id || '').trim();
+    studentNameField.value = studentDisplayName(student);
+
+    const composedGradeSection = [student.grade, student.section].filter(Boolean).join('-');
+    if (!gradeSectionField.value || !gradeSectionField.value.trim()) {
+      gradeSectionField.value = composedGradeSection || gradeSectionField.value;
+    }
+
+    previousOffensesLoadedStudentId = '';
+    displayPastOffensesFor(student.id);
+    if (previousOffensesAccordion?.open) {
+      loadPreviousOffensesForSelectedStudent();
+    } else {
+      renderPreviousOffensesMessage('Click to view previous offenses for this student.');
+    }
+  }
+
+  function clearStudentFromForm() {
+    violationForm.dataset.studentId = '';
+    studentNameField.value = '';
+    previousOffensesLoadedStudentId = '';
+    displayPastOffensesFor(null);
+    if (previousOffensesAccordion?.open) {
+      loadPreviousOffensesForSelectedStudent();
+    } else {
+      renderPreviousOffensesMessage('Select a student first to view previous offenses.');
+    }
+  }
+
+  async function fetchStudentByLRN(lrn) {
+    const normalized = normalizeLRN(lrn);
+    if (!normalized) return null;
+
+    const cached = findStudentByLRN(normalized);
+    if (cached) return cached;
+
+    try {
+      const params = new URLSearchParams({ lrn: String(lrn).trim() });
+      const payload = await api(`/students?${params.toString()}`);
+      const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+      const student = Array.isArray(data) && data.length ? data[0] : null;
+      if (student && !students.some(s => String(s.id) === String(student.id))) {
+        students.push(student);
+      }
+      return student;
+    } catch (err) {
+      console.warn('[violations] LRN lookup API fallback failed', err);
+      return null;
+    }
+  }
+
+  async function resolveStudentByLRN(rawLRN, { showAlertOnMiss = false } = {}) {
+    const lookupId = ++__lrnLookupSeq;
+    const lrn = String(rawLRN || '').trim();
+
+    if (!lrn) {
+      clearStudentFromForm();
+      return null;
+    }
+
+    const match = await fetchStudentByLRN(lrn);
+    if (lookupId !== __lrnLookupSeq) return null;
+
+    if (match) {
+      applyStudentToForm(match);
+      return match;
+    }
+
+    clearStudentFromForm();
+    if (showAlertOnMiss) {
+      alert('No student found for that LRN. Please ensure the student exists in the system.');
+    }
+    return null;
   }
 
   function displayPastOffensesFor(studentId, excludeId) {
@@ -1428,45 +1518,23 @@ violationTypeField?.addEventListener('change', async function () {
       else if (action === 'resolve') handleResolve(index);
     });
 
-    // LRN lookup
+    // LRN lookup (supports typing, Enter key, and blur)
+    studentLRNField?.addEventListener('input', () => {
+      if (__lrnLookupDebounce) clearTimeout(__lrnLookupDebounce);
+      __lrnLookupDebounce = setTimeout(() => {
+        resolveStudentByLRN(studentLRNField.value, { showAlertOnMiss: false }).catch(console.error);
+      }, 250);
+    });
+    studentLRNField?.addEventListener('change', () => {
+      resolveStudentByLRN(studentLRNField.value, { showAlertOnMiss: false }).catch(console.error);
+    });
     studentLRNField?.addEventListener('blur', () => {
-      const lrn = studentLRNField.value.trim();
-      previousOffensesLoadedStudentId = '';
-      if (!lrn) {
-        violationForm.dataset.studentId = '';
-        studentNameField.value = '';
-        displayPastOffensesFor(null);
-        if (previousOffensesAccordion?.open) {
-          loadPreviousOffensesForSelectedStudent();
-        } else {
-          renderPreviousOffensesMessage('Select a student first to view previous offenses.');
-        }
-        return;
-      }
-      const match = findStudentByLRN(lrn);
-      if (match) {
-        violationForm.dataset.studentId = String(match.id);
-        studentNameField.value = [match.first_name, match.middle_name, match.last_name].filter(Boolean).join(' ');
-        if (!gradeSectionField.value) {
-          const composed = [match.grade, match.section].filter(Boolean).join('-');
-          gradeSectionField.value = composed || gradeSectionField.value;
-        }
-        displayPastOffensesFor(match.id);
-        if (previousOffensesAccordion?.open) {
-          loadPreviousOffensesForSelectedStudent();
-        } else {
-          renderPreviousOffensesMessage('Click to view previous offenses for this student.');
-        }
-      } else {
-        violationForm.dataset.studentId = '';
-        displayPastOffensesFor(null);
-        if (previousOffensesAccordion?.open) {
-          loadPreviousOffensesForSelectedStudent();
-        } else {
-          renderPreviousOffensesMessage('Select a student first to view previous offenses.');
-        }
-        alert('No student found for that LRN. Please ensure the student exists in the system.');
-      }
+      resolveStudentByLRN(studentLRNField.value, { showAlertOnMiss: true }).catch(console.error);
+    });
+    studentLRNField?.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      resolveStudentByLRN(studentLRNField.value, { showAlertOnMiss: true }).catch(console.error);
     });
 
     previousOffensesAccordion?.addEventListener('toggle', () => {
@@ -1493,8 +1561,8 @@ violationTypeField?.addEventListener('change', async function () {
     applyFilterBtn?.addEventListener('click', applyFilters);
   filterStrand?.addEventListener('change', applyFilters);
     filterViolationType?.addEventListener('change', applyFilters);
-    // show centered floating picker for long lists (better display inside modals)
-    [filterViolationType, violationTypeField].forEach(sel => {
+    // keep floating picker for filter only; modal violation type uses native dropdown
+    [filterViolationType].forEach(sel => {
       if (!sel) return;
       sel.addEventListener('mousedown', (ev) => {
         // prevent native opening and show our centered picker
