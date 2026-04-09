@@ -670,7 +670,8 @@
     const raw = document.getElementById('searchInput')?.value || '';
     const input = raw.toString().trim();
     if (!input) {
-      renderTable(allStudents);
+      const state = paginator?.getState?.() || { currentPage: 1 };
+      await refreshCurrentPage(state.currentPage);
       return;
     }
 
@@ -681,15 +682,62 @@
         const data = await api(`/students?lrn=${encodeURIComponent(input)}`);
         const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
         renderTable(rows.map(normalizeStudent));
+        if (paginationSummary) {
+          const count = rows.length;
+          paginationSummary.textContent = count
+            ? `Showing ${count} result${count === 1 ? '' : 's'}`
+            : 'No matching student found';
+        }
+        if (paginationControls) {
+          paginationControls.classList.add('is-hidden');
+        }
         return;
       } catch (err) {
         console.error('[students] LRN search failed', err);
       }
     }
 
-    // Default: client-side text filter on the latest full page dataset
+    // Default: fetch all students through paginated API, then filter globally.
+    const fetchAllStudents = async () => {
+      const firstPage = await api('/students?page=1&limit=1000');
+      const firstRows = Array.isArray(firstPage)
+        ? firstPage
+        : Array.isArray(firstPage?.data)
+          ? firstPage.data
+          : [];
+      const totalPagesRaw = Number(firstPage?.totalPages);
+      const totalPages = Number.isFinite(totalPagesRaw) && totalPagesRaw > 0 ? totalPagesRaw : 1;
+
+      if (totalPages <= 1 || Array.isArray(firstPage)) {
+        return firstRows.map(normalizeStudent);
+      }
+
+      const pageRequests = [];
+      for (let page = 2; page <= totalPages; page++) {
+        pageRequests.push(api(`/students?page=${page}&limit=1000`));
+      }
+
+      const pagePayloads = await Promise.all(pageRequests);
+      const mergedRows = firstRows.slice();
+      pagePayloads.forEach((payload) => {
+        const rows = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+        mergedRows.push(...rows);
+      });
+
+      return mergedRows.map(normalizeStudent);
+    };
+
+    let fullDataset = [];
+    try {
+      fullDataset = await fetchAllStudents();
+    } catch (err) {
+      console.error('[students] global search fetch failed', err);
+      alert(err?.message || 'Failed to search students.');
+      return;
+    }
+
     const q = input.toLowerCase();
-    const filtered = allStudents.filter((student) => {
+    const filtered = fullDataset.filter((student) => {
       const rowText = [
         student.lrn,
         student.fullName || composeFullName(student.firstName, student.middleName, student.lastName),
@@ -700,7 +748,18 @@
       ].join(' ').toLowerCase();
       return rowText.includes(q);
     });
+
     renderTable(filtered);
+    if (paginationSummary) {
+      const count = filtered.length;
+      const total = fullDataset.length;
+      paginationSummary.textContent = count
+        ? `Showing ${count} result${count === 1 ? '' : 's'} of ${total}`
+        : `No results found in ${total} student records`;
+    }
+    if (paginationControls) {
+      paginationControls.classList.add('is-hidden');
+    }
   }
 
   (function(){
