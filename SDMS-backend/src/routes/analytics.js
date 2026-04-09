@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import {
   backfillViolationPredictions,
+  cleanupPredictiveData,
   listAvailableSections,
   listAvailableViolationLabels,
   listSectionLikelihood,
@@ -80,6 +81,31 @@ router.post('/predictive-repeat-risk/backfill', requireAuth, requireAdmin, async
     res.status(500).json({ error: error.message });
   } finally {
     backfillInProgress = false;
+  }
+});
+
+router.post('/predictive-repeat-risk/cleanup', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const sections = Array.isArray(req.body?.sections) ? req.body.sections : [];
+    const violations = Array.isArray(req.body?.violations) ? req.body.violations : [];
+    const dryRun = req.body?.dryRun === true;
+
+    const result = await cleanupPredictiveData({
+      sections,
+      violations,
+      dryRun,
+    });
+
+    res.json({
+      dryRun,
+      sections,
+      violations,
+      ...result,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[analytics/predictive-repeat-risk/cleanup] failed', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

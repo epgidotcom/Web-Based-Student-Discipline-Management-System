@@ -16,6 +16,41 @@ async function predictiveTablesReady() {
   return Boolean(rows[0]?.exists);
 }
 
+function normalizeStringList(values) {
+  if (!Array.isArray(values)) return [];
+  const unique = new Set();
+  values.forEach((value) => {
+    const normalized = String(value ?? '').trim();
+    if (normalized) unique.add(normalized);
+  });
+  return Array.from(unique);
+}
+
+async function listCanonicalSections() {
+  const { rows } = await query(
+    `SELECT DISTINCT (grade_level::text || '-' || section_name) AS grade_section
+       FROM norm_sections
+      WHERE grade_level IS NOT NULL
+        AND section_name IS NOT NULL
+        AND trim(section_name) <> ''
+      ORDER BY grade_section ASC`
+  );
+
+  return rows.map((row) => String(row.grade_section || '').trim()).filter(Boolean);
+}
+
+async function listCanonicalViolationLabels() {
+  const { rows } = await query(
+    `SELECT DISTINCT description
+       FROM norm_offenses
+      WHERE description IS NOT NULL
+        AND trim(description) <> ''
+      ORDER BY description ASC`
+  );
+
+  return rows.map((row) => String(row.description || '').trim()).filter(Boolean);
+}
+
 function getPredictiveServiceUrl() {
   //const value = String(process.env.PREDICTIVE_SERVICE_URL || '').trim();
   const value = "https://sdms-predictive.onrender.com/"
@@ -263,6 +298,19 @@ export async function listSectionLikelihood({ section = null, violation = null, 
        AVG(vp.repeat_probability) AS likelihood,
        COUNT(*)::int AS sample_size
      FROM violation_predictions vp
+     INNER JOIN (
+       SELECT DISTINCT (grade_level::text || '-' || section_name) AS grade_section
+         FROM norm_sections
+        WHERE grade_level IS NOT NULL
+          AND section_name IS NOT NULL
+          AND trim(section_name) <> ''
+     ) valid_sections ON valid_sections.grade_section = vp.grade_section
+     INNER JOIN (
+       SELECT DISTINCT description AS violation_label
+         FROM norm_offenses
+        WHERE description IS NOT NULL
+          AND trim(description) <> ''
+     ) valid_violations ON valid_violations.violation_label = vp.violation_label
      ${where}
      GROUP BY vp.grade_section
      ORDER BY likelihood DESC, sample_size DESC
@@ -283,12 +331,15 @@ export async function listAvailableViolationLabels() {
   }
 
   const { rows } = await query(
-    `SELECT DISTINCT violation_label
-       FROM violation_predictions
-      WHERE violation_label IS NOT NULL AND violation_label <> ''
-      ORDER BY violation_label ASC`
+    `SELECT DISTINCT vp.violation_label
+       FROM violation_predictions vp
+       INNER JOIN norm_offenses no ON no.description = vp.violation_label
+      WHERE vp.violation_label IS NOT NULL
+        AND trim(vp.violation_label) <> ''
+      ORDER BY vp.violation_label ASC`
   );
-  return rows.map((row) => row.violation_label);
+
+  return rows.map((row) => String(row.violation_label || '').trim()).filter(Boolean);
 }
 
 export async function listAvailableSections() {
@@ -297,12 +348,104 @@ export async function listAvailableSections() {
   }
 
   const { rows } = await query(
-    `SELECT DISTINCT grade_section
-       FROM violation_predictions
-      WHERE grade_section IS NOT NULL AND grade_section <> ''
-      ORDER BY grade_section ASC`
+    `SELECT DISTINCT vp.grade_section
+       FROM violation_predictions vp
+       INNER JOIN (
+         SELECT DISTINCT (grade_level::text || '-' || section_name) AS grade_section
+           FROM norm_sections
+          WHERE grade_level IS NOT NULL
+            AND section_name IS NOT NULL
+            AND trim(section_name) <> ''
+       ) valid_sections ON valid_sections.grade_section = vp.grade_section
+      WHERE vp.grade_section IS NOT NULL
+        AND trim(vp.grade_section) <> ''
+      ORDER BY vp.grade_section ASC`
   );
-  return rows.map((row) => row.grade_section);
+
+  return rows.map((row) => String(row.grade_section || '').trim()).filter(Boolean);
+}
+
+export async function cleanupPredictiveData({ sections = [], violations = [], dryRun = false } = {}) {
+  if (!(await predictiveTablesReady())) {
+    return {
+      matchedPredictions: 0,
+      matchedSnapshots: 0,
+      deletedPredictions: 0,
+      deletedSnapshots: 0,
+    };
+  }
+
+  const normalizedSections = normalizeStringList(sections);
+  const normalizedViolations = normalizeStringList(violations);
+
+  if (!normalizedSections.length && !normalizedViolations.length) {
+    return {
+      matchedPredictions: 0,
+      matchedSnapshots: 0,
+      deletedPredictions: 0,
+      deletedSnapshots: 0,
+    };
+  }
+
+  const whereParts = [];
+  const params = [];
+
+  if (normalizedSections.length) {
+    params.push(normalizedSections);
+    whereParts.push(`grade_section = ANY($${params.length}::varchar[])`);
+  }
+
+  if (normalizedViolations.length) {
+    params.push(normalizedViolations);
+    whereParts.push(`violation_label = ANY($${params.length}::varchar[])`);
+  }
+
+  const whereClause = whereParts.join(' OR ');
+
+  const predictionCountResult = await query(
+    `SELECT COUNT(*)::int AS c
+       FROM violation_predictions
+      WHERE ${whereClause}`,
+    params
+  );
+
+  const snapshotCountResult = await query(
+    `SELECT COUNT(*)::int AS c
+       FROM section_repeat_likelihood_snapshots
+      WHERE ${whereClause}`,
+    params
+  );
+
+  const matchedPredictions = Number(predictionCountResult.rows[0]?.c || 0);
+  const matchedSnapshots = Number(snapshotCountResult.rows[0]?.c || 0);
+
+  if (dryRun) {
+    return {
+      matchedPredictions,
+      matchedSnapshots,
+      deletedPredictions: 0,
+      deletedSnapshots: 0,
+    };
+  }
+
+  const deletedPredictionsResult = await query(
+    `DELETE FROM violation_predictions
+      WHERE ${whereClause}`,
+    params
+  );
+
+  const deletedSnapshotsResult = await query(
+    `DELETE FROM section_repeat_likelihood_snapshots
+      WHERE ${whereClause}`,
+    params
+  );
+
+  return {
+    matchedPredictions,
+    matchedSnapshots,
+    deletedPredictions: deletedPredictionsResult.rowCount || 0,
+    deletedSnapshots: deletedSnapshotsResult.rowCount || 0,
+  };
 }
 
 export async function backfillViolationPredictions({ limit = 200 } = {}) {
