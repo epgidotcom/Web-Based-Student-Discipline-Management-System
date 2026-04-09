@@ -326,6 +326,40 @@ export async function listSectionLikelihood({ section = null, violation = null, 
     return [];
   }
 
+  const legacyLabelCategoryMap = new Map([
+    ['classroom misconduct', 'Conduct & Disruption'],
+    ['cutting classes', 'Attendance & Punctuality'],
+    ['cutting classess', 'Attendance & Punctuality'],
+    ['dress code violation', 'Dress Code & Identification'],
+    ['tardiness', 'Attendance & Punctuality'],
+    ['using a cellphone during class without permission', 'Devices & Technology'],
+    ['bringing or displaying objects resembling explosives or items associated with terrorism.', 'Safety & Prohibited Items'],
+  ]);
+
+  const normalizeKey = (value) => String(value ?? '').trim().toLowerCase();
+
+  const offenseRows = await query(
+    `SELECT LOWER(TRIM(description)) AS description_key, category
+       FROM norm_offenses
+      WHERE description IS NOT NULL
+        AND trim(description) <> ''
+        AND category IS NOT NULL
+        AND trim(category) <> ''`
+  );
+
+  const descriptionToCategory = new Map();
+  offenseRows.rows.forEach((row) => {
+    const key = normalizeKey(row.description_key);
+    const value = String(row.category || '').trim();
+    if (key && value) descriptionToCategory.set(key, value);
+  });
+
+  const resolveCategory = (label) => {
+    const key = normalizeKey(label);
+    if (!key) return null;
+    return descriptionToCategory.get(key) || legacyLabelCategoryMap.get(key) || null;
+  };
+
   const params = [windowDays];
   let where = `WHERE COALESCE(vp.incident_date, vp.created_at::date) >= CURRENT_DATE - $1::int`;
 
@@ -334,37 +368,44 @@ export async function listSectionLikelihood({ section = null, violation = null, 
     where += ` AND vp.grade_section = $${params.length}`;
   }
 
-  if (violation && violation !== 'All') {
-    params.push(violation);
-    where += ` AND vp.violation_label = $${params.length}`;
-  }
-
-  const blockedSections = getBlockedSections();
-  if (blockedSections.length) {
-    params.push(blockedSections);
-    where += ` AND NOT (vp.grade_section = ANY($${params.length}::varchar[]))`;
-  }
-
-  params.push(limit);
-
   const { rows } = await query(
     `SELECT
        vp.grade_section,
-       AVG(vp.repeat_probability) AS likelihood,
-       COUNT(*)::int AS sample_size
+       vp.violation_label,
+       vp.repeat_probability
      FROM violation_predictions vp
      ${where}
-     GROUP BY vp.grade_section
-     ORDER BY likelihood DESC, sample_size DESC
-     LIMIT $${params.length}`,
+     ORDER BY vp.grade_section ASC`,
     params
   );
 
-  return rows.map((row) => ({
-    section: row.grade_section || 'Unknown',
-    likelihood: Number(row.likelihood || 0),
-    sample_size: Number(row.sample_size || 0),
-  }));
+  const selectedCategory = violation && violation !== 'All' ? String(violation).trim() : null;
+  const grouped = new Map();
+
+  rows.forEach((row) => {
+    const gradeSection = String(row.grade_section || 'Unknown').trim() || 'Unknown';
+    if (isBlockedSection(gradeSection)) return;
+
+    if (selectedCategory) {
+      const category = resolveCategory(row.violation_label);
+      if (category !== selectedCategory) return;
+    }
+
+    const probability = Number(row.repeat_probability || 0);
+    const current = grouped.get(gradeSection) || { sum: 0, count: 0 };
+    current.sum += probability;
+    current.count += 1;
+    grouped.set(gradeSection, current);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([gradeSection, stats]) => ({
+      section: gradeSection,
+      likelihood: stats.count > 0 ? stats.sum / stats.count : 0,
+      sample_size: stats.count,
+    }))
+    .sort((a, b) => b.likelihood - a.likelihood || b.sample_size - a.sample_size)
+    .slice(0, Math.max(1, Number(limit) || 30));
 }
 
 export async function listAvailableViolationLabels() {
@@ -373,14 +414,14 @@ export async function listAvailableViolationLabels() {
   }
 
   const { rows } = await query(
-    `SELECT DISTINCT violation_label
-       FROM violation_predictions
-      WHERE violation_label IS NOT NULL
-        AND trim(violation_label) <> ''
-      ORDER BY violation_label ASC`
+    `SELECT DISTINCT no.category AS category
+       FROM norm_offenses no
+      WHERE no.category IS NOT NULL
+        AND trim(no.category) <> ''
+      ORDER BY no.category ASC`
   );
 
-  return normalizeStringList(rows.map((row) => row.violation_label));
+  return normalizeStringList(rows.map((row) => row.category));
 }
 
 export async function listAvailableSections() {
