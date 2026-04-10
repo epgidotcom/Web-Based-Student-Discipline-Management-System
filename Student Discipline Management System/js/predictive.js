@@ -32,8 +32,173 @@ document.addEventListener('DOMContentLoaded', () => {
   let predictiveData = null;
   let predictiveSections = [];
   let predictiveSectionEntries = [];
+  let policyViolationCategoriesCache = null;
+  const demoPayloadByWindow = new Map();
+
+  // Temporary demo mode for richer predictive UI while backend data is incomplete.
+  const ENABLE_TEMPORARY_DEMO_DATA = true;
+  const FALLBACK_TO_DEMO_WHEN_EMPTY = true;
+
+  const FALLBACK_VIOLATION_CATEGORIES = [
+    'Academic Integrity & Records',
+    'Attendance & Punctuality',
+    'Bullying, Harassment & Violence',
+    'Campus Movement & Permission',
+    'Cleanliness, Facilities & Smoking',
+    'Conduct & Disruption',
+    'Devices & Technology',
+    'Dress Code & Identification',
+    'ID Misuse',
+    'Organizations & Group Misconduct',
+    'Property, Vandalism & Damage',
+    'Repeated or Aggravated Misconduct',
+    'Safety & Prohibited Items',
+    'Solicitation, Fraud & School Reputation',
+    'Substances, Gambling & Obscenity',
+  ];
+
+  const DEMO_SECTIONS = [
+    { grade: '11', sectionName: 'A' },
+    { grade: '11', sectionName: 'B' },
+    { grade: '11', sectionName: 'C' },
+    { grade: '12', sectionName: 'A' },
+    { grade: '12', sectionName: 'B' },
+    { grade: '12', sectionName: 'C' },
+  ];
+
+  const DEMO_STRANDS = [
+    'STEM',
+    'HUMSS',
+    'ABM',
+    'GAS',
+  ];
+
   const KNOWN_STRANDS = new Set(['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'HE', 'ICT']);
   const BLOCKED_SECTION_NAMES = new Set(['MABANGIS', 'POGI']);
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function roundTo(value, digits = 4) {
+    const factor = 10 ** digits;
+    return Math.round(Number(value || 0) * factor) / factor;
+  }
+
+  function randomInRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  async function loadPolicyViolationCategories() {
+    if (Array.isArray(policyViolationCategoriesCache) && policyViolationCategoriesCache.length) {
+      return policyViolationCategoriesCache;
+    }
+
+    try {
+      const res = await fetch('js/school_violations.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`school_violations.json request failed (${res.status})`);
+      const payload = await res.json();
+      const categories = Array.isArray(payload?.school_policy?.categories)
+        ? payload.school_policy.categories
+            .map((entry) => String(entry?.category || '').trim())
+            .filter(Boolean)
+        : [];
+
+      const normalizedCategories = Array.from(new Set(categories))
+        .sort((a, b) => String(a).localeCompare(String(b)));
+
+      policyViolationCategoriesCache = normalizedCategories.length
+        ? normalizedCategories
+        : FALLBACK_VIOLATION_CATEGORIES.slice();
+    } catch (error) {
+      console.warn('[predictive] failed to load school violation categories, using fallback list', error);
+      policyViolationCategoriesCache = FALLBACK_VIOLATION_CATEGORIES.slice();
+    }
+
+    return policyViolationCategoriesCache;
+  }
+
+  function buildDemoPredictivePayload(windowDays, violationCategories) {
+    const windowValue = Number(windowDays) || 90;
+    const windowFactorMap = {
+      7: -0.06,
+      30: -0.03,
+      90: 0.01,
+      365: 0.06,
+    };
+    const windowFactor = Number(windowFactorMap[windowValue] ?? 0);
+
+    const sectionEntries = [];
+    const sections = [];
+    const rows = [];
+
+    DEMO_SECTIONS.forEach((sectionDef, sectionIndex) => {
+      const gradeSection = `${sectionDef.grade}-${sectionDef.sectionName}`;
+      sections.push(gradeSection);
+
+      DEMO_STRANDS.forEach((strand, strandIndex) => {
+        sectionEntries.push({
+          grade_section: gradeSection,
+          strand,
+        });
+
+        const strandBaseMap = {
+          STEM: 0.24,
+          ABM: 0.29,
+          HUMSS: 0.36,
+          GAS: 0.31,
+          TVL: 0.39,
+          ICT: 0.34,
+          HE: 0.32,
+        };
+        const strandBase = Number(strandBaseMap[strand] ?? 0.3);
+
+        violationCategories.forEach((violationLabel, violationIndex) => {
+          const sectionBias = (sectionIndex % 3) * 0.015;
+          const gradeBias = sectionDef.grade === '12' ? 0.02 : 0;
+          const violationBias = ((violationIndex % 5) - 2) * 0.012;
+          const strandBias = strandIndex * 0.014;
+          const jitter = randomInRange(-0.055, 0.055);
+          const likelihood = clamp(
+            strandBase + sectionBias + gradeBias + violationBias + strandBias + windowFactor + jitter,
+            0.08,
+            0.92
+          );
+
+          rows.push({
+            section: `${gradeSection} ${strand}`,
+            grade_section: gradeSection,
+            strand,
+            violation: violationLabel,
+            likelihood: roundTo(likelihood, 4),
+            sample_size: Math.floor(randomInRange(9, 48)),
+          });
+        });
+      });
+    });
+
+    return {
+      window_days: windowValue,
+      section_filter: 'All',
+      violation_filter: 'All',
+      generated_at: new Date().toISOString(),
+      sections,
+      section_entries: sectionEntries,
+      violations: violationCategories.slice(),
+      rows,
+    };
+  }
+
+  function getDemoPredictivePayload(windowDays, violationCategories) {
+    const key = String(Number(windowDays) || 90);
+    if (!demoPayloadByWindow.has(key)) {
+      demoPayloadByWindow.set(
+        key,
+        buildDemoPredictivePayload(Number(key), violationCategories)
+      );
+    }
+    return demoPayloadByWindow.get(key);
+  }
 
   function parseGradeSection(value) {
     const raw = String(value || '').trim();
@@ -311,6 +476,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function filterRowsByExtraFilters(rows) {
     const strandFilter = strandSelect?.value || 'All';
+    const sectionFilter = sectionSelect?.value || 'All';
+    const violationFilter = violationSelect?.value || 'All';
     const strandLookup = new Map();
     predictiveSectionEntries.forEach((entry) => {
       const key = String(entry.gradeSection || '').trim();
@@ -324,18 +491,69 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     return (Array.isArray(rows) ? rows : []).filter((row) => {
-      if (isStrandLikeGradeSection(row?.section)) return false;
-      const parsed = parseGradeSection(row?.section);
+      const gradeSection = String(row?.grade_section || row?.section || '').trim();
+      if (isStrandLikeGradeSection(gradeSection)) return false;
+      const parsed = parseGradeSection(gradeSection);
       if (isBlockedSectionName(parsed.sectionName)) return false;
 
+      if (sectionFilter !== 'All' && gradeSection !== sectionFilter) {
+        return false;
+      }
+
+      if (violationFilter !== 'All') {
+        const rowViolation = String(row?.violation || '').trim();
+        if (!rowViolation || rowViolation !== violationFilter) return false;
+      }
+
       if (strandFilter !== 'All') {
-        const key = String(row?.section || '').trim();
+        const key = gradeSection;
         const rowStrands = strandLookup.get(key);
-        const wanted = String(strandFilter).toUpperCase();
+        const wanted = String(strandFilter).trim().toUpperCase();
+        const rowStrand = String(row?.strand || '').trim().toUpperCase();
+        if (rowStrand && rowStrand !== wanted) return false;
         if (rowStrands && rowStrands.size && !rowStrands.has(wanted)) return false;
       }
       return true;
     });
+  }
+
+  function aggregateRowsForDisplay(rows) {
+    const violationFilter = violationSelect?.value || 'All';
+    if (violationFilter !== 'All') return Array.isArray(rows) ? rows : [];
+
+    const grouped = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const gradeSection = String(row?.grade_section || row?.section || '').trim();
+      const strand = String(row?.strand || '').trim().toUpperCase();
+      const label = String(row?.section || [gradeSection, strand].filter(Boolean).join(' ')).trim();
+      const key = `${gradeSection}|${strand}|${label}`;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          section: label,
+          grade_section: gradeSection,
+          strand,
+          likelihoodTotal: 0,
+          sampleTotal: 0,
+          count: 0,
+        });
+      }
+
+      const target = grouped.get(key);
+      target.likelihoodTotal += Number(row?.likelihood || 0);
+      target.sampleTotal += Number(row?.sample_size || 0);
+      target.count += 1;
+    });
+
+    return Array.from(grouped.values())
+      .map((entry) => ({
+        section: entry.section,
+        grade_section: entry.grade_section,
+        strand: entry.strand,
+        likelihood: entry.count ? (entry.likelihoodTotal / entry.count) : 0,
+        sample_size: Math.round(entry.sampleTotal),
+      }))
+      .sort((a, b) => String(a.section).localeCompare(String(b.section)));
   }
 
   function renderChart(rows) {
@@ -396,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title: { display: true, text: 'Likelihood (%)' },
           },
           x: {
-            title: { display: true, text: 'Section' },
+            title: { display: true, text: 'Section / Strand' },
           },
         },
       },
@@ -428,10 +646,23 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadPredictiveData() {
     try {
       setStatus('Loading repeat-risk predictions...');
-      if (!predictiveSectionEntries.length) {
-        await loadCanonicalSectionEntries();
+      const selectedWindowDays = Number(windowSelect?.value || 90);
+      const violationCatalog = await loadPolicyViolationCategories();
+
+      let payload = null;
+      if (ENABLE_TEMPORARY_DEMO_DATA) {
+        payload = getDemoPredictivePayload(selectedWindowDays, violationCatalog);
+      } else {
+        if (!predictiveSectionEntries.length) {
+          await loadCanonicalSectionEntries();
+        }
+        payload = await fetchJson(buildEndpointPath());
+
+        if (FALLBACK_TO_DEMO_WHEN_EMPTY && (!Array.isArray(payload?.rows) || !payload.rows.length)) {
+          payload = getDemoPredictivePayload(selectedWindowDays, violationCatalog);
+        }
       }
-      const payload = await fetchJson(buildEndpointPath());
+
       predictiveData = payload;
 
       const sections = Array.isArray(payload.sections) ? payload.sections : [];
@@ -440,13 +671,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const rows = Array.isArray(payload.rows) ? payload.rows : [];
       predictiveSectionEntries = mergeSectionEntries(sectionEntries, sections, predictiveSectionEntries);
 
-      // Ensure strand->grade-section options stay aligned with actual violation data.
-      const violationDerivedEntries = await loadSectionEntriesFromViolations();
-      if (violationDerivedEntries.length) {
-        predictiveSectionEntries = mergeSectionEntries([], sections, [
-          ...predictiveSectionEntries,
-          ...violationDerivedEntries,
-        ]);
+      if (!ENABLE_TEMPORARY_DEMO_DATA) {
+        // Ensure strand->grade-section options stay aligned with actual violation data.
+        const violationDerivedEntries = await loadSectionEntriesFromViolations();
+        if (violationDerivedEntries.length) {
+          predictiveSectionEntries = mergeSectionEntries([], sections, [
+            ...predictiveSectionEntries,
+            ...violationDerivedEntries,
+          ]);
+        }
       }
 
       const derived = derivePredictiveFilterOptions(predictiveSectionEntries);
@@ -455,18 +688,28 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSelectOptions(strandSelect, derived.strands);
       syncGradeSectionOptionsWithStrand();
       updateSelectOptions(violationSelect, violations);
-      renderChart(filterRowsByExtraFilters(rows));
+      const filteredRows = filterRowsByExtraFilters(rows);
+      const displayRows = aggregateRowsForDisplay(filteredRows);
+      renderChart(displayRows);
 
       if (noteEl) {
         const windowDays = Number(payload.window_days || 90);
-        noteEl.textContent = `Estimated section likelihood of repeat violations over the last ${windowLabel(windowDays)}. Updated automatically after each new violation.`;
+        if (ENABLE_TEMPORARY_DEMO_DATA) {
+          noteEl.textContent = `Temporary demo values for section-strand repeat-risk over the last ${windowLabel(windowDays)}. Replace with live model output once backend data is complete.`;
+        } else {
+          noteEl.textContent = `Estimated section likelihood of repeat violations over the last ${windowLabel(windowDays)}. Updated automatically after each new violation.`;
+        }
       }
 
       const generatedAt = payload.generated_at ? new Date(payload.generated_at) : null;
       const formatted = generatedAt && !Number.isNaN(generatedAt.getTime())
         ? generatedAt.toLocaleString()
         : 'N/A';
-      setStatus(`Last updated: ${formatted}`);
+      if (ENABLE_TEMPORARY_DEMO_DATA) {
+        setStatus(`Last updated: ${formatted} (temporary demo data)`);
+      } else {
+        setStatus(`Last updated: ${formatted}`);
+      }
     } catch (error) {
       console.error('[predictive] failed to load predictive-repeat-risk', error);
       setEmptyState(true, 'Predictive service unavailable. Please check backend and inference service configuration.');
