@@ -542,6 +542,83 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+
+// === Export ALL violations (no pagination, no 500-row cap)
+router.get('/export/all', async (req, res) => {
+  try {
+    // Accept both snake_case and camelCase query parameter names
+    const rawQuery = req.query || {};
+    const student_id = rawQuery.student_id || rawQuery.studentId || null;
+    const { offense_type, q, grade, strand, section, violation_type, date_from, date_to } = rawQuery;
+
+    console.log('[violations/export/all] hit', req.query);
+
+    const clauses = [];
+    const params = [];
+
+    // Authenticated student scoping (reuse logic from main list route)
+    try {
+      const { tryGetUser } = await import('../middleware/auth.js');
+      const user = await tryGetUser(req);
+      if (user && user.role && user.role.toLowerCase() === 'student') {
+        if (user.id) {
+          params.push(user.id);
+          clauses.push(`v.student_id = $${params.length}`);
+        }
+      } else if (student_id) {
+        params.push(student_id);
+        clauses.push(`v.student_id = $${params.length}`);
+      }
+    } catch (e) {
+      if (student_id) {
+        params.push(student_id);
+        clauses.push(`v.student_id = $${params.length}`);
+      }
+    }
+
+    if (q) {
+      params.push(`%${q.toLowerCase()}%`);
+      clauses.push(`(
+        LOWER(v.description) LIKE $${params.length} OR
+        LOWER(v.sanction) LIKE $${params.length}
+      )`);
+    }
+    if (grade) {
+      params.push(grade);
+      clauses.push(`sec.grade_level = $${params.length}`);
+    }
+    if (strand) {
+      params.push(strand);
+      clauses.push(`sec.strand = $${params.length}`);
+    }
+    if (section) {
+      params.push(section);
+      clauses.push(`sec.section_name = $${params.length}`);
+    }
+    if (violation_type) {
+      params.push(violation_type);
+      clauses.push(`COALESCE(od.description, oi.description, v.description) = $${params.length}`);
+    }
+    if (date_from) {
+      params.push(date_from);
+      clauses.push(`v.incident_date >= $${params.length}`);
+    }
+    if (date_to) {
+      params.push(date_to);
+      clauses.push(`v.incident_date <= $${params.length}`);
+    }
+
+    const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+    const sql = `${violationSelectSql(where, 'ORDER BY v.incident_date DESC, v.created_at DESC')}`;
+    const { rows } = await query(sql, params);
+    const data = rows.map(r => ({ ...r, repeat_count: r.repeat_count_at_insert }));
+    return res.json({ data });
+  } catch (e) {
+    console.error('Error exporting all violations:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // === GET single violation
 router.get('/:id', async (req, res) => {
   try {

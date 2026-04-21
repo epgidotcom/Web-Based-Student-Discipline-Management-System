@@ -60,7 +60,7 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false, // set to true only if using cookies/auth headers across sites
+  credentials: true, // allow cookies/auth headers with cross-origin requests
   optionsSuccessStatus: 204,
 };
 

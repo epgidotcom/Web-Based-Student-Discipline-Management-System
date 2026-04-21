@@ -1393,7 +1393,7 @@ violationTypeField?.addEventListener('change', async function () {
   }
 
   // === NEW: Download (CSV) of the currently filtered/visible rows ===
-  function downloadFilteredReport() {
+  async function downloadFilteredReport() { //jem
     const table = document.getElementById('violationTable');
     if (!table) return;
 
@@ -1407,18 +1407,125 @@ violationTypeField?.addEventListener('change', async function () {
     const ths = Array.from(table.querySelectorAll('thead th'));
     const headers = ths.slice(0, ths.length - 1).map(th => th.textContent.trim());
 
-    // visible rows only (respect filters + CSS display)
-    const bodyRows = Array.from(table.tBodies?.[0]?.rows || []).filter(r => {
-      if (r.dataset?.placeholder === 'empty') return false;
-      const disp = (r.style.display || '').trim();
-      const cssDisp = getComputedStyle(r).display;
-      return disp !== 'none' && cssDisp !== 'none';
+    // Fetch all violations from backend export-all endpoint (no pagination)
+    let allViolations = [];
+    try {
+      const params = new URLSearchParams();
+      if (filterGrade?.value) params.append('grade', filterGrade.value);
+      if (filterStrand?.value) params.append('strand', filterStrand.value);
+      if (filterSection?.value) params.append('section', filterSection.value);
+      if (filterViolationType?.value) params.append('violation_type', filterViolationType.value);
+      if (filterText?.value) params.append('q', filterText.value);
+      if (typeof __rangeFrom !== 'undefined' && __rangeFrom) params.append('date_from', __rangeFrom);
+      if (typeof __rangeTo !== 'undefined' && __rangeTo) params.append('date_to', __rangeTo);
+      else if (typeof __selectedDate !== 'undefined' && __selectedDate) {
+        const r = computeRange(__selectedDate, __dateMode);
+        if (r.from) params.append('date_from', r.from);
+        if (r.to) params.append('date_to', r.to);
+      }
+      if (searchInput?.value) params.append('q', searchInput.value);
+      const exportUrl = `/violations/export/all?${params.toString()}`;
+      // const exportUrl = `/violations/export/all`;
+      console.log('[Export] Final export URL:', API_ROOT + exportUrl);
+      const res = await fetch(API_ROOT + exportUrl, {
+        method: 'GET',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('[Export] Response not ok:', res.status, text);
+        alert(`Failed to fetch all violations for report.\nStatus: ${res.status}\n${text}`);
+        return;
+      }
+      const payload = await res.json();
+      const data = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
+      allViolations = Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.error('[Export] Fetch error:', err);
+      alert('Failed to fetch all violations for report. ' + (err && err.message ? err.message : ''));
+      return;
+    }
+
+    // Apply the same filters as the UI
+    const gradeFilter = (filterGrade?.value || '').toLowerCase();
+    const strandFilter = (filterStrand?.value || '').toLowerCase();
+    const sectionFilter = (filterSection?.value || '').toLowerCase();
+    const violationType = (filterViolationType?.value || '').toLowerCase();
+    const textQuery = (filterText?.value || '').toLowerCase();
+    const globalQuery = (searchInput?.value || '').toLowerCase();
+
+    // Date filter logic
+    let fromDate = null, toDate = null;
+    if (typeof __rangeFrom !== 'undefined' && typeof __rangeTo !== 'undefined') {
+      fromDate = __rangeFrom ? new Date(__rangeFrom) : null;
+      toDate   = __rangeTo   ? new Date(__rangeTo)   : null;
+    } else if (typeof __selectedDate !== 'undefined' && __selectedDate) {
+      const r = computeRange(__selectedDate, __dateMode);
+      fromDate = r.from ? new Date(r.from) : null;
+      toDate   = r.to   ? new Date(r.to)   : null;
+    }
+
+    // Helper to parse grade-section
+    function parseGradeSectionValue(rawValue) {
+      const value = String(rawValue || '').trim();
+      if (!value || value === '—') return { grade: '', section: '' };
+      const parts = value.split('-').map((p) => p.trim()).filter(Boolean);
+      if (parts.length <= 1) return { grade: parts[0] || '', section: '' };
+      return { grade: parts[0] || '', section: parts.slice(1).join('-') };
+    }
+
+    // Filter allViolations
+    const filtered = allViolations.filter(v => {
+      const studentName = (v.student_name || '').toLowerCase();
+      const strand = (v.strand || '').toLowerCase();
+      const gradeSection = (v.grade_section || '').toLowerCase();
+      const parsed = parseGradeSectionValue(v.grade_section);
+      const vType = (v.violation_type || v.description || '').toLowerCase();
+      const description = (v.description || '').toLowerCase();
+      const rowText = [studentName, strand, gradeSection, vType, description, v.sanction || '', v.remarks || ''].join(' ').toLowerCase();
+
+      const matchGrade = !gradeFilter || (parsed.grade || '').toLowerCase() === gradeFilter;
+      const matchStrand = !strandFilter || strand === strandFilter;
+      const matchSection = !sectionFilter || (parsed.section || '').toLowerCase() === sectionFilter;
+      const matchType = !violationType || vType.includes(violationType);
+      const matchText = !textQuery || [studentName, strand, gradeSection, vType, description].some(s => s.includes(textQuery));
+      const matchGlobal = !globalQuery || rowText.includes(globalQuery);
+
+      // date match
+      let matchDate = true;
+      if (fromDate || toDate) {
+        const raw = v.incident_date || '';
+        const d = raw ? new Date(raw) : null;
+        if (!d || isNaN(d)) {
+          matchDate = false;
+        } else {
+          if (fromDate && d < fromDate) matchDate = false;
+          if (toDate && d > toDate)     matchDate = false;
+        }
+      }
+
+      return matchGrade && matchStrand && matchSection && matchType && matchText && matchGlobal && matchDate;
     });
 
-    const rows = bodyRows.map(tr => {
-      const cells = Array.from(tr.cells);
-      const wanted = cells.slice(0, Math.max(0, cells.length - 1)); // drop Actions col
-      return wanted.map(td => (td.textContent || '').trim());
+    // Map filtered data to table row format (excluding Actions col)
+    const rows = filtered.map(v => {
+      // The order of columns should match the table headers (excluding Actions)
+      // You may need to adjust this if the table structure changes
+      // Example: [Student Name, Strand, Grade-Section, Incident Date, Violation Type, Description, Sanction, Remarks, Status, ...]
+      // We'll try to match the most common columns
+      return [
+        v.student_name || '',
+        v.strand || '',
+        v.grade_section || '',
+        v.incident_date ? String(v.incident_date).slice(0, 10) : '',
+        v.violation_type || v.description || '',
+        v.description || '',
+        v.sanction || '',
+        v.remarks || '',
+        v.status || '',
+        v.created_at ? String(v.created_at).slice(0, 10) : ''
+      ].slice(0, headers.length); // ensure length matches headers
     });
 
     // CSV helpers
