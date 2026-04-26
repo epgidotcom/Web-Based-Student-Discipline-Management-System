@@ -170,8 +170,8 @@
     <form id="violationForm">
       <input type="hidden" id="editIndex">
 
-      <label>LRN (Lookup):</label>
-      <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" />
+      <label>LRN (Lookup):<span style="color:red">*</span></label>
+      <input type="text" id="studentLRN" placeholder="Enter Learner Reference Number" autocomplete="off" required />
 
       <label>Student Name:</label>
       <input type="text" id="studentName" autocomplete="off">
@@ -190,25 +190,25 @@
         </div>
       </details>
 
-      <label>Incident Date:</label>
+      <label>Incident Date:<span style="color:red">*</span></label>
       <input type="date" id="incidentDate" required>
 
 
-      <label>Violation Type:</label>
+      <label>Violation Type:<span style="color:red">*</span></label>
       <select id="violationType2" required>
         <option value="" disabled selected>Select Violation</option>
       </select>
 
-      <label>Description:</label>
+      <label>Description:<span style="color:red">*</span></label>
         <select id="violationDescription" required>
           <option value="" disabled selected>Select Description</option>       
       </select>
       
 
-      <label>Remarks:</label>
+      <label>Remarks:<span style="color:red">*</span></label>
       <input type="text" id="remarks" placeholder="Enter Remarks (Teacher Incharge, Students Involved, Etc.)" required>
 
-      <label>Sanction:</label>
+      <label>Sanction:<span style="color:red">*</span></label>
       <select id="sanction" required>
         <option value="" disabled selected>Select sanction</option>
       </select>
