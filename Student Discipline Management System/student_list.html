@@ -165,37 +165,37 @@
         </div>
       </div>
 
-      <label for="lrn">LRN:</label>
-      <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number">
+      <label for="lrn">LRN: <span style="color:red">*</span></label>
+      <input type="text" id="lrn" name="lrn" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit number" required>
 
-      <label for="firstName">First Name:</label>
+      <label for="firstName">First Name: <span style="color:red">*</span></label>
       <input type="text" id="firstName" name="firstName" required>
 
-      <label for="middleName">Middle Name:</label>
-      <input type="text" id="middleName" name="middleName">
+      <label for="middleName">Middle Name: <span style="color:red">*</span></label>
+      <input type="text" id="middleName" name="middleName" required>
 
-      <label for="lastName">Last Name:</label>
+      <label for="lastName">Last Name: <span style="color:red">*</span></label>
       <input type="text" id="lastName" name="lastName" required>
 
-      <label for="birthdate">Birthdate:</label>
+      <label for="birthdate">Birthdate:<span style="color:red">*</span></label>
       <input type="date" id="birthdate" name="birthdate" required>
 
-      <label for="grade">Grade:</label>
+      <label for="grade">Grade:<span style="color:red">*</span></label>
       <select id="grade" name="grade" required>
         <option value="">-- Select Grade --</option>
       </select>
 
-      <label for="section">Section:</label>
+      <label for="section">Section:<span style="color:red">*</span></label>
       <select id="section" name="section" required>
         <option value="">-- Select Section --</option>
       </select>
 
-      <label for="strand">Strand:</label>
+      <label for="strand">Strand:<span style="color:red">*</span></label>
       <select id="strand" name="strand">
         <option value="">-- Select Strand --</option>
       </select>
 
-      <label for="parentContact">Parent's Contact Number:</label>
+      <label for="parentContact">Parent's Contact Number:<span style="color:red">*</span></label>
       <input type="text" id="parentContact" name="parentContact" maxlength="11" pattern="[0-9]{11}" placeholder="11-digit number" required>
 
       <button type="submit" class="save-btn">Save</button>
